@@ -1,0 +1,74 @@
+# Kconfig - SHTC1 temperature and humidity sensor configuration options
+
+#
+# Copyright (c) 2016 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menuconfig SHTC1
+	bool
+	prompt "SHTC1 Temperature and Humidity Sensor"
+	depends on I2C
+	default n
+	help
+	  Enable driver for SHTC1 temperature and humidity sensors.
+
+config SHTC1_NAME
+	string
+	prompt "Driver name"
+	default "SHTC1"
+	depends on SHTC1
+	help
+	  Device name with which the SHTC1 sensor is identified.
+
+config SHTC1_I2C_ADDR
+	hex "SHTC1 I2C address"
+	depends on SHTC1
+	default "0x70"
+	help
+	  I2C address of the SHTC1 sensor.
+
+config SHTC1_I2C_MASTER_DEV_NAME
+	string
+	prompt "I2C master where SHTC1 is connected"
+	depends on SHTC1
+	default "I2C_0"
+	help
+	  Specify the device name of the I2C master device to which the
+	  SHTC1 chip is connected.
+	  
+choice
+    prompt "Clock stretching"
+    depends on SHTC1
+    default SHTC1_CLOCK_STRETCHING_DIS
+    help
+      Enable I2C clock stretching for the device. 
+
+config SHTC1_CLOCK_STRETCHING_EN
+    bool
+    prompt "enabled"
+
+config SHTC1_CLOCK_STRETCHING_DIS
+    bool
+    prompt "disabled"
+
+endchoice
+
+choice
+    prompt "First readout measurement"
+    depends on SHTC1
+    default SHTC1_FIRST_MEASUREMENT_TEMP
+    help
+      First measurement comming out when reading data. 
+
+config SHTC1_FIRST_MEASUREMENT_TEMP
+    bool
+    prompt "temperature"
+
+config SHTC1_FIRST_MEASUREMENT_HUM
+    bool
+    prompt "humidity"
+
+endchoice
+

@@ -108,6 +108,8 @@ source "drivers/sensor/pms7003/Kconfig"
 
 source "drivers/sensor/sht3xd/Kconfig"
 
+source "drivers/sensor/shtc1/Kconfig"
+
 source "drivers/sensor/sx9500/Kconfig"
 
 source "drivers/sensor/th02/Kconfig"

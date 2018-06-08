@@ -1,0 +1,1 @@
+add_subdirectory_ifdef(CONFIG_LORA_IM881A wimod_im881a)

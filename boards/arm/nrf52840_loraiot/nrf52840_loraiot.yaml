@@ -1,0 +1,11 @@
+identifier: nrf52840_loraiot
+name: nRF52840-LoRaIoT
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gccarmemb
+supported:
+  - usb_device
+  - ble
+  - ieee802154

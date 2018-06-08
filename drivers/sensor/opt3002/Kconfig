@@ -1,0 +1,104 @@
+# Kconfig - OPT3002 light sensor configuration options
+#
+# Copyright (c) 2016 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menuconfig OPT3002
+	bool
+	prompt "OPT3002 Light Sensor"
+	depends on I2C
+	default n
+	help
+	  Enable driver for OPT3002 light sensor.
+
+config OPT3002_NAME
+	string
+	prompt "Driver name"
+	default "OPT3002"
+	depends on OPT3002
+	help
+	  Device name with which the OPT3002 sensor is identified.
+
+config OPT3002_I2C_ADDR
+	hex "OPT3002 I2C address"
+	depends on OPT3002
+	default "0x44"
+	help
+	  I2C address of the OPT3002 sensor.
+
+config OPT3002_I2C_MASTER_DEV_NAME
+	string
+	prompt "I2C master where OPT3002 is connected"
+	depends on OPT3002
+	default "I2C_0"
+	help
+	  Specify the device name of the I2C master device to which the
+	  OPT3002 chip is connected.
+	  
+	  
+choice
+    prompt "Trigger mode"
+    depends on OPT3002
+    default OPT3002_TRIGGER_NONE
+    help
+      Specify the type of triggering to be used by the driver.
+
+config OPT3002_TRIGGER_NONE
+    bool
+    prompt "No trigger"
+
+config OPT3002_TRIGGER_GLOBAL_THREAD
+    bool
+    prompt "Use global thread"
+    depends on GPIO
+    select OPT3002_TRIGGER
+
+config OPT3002_TRIGGER_OWN_THREAD
+    bool
+    prompt "Use own thread"
+    depends on GPIO
+    select OPT3002_TRIGGER
+
+endchoice
+
+config OPT3002_TRIGGER
+    bool
+    depends on OPT3002
+
+config OPT3002_GPIO_DEV_NAME
+    string
+    prompt "GPIO device"
+    default "GPIO_0"
+    depends on OPT3002 && OPT3002_TRIGGER
+    help
+      The device name of the GPIO device to which the OPT3002 interrupt
+      pins are connected.
+
+config OPT3002_GPIO_PIN_NUM
+    int
+    prompt "Interrupt GPIO pin number"
+    default 0
+    depends on OPT3002 && OPT3002_TRIGGER
+    help
+      The number of the GPIO on which the interrupt signal from the
+      OPT3002 chip will be received.
+
+config OPT3002_THREAD_PRIORITY
+    int
+    prompt "Thread priority"
+    depends on OPT3002 && OPT3002_TRIGGER_OWN_THREAD
+    default 10
+    help
+      Priority of thread used by the driver to handle interrupts.
+
+config OPT3002_THREAD_STACK_SIZE
+    int
+    prompt "Thread stack size"
+    depends on OPT3002 && OPT3002_TRIGGER_OWN_THREAD
+    default 1024
+    help
+      Stack size of thread used by the driver to handle interrupts.
+	  
+	  

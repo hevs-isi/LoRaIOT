@@ -1,0 +1,4 @@
+zephyr_library()
+
+zephyr_library_sources_ifdef(CONFIG_OPT3002 opt3002.c)
+zephyr_library_sources_ifdef(CONFIG_OPT3002_TRIGGER opt3002_trigger.c)

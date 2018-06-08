@@ -1,0 +1,32 @@
+# Kconfig - Atmel IM881A WiFi driver options
+
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menuconfig LORA_IM881A
+	bool "IM881A driver support"
+	default n
+	select SERIAL
+
+if LORA_IM881A
+
+config LORA_IM881A_NAME
+	string "Driver name"
+	default "IM881A"
+
+config LORA_IM881A_UART_DRV_NAME
+	string "UART device where IM881A is connected"
+	default "UART_0"
+	help
+	 Specify the device name of the UART device to which IM881A is
+	 connected.
+
+config LORA_IM881A_UART_FREQ
+	int "UART baudrate to use with IM881A"
+	default 115200
+	help
+	 UART baudrate to use with IM881A
+
+
+endif # LORA_IM881A

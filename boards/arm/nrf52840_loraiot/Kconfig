@@ -1,0 +1,7 @@
+# Kconfig - nRF52840 LoRaIoT board configuration
+#
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_NRF52840_LORAIOT
+
+endif # BOARD_NRF52840_LORAIOT
