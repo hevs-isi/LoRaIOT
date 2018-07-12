@@ -5,6 +5,7 @@
 
 #include "opt3002.h"
 
+
 #include <device.h>
 #include <i2c.h>
 #include <kernel.h>
@@ -37,11 +38,11 @@ int opt3002_write_reg(struct opt3002_data *drv_data, u8_t reg, u16_t val)
 			 OPT3002_I2C_ADDRESS);
 }
 
-int opt3002_read_reg(struct opt3002_data *drv_data, u8_t reg, u16_t *val)
+int opt3002_read_reg(struct opt3002_data *drv_data, u8_t reg, u8_t *val)
 {
 	u8_t reg_addr[1];
 	reg_addr[0] = reg;
-	return i2c_burst_read_addr(drv_data->i2c, OPT3002_I2C_ADDRESS, reg_addr, 1, val, 2);
+	return i2c_burst_read_addr(drv_data->i2c, OPT3002_I2C_ADDRESS, &reg, 1, val, 2);
 }
 
 static int opt3002_sample_fetch(struct device *dev, enum sensor_channel chan)
@@ -51,28 +52,13 @@ static int opt3002_sample_fetch(struct device *dev, enum sensor_channel chan)
 
 	__ASSERT_NO_MSG(chan == SENSOR_CHAN_ALL || chan == SENSOR_CHAN_LIGHT);
 
-	u8_t tx_buf[1] = {OPT3002_REG_RESULT};
-
-	struct i2c_msg msgs[2] = {
-		{
-			.buf = tx_buf,
-			.len = sizeof(tx_buf),
-			.flags = I2C_MSG_WRITE | I2C_MSG_RESTART,
-		},
-		{
-			.buf = rx_buf,
-			.len = sizeof(rx_buf),
-			.flags = I2C_MSG_READ | I2C_MSG_STOP,
-		},
-	};
-
-	if (i2c_transfer(drv_data->i2c, msgs, 2, OPT3002_I2C_ADDRESS) < 0) {
-		SYS_LOG_DBG("Failed to read data sample!");
-		return -EIO;
+	opt3002_write_reg(drv_data, OPT3002_REG_CONFIG, OPT3002_CONFIG_RESET | OPT3002_CONF_MODE);
+	k_sleep(1000);
+	if(opt3002_read_reg(drv_data, OPT3002_REG_RESULT, rx_buf) > 0){
+		SYS_LOG_DBG("Failed to read result register!");
 	}
 
 	drv_data->sample = (rx_buf[0] << 8) | rx_buf[1];
-
 	return 0;
 }
 

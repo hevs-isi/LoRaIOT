@@ -38,6 +38,8 @@ struct shtc1_data {
 	u16_t rh_sample;
 };
 
+void shtc1_read_id_register(struct device *dev, u8_t *buf, u8_t num_bytes);
+
 #define SYS_LOG_DOMAIN "SHTC1"
 #define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
 #include <logging/sys_log.h>

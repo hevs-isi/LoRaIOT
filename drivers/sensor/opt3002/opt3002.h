@@ -37,6 +37,8 @@
 #define OPT3002_MODE_SINGLESHOT	0x01
 #define OPT3002_MODE_CONTINUOUS	0x11
 
+#define OPT3002_CONFIG_RESET	0xC810
+
 struct opt3002_data {
 	struct device *i2c;
 	u16_t conf_reg;

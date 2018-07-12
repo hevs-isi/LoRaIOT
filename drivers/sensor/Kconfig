@@ -120,4 +120,10 @@ source "drivers/sensor/tmp112/Kconfig"
 
 source "drivers/sensor/vl53l0x/Kconfig"
 
+source "drivers/sensor/opt3002/Kconfig"
+
+source "drivers/sensor/pyd1588/Kconfig"
+
+source "drivers/sensor/analogmic/Kconfig"
+
 endif # SENSOR

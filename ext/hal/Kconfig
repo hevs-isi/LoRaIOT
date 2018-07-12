@@ -32,4 +32,6 @@ source "ext/hal/st/lib/Kconfig"
 
 source "ext/hal/ti/simplelink/Kconfig"
 
+source "ext/hal/wimod/Kconfig"
+
 endmenu

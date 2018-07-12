@@ -181,6 +181,7 @@ static int gpio_nrf5_config(struct device *dev,
 	};
 	volatile struct _gpiote *gpiote = (void *)NRF_GPIOTE_BASE;
 	volatile struct _gpio *gpio = GPIO_STRUCT(dev);
+	u32_t port = GPIO_PORT(dev);
 
 	if (access_op == GPIO_ACCESS_BY_PIN) {
 
@@ -217,6 +218,15 @@ static int gpio_nrf5_config(struct device *dev,
 					      pull |
 					      GPIO_INPUT_DISCONNECT |
 					      GPIO_DIR_OUTPUT);
+
+			// disable channel if previously enabled
+			int i = gpiote_find_channel(dev, pin, port);
+
+			if(i >= 0){
+				gpiote_chan_mask &= ~BIT(i);
+				gpiote->CONFIG[i] = 0;
+			}
+
 		} else {
 			/* Config as input */
 			gpio->PIN_CNF[pin] = (sense |
@@ -229,9 +239,9 @@ static int gpio_nrf5_config(struct device *dev,
 		return -ENOTSUP;
 	}
 
+
 	if (flags & GPIO_INT) {
 		u32_t config = 0;
-		u32_t port = GPIO_PORT(dev);
 
 		if (flags & GPIO_INT_EDGE) {
 			if (flags & GPIO_INT_DOUBLE_EDGE) {

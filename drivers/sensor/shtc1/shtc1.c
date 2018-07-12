@@ -40,6 +40,12 @@ int shtc1_write_command(struct shtc1_data *drv_data, u16_t cmd)
 			 SHTC1_I2C_ADDRESS);
 }
 
+void shtc1_read_id_register(struct device *dev, u8_t *buf, u8_t num_bytes)
+{
+
+	i2c_burst_read16(dev, SHTC1_I2C_ADDRESS, SHTC1_CMD_READ_ID, buf, 2);
+}
+
 static int shtc1_sample_fetch(struct device *dev, enum sensor_channel chan)
 {
 	struct shtc1_data *drv_data = dev->driver_data;
@@ -53,22 +59,10 @@ static int shtc1_sample_fetch(struct device *dev, enum sensor_channel chan)
 			shtc1_measure_cmd[SHTC1_CLOCK_STRETCHING_IDX][SHTC1_FIRST_MEASUREMENT_IDX] & 0xFF
 	};
 
-	struct i2c_msg msgs[2] = {
-		{
-			.buf = tx_buf,
-			.len = sizeof(tx_buf),
-			.flags = I2C_MSG_WRITE | I2C_MSG_RESTART,
-		},
-		{
-			.buf = rx_buf,
-			.len = sizeof(rx_buf),
-			.flags = I2C_MSG_READ | I2C_MSG_STOP,
-		},
-	};
-
-	if (i2c_transfer(drv_data->i2c, msgs, 2, SHTC1_I2C_ADDRESS) < 0) {
-		SYS_LOG_DBG("Failed to read data sample!");
-		return -EIO;
+	i2c_write(drv_data->i2c, tx_buf, sizeof(tx_buf), SHTC1_I2C_ADDRESS);
+	k_sleep(20);
+	if(i2c_read(drv_data->i2c, rx_buf, sizeof(rx_buf), SHTC1_I2C_ADDRESS) > 0){
+		SYS_LOG_DBG("Failed to read ID!");
 	}
 
 	t_sample = (rx_buf[0+SHTC1_FIRST_MEASUREMENT_IDX*3] << 8) |

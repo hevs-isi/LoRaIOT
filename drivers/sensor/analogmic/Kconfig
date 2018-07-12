@@ -1,0 +1,78 @@
+# Kconfig - Analog microphone configuration options
+
+#
+# Copyright (c) 2016 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menuconfig ANALOGMIC
+	bool
+	prompt "Analog microphone"
+	default n
+	help
+	  Enable driver for analog microphone.
+
+config ANALOGMIC_NAME
+	string
+	prompt "Driver name"
+	default "ANALOGMIC"
+	depends on ANALOGMIC
+	help
+	  Device name with which the analog microphone is identified.
+	  
+
+choice
+    prompt "Trigger thread"
+    depends on ANALOGMIC
+    default ANALOGMIC_TRIGGER_OWN_THREAD
+    help
+      Specify the type of thread to be used by the driver.
+
+config ANALOGMIC_TRIGGER_GLOBAL_THREAD
+    bool
+    prompt "Use global thread"
+    depends on GPIO
+
+config ANALOGMIC_TRIGGER_OWN_THREAD
+    bool
+    prompt "Use own thread"
+    depends on GPIO
+
+endchoice
+
+config ANALOGMIC_OUT_GPIO_DEV_NAME
+    string
+    prompt "Microphone output GPIO device"
+    default "GPIO_0"
+    depends on ANALOGMIC
+    help
+      The device name of the GPIO device to which the output 
+      of the microphone is connected.
+
+config ANALOGMIC_OUT_GPIO_PIN_NUM
+    int
+    prompt "Microphone output GPIO pin number"
+    default 0
+    depends on ANALOGMIC
+    help
+      The number of the GPIO on which the output signal from the
+      microphone chip will be received.
+      
+config ANALOGMIC_THREAD_PRIORITY
+    int
+    prompt "Thread priority"
+    depends on ANALOGMIC && ANALOGMIC_TRIGGER_OWN_THREAD
+    default 10
+    help
+      Priority of thread used by the driver to handle interrupts.
+
+config ANALOGMIC_THREAD_STACK_SIZE
+    int
+    prompt "Thread stack size"
+    depends on ANALOGMIC && ANALOGMIC_TRIGGER_OWN_THREAD
+    default 1024
+    help
+      Stack size of thread used by the driver to handle interrupts.
+      
+    

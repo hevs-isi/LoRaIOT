@@ -534,7 +534,7 @@
 // <e> NRFX_LPCOMP_ENABLED - nrfx_lpcomp - LPCOMP peripheral driver
 //==========================================================
 #ifndef NRFX_LPCOMP_ENABLED
-#define NRFX_LPCOMP_ENABLED 0
+#define NRFX_LPCOMP_ENABLED 1
 #endif
 // <o> NRFX_LPCOMP_CONFIG_REFERENCE  - Reference voltage
 

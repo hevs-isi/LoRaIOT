@@ -1,0 +1,24 @@
+
+menuconfig I2C_SWITCH
+    bool
+    prompt "I2C switch driver (wrapper)"
+    depends on I2C
+    default n
+    help
+      Enable driver for an I2C switch.
+
+config I2C_SWITCH_ADDR
+    hex "I2C swtich address"
+    depends on I2C_SWITCH
+    default "0x74"
+    help
+      I2C address of the I2C switch.
+
+config I2C_SWITCH_I2C_MASTER_DEV_NAME
+    string
+    prompt "I2C master where the I2C switch is connected"
+    depends on I2C_SWITCH
+    default "I2C_0"
+    help
+      Specify the device name of the I2C master device to which the
+      I2C switch chip is connected.

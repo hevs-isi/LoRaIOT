@@ -1,0 +1,29 @@
+# Kconfig.nrf5 - Nordic Semiconductor nRF5x COMP configuration options
+#
+# Copyright (c) 2016-2018 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menuconfig LPCOMP_NRF5
+	bool "Nordic Semiconductor nRF5x-based LPCOMP driver"
+	depends on COMP && SOC_FAMILY_NRF
+	help
+	  Enable LPCOMP driver for nRF5.
+
+if LPCOMP_NRF5
+
+config LPCOMP_NRF5_INIT_PRIORITY
+	int "nRF5 LPCOMP initialization priority"
+	default 40
+	help
+	  Initialization priority for nRF5 LPCOMP.
+
+config LPCOMP_NRF5_DEV_NAME
+	string "Low Power Comparator Device Name"
+	depends on LPCOMP_NRF5
+	default "LPCOMP"
+	help
+	  Specify the device name to be used for the Low Power Comparator.
+	  
+endif # LPCOMP_NRF5

@@ -1,0 +1,95 @@
+# Kconfig - PYD1588 motion sensor configuration options
+
+#
+# Copyright (c) 2016 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menuconfig PYD1588
+	bool
+	prompt "PYD1588 Motion Sensor"
+	default n
+	help
+	  Enable driver for PYD1588 PIR sensor.
+
+config PYD1588_NAME
+	string
+	prompt "Driver name"
+	default "PYD1588"
+	depends on PYD1588
+	help
+	  Device name with which the PYD1588 sensor is identified.
+	  
+
+choice
+    prompt "Trigger thread"
+    depends on PYD1588
+    default PYD1588_TRIGGER_OWN_THREAD
+    help
+      Specify the type of thread to be used by the driver.
+
+config PYD1588_TRIGGER_GLOBAL_THREAD
+    bool
+    prompt "Use global thread"
+    depends on GPIO
+
+config PYD1588_TRIGGER_OWN_THREAD
+    bool
+    prompt "Use own thread"
+    depends on GPIO
+
+endchoice
+
+config PYD1588_DL_GPIO_DEV_NAME
+    string
+    prompt "Direct Link GPIO device"
+    default "GPIO_0"
+    depends on PYD1588
+    help
+      The device name of the GPIO device to which the Direct Link 
+      pin is connected.
+
+config PYD1588_DL_GPIO_PIN_NUM
+    int
+    prompt "Direct Link GPIO pin number"
+    default 0
+    depends on PYD1588
+    help
+      The number of the GPIO on which the interrupt signal from the
+      PYD1588 chip will be received.
+      
+config PYD1588_SERIN_GPIO_DEV_NAME
+    string
+    prompt "Serial In GPIO device"
+    default "GPIO_0"
+    depends on PYD1588
+    help
+      The device name of the GPIO device to which the Serial In 
+      pin is connected.
+
+config PYD1588_SERIN_GPIO_PIN_NUM
+    int
+    prompt "Serial In GPIO pin number"
+    default 1
+    depends on PYD1588
+    help
+      The number of the GPIO on which the Serial In pin is connected.
+
+config PYD1588_THREAD_PRIORITY
+    int
+    prompt "Thread priority"
+    depends on PYD1588 && PYD1588_TRIGGER_OWN_THREAD
+    default 10
+    help
+      Priority of thread used by the driver to handle interrupts.
+
+config PYD1588_THREAD_STACK_SIZE
+    int
+    prompt "Thread stack size"
+    depends on PYD1588 && PYD1588_TRIGGER_OWN_THREAD
+    default 1024
+    help
+      Stack size of thread used by the driver to handle interrupts.
+      
+    

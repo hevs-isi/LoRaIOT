@@ -8,6 +8,7 @@ menuconfig LORA_IM881A
 	bool "IM881A driver support"
 	default n
 	select SERIAL
+	select LORA_WIMOD
 
 if LORA_IM881A
 

@@ -13,7 +13,7 @@
 		     "nordic,nrf52840";
 
 	chosen {
-		zephyr,console = &uart0;
+		zephyr,uart-pipe = &uart0;
 #ifdef CONFIG_MCUMGR_SMP_UART
 		zephyr,uart-mcumgr = &uart0;
 #endif
@@ -30,17 +30,42 @@
 
 &i2c0 {
 	status = "ok";
-};
-
-&i2c1 {
-	status = "ok";
 	clock-frequency = <I2C_BITRATE_FAST>;
+    
+    tca9546a: tca9546a@74 {
+        compatible = "ti,tca9546a";
+        reg = <0x74>;
+        label = "TCA9546A";
+    };
     
     shtc1: shtc1@70 {
         compatible = "sensirion,shtc1";
         reg = <0x70>;
         label = "SHTC1";
     };
+    
+    opt3002: opt3002@44 {
+        compatible = "ti,opt3002";
+        reg = <0x44>;
+        label = "OPT3002";
+    };
+    
+    ccs811: ccs811@2d {
+        compatible = "ams,ccs811";
+        reg = <0x2d>;
+        label = "CCS811";
+    };
+    
+    pac1934: pac1934@10 {
+        compatible = "microchip,pac1934";
+        reg = <0x10>;
+        label = "PAC1934";
+    };
+    
+};
+
+&i2c1 {
+	status = "ok";
 };
 
 &flash0 {
