@@ -54,8 +54,10 @@
 #define PAC1934_POWER_PORT	CONFIG_GPIO_NRF5_P0_DEV_NAME
 #define PAC1934_POWER_PIN	6
 
-#define SENSOR_ACTIVATE(name)	power_sensor(name, 1)
-#define SENSOR_DEACTIVATE(name)	power_sensor(name, 0)
+#define DISABLE_BOOST_PORT	CONFIG_GPIO_NRF5_P0_DEV_NAME
+#define DISABLE_BOOST_PIN	19
 
+#define EN_VDDH_PORT	CONFIG_GPIO_NRF5_P0_DEV_NAME
+#define EN_VDDH_PIN		23
 
 #endif /* __INC_BOARD_H */

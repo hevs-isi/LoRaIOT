@@ -13,6 +13,8 @@
 #include <i2c_switch.h>
 #include <logging/sys_log.h>
 
+#include <board_utils.h>
+
 struct sensor_pwr_ctrl_cfg {
 	const char *name;
 	const char *port;
@@ -20,6 +22,8 @@ struct sensor_pwr_ctrl_cfg {
 	u8_t polarity;
 	s8_t i2c_channel;
 };
+
+static u8_t vddh_active;
 
 static const struct sensor_pwr_ctrl_cfg pwr_ctrl_cfg[] = {
 #if CONFIG_SHTC1
@@ -57,6 +61,7 @@ static const struct sensor_pwr_ctrl_cfg pwr_ctrl_cfg[] = {
 		.i2c_channel = -1
 	},
 #endif
+#if CONFIG_ANALOGMIC
 	{
 		.name = CONFIG_ANALOGMIC_NAME,
 		.port = MIC_POWER_PORT,
@@ -64,6 +69,7 @@ static const struct sensor_pwr_ctrl_cfg pwr_ctrl_cfg[] = {
 		.polarity = 1,
 		.i2c_channel = -1
 	},
+#endif
 	{
 		.name = "PAC1934",
 		.port = PAC1934_POWER_PORT,
@@ -88,7 +94,7 @@ static int pwr_ctrl_init(struct device *dev)
 	for(i=0;i<sizeof(pwr_ctrl_cfg)/sizeof(pwr_ctrl_cfg[0]);i++){
 		gpio = device_get_binding(cfg[i].port);
 		if (!gpio) {
-			printk("Could not bind device \"%s\"\n", cfg[i].port);
+			SYS_LOG_ERR("Could not bind device \"%s\"\n", cfg[i].port);
 			return -ENODEV;
 		}
 
@@ -98,6 +104,16 @@ static int pwr_ctrl_init(struct device *dev)
 
 	//gpio = device_get_binding(MIC_OUTPUT_PORT);
 	//gpio_pin_configure(gpio, MIC_OUTPUT_PIN, GPIO_DIR_IN);
+
+	// TODO: disable boost converter when not used
+	gpio = device_get_binding(DISABLE_BOOST_PORT);
+	gpio_pin_configure(gpio, DISABLE_BOOST_PIN, GPIO_DIR_OUT);
+	gpio_pin_write(gpio, DISABLE_BOOST_PIN, 1);
+
+	gpio = device_get_binding(EN_VDDH_PORT);
+	gpio_pin_configure(gpio, EN_VDDH_PIN, GPIO_DIR_OUT);
+	gpio_pin_write(gpio, EN_VDDH_PIN, 0);
+
 
 	return 0;
 }
@@ -111,38 +127,51 @@ void power_sensor(const char *name, u8_t power){
 	// power on/off the sensor and de/activate the corresponding I2C channel
 	for(i=0;i<sizeof(pwr_ctrl_cfg)/sizeof(pwr_ctrl_cfg[0]);i++){
 		if(strcmp(name, pwr_ctrl_cfg[i].name) == 0){
-			gpio = device_get_binding(pwr_ctrl_cfg[i].port);
-			gpio_pin_write(gpio, pwr_ctrl_cfg[i].pin, !(power ^ pwr_ctrl_cfg[i].polarity));
 
-			// TODO_ need to be adjusted
-			k_busy_wait(100);
+			// turn on device before I2C switch configuration
+			// (bug when turned off before disabling I2C channel)
+			if(power){
+				gpio = device_get_binding(pwr_ctrl_cfg[i].port);
+				gpio_pin_write(gpio, pwr_ctrl_cfg[i].pin, !(power ^ pwr_ctrl_cfg[i].polarity));
+				// TODO_ need to be adjusted
+				k_busy_wait(100);
+			}
+
 #if CONFIG_I2C_SWITCH
+			// enable or disable the I2C switch channel
 			if(pwr_ctrl_cfg[i].i2c_channel >= 0){
-				SYS_LOG_DBG("Configure i2c channel for %s.", name);
+				SYS_LOG_DBG("Configure I2C channel -> device: %s, power: %d.", name, power);
 				dev = device_get_binding(CONFIG_I2C_SWITCH_I2C_MASTER_DEV_NAME);
 				// read i2c switch status
 				if(i2c_read(dev, buf, 1, CONFIG_I2C_SWITCH_ADDR) > 0){
-					SYS_LOG_DBG("Failed to read data sample!");
+					SYS_LOG_ERR("Failed to read data sample!");
 				}
 
+				SYS_LOG_DBG("I2C Switch status: 0x%x", buf[0]);
 				if(power){
 					buf[0] |= (1 << pwr_ctrl_cfg[i].i2c_channel);
 				} else {
 					buf[0] &= ~(1 << pwr_ctrl_cfg[i].i2c_channel);
 				}
 
-				//buf[0] = (1 << pwr_ctrl_cfg[i].i2c_channel);
-
 				i2c_write(dev, buf, 1, CONFIG_I2C_SWITCH_ADDR);
+				SYS_LOG_DBG("Writing I2C switch status 0x%x", buf[0]);
 			}
 #endif
 
+			/* Execute init function of the device when powered on */
 			if(power){
 				dev = device_get_binding(pwr_ctrl_cfg[i].name);
 				if(dev){
+					SYS_LOG_DBG("Init device: %s", pwr_ctrl_cfg[i].name);
 					dev->config->init(dev);
-					SYS_LOG_DBG("Sensor init");
 				}
+			}
+
+			// turn off device after I2C switch configuration
+			else {
+				gpio = device_get_binding(pwr_ctrl_cfg[i].port);
+				gpio_pin_write(gpio, pwr_ctrl_cfg[i].pin, !(power ^ pwr_ctrl_cfg[i].polarity));
 			}
 
 
@@ -152,7 +181,22 @@ void power_sensor(const char *name, u8_t power){
 
 }
 
+void enable_high_voltage(u8_t status)
+{
+	struct device *gpio;
+	gpio = device_get_binding(EN_VDDH_PORT);
+	gpio_pin_configure(gpio, EN_VDDH_PIN, GPIO_DIR_OUT);
+	gpio_pin_write(gpio, EN_VDDH_PIN, !status);
+
+	vddh_active = status;
+}
+
+u8_t get_vddh_status(void)
+{
+	return vddh_active;
+}
+
 
 DEVICE_INIT(vdd_pwr_ctrl, "SENSOR_PWR_CTRL", pwr_ctrl_init, NULL, pwr_ctrl_cfg,
-	    POST_KERNEL, 50);
+	    POST_KERNEL, 5);
 

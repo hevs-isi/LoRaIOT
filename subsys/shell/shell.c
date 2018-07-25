@@ -31,6 +31,9 @@
 #ifdef CONFIG_WEBSOCKET_CONSOLE
 #include <console/websocket_console.h>
 #endif
+#ifdef CONFIG_RTT_CONSOLE
+#include <console/rtt_console.h>
+#endif
 
 #include <shell/shell.h>
 
@@ -644,6 +647,10 @@ void shell_init(const char *str)
 #ifdef CONFIG_WEBSOCKET_CONSOLE
 	ws_register_input(&avail_queue, &cmds_queue, completion);
 #endif
+#ifdef CONFIG_RTT_CONSOLE
+	rtt_register_input(&avail_queue, &cmds_queue, completion);
+#endif
+
 }
 
 /** @brief Optionally register an app default cmd handler.

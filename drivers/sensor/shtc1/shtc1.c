@@ -130,6 +130,8 @@ static int shtc1_init(struct device *dev)
 		return -EINVAL;
 	}
 
+	SYS_LOG_DBG("Sensor initialized.");
+
 	return 0;
 }
 

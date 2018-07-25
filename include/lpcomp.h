@@ -20,6 +20,15 @@
 extern "C" {
 #endif
 
+
+/**
+ * @typedef lpcomp_callback_t
+ * @brief Define the application callback function signature for LPCOMP.
+ *
+ * @param lpcomp Device struct for the LPCOMP device.
+ */
+typedef void *(*lpcomp_callback_handler_t)(void);
+
 /**
  * @brief COMP Driver APIs
  * @defgroup lpcomp_interface COMP Driver APIs
@@ -44,6 +53,9 @@ struct lpcomp_driver_api {
 
 	/** Pointer to the disable routine. */
 	void (*disable)(struct device *dev);
+
+	/** Set the callback function */
+	void (*set_callback)(struct device *dev, lpcomp_callback_handler_t cb);
 };
 
 /*
@@ -75,6 +87,20 @@ static inline void _impl_lpcomp_disable(struct device *dev)
 	api->disable(dev);
 }
 
+//__syscall void lpcomp_callback_set(struct device *dev, lpcomp_callback_t cb);
+
+static inline void lpcomp_callback_set(struct device *dev,
+					lpcomp_callback_handler_t cb)
+{
+	const struct lpcomp_driver_api *api =
+		(const struct lpcomp_driver_api *)dev->driver_api;
+
+	__ASSERT(cb, "Callback pointer should not be NULL");
+
+	if ((api != NULL) && (api->set_callback != NULL)) {
+		api->set_callback(dev, cb);
+	}
+}
 
 /**
  * @}
@@ -84,5 +110,7 @@ static inline void _impl_lpcomp_disable(struct device *dev)
 #ifdef __cplusplus
 }
 #endif
+
+#include <syscalls/lpcomp.h>
 
 #endif /* __LPCOMP_H__ */

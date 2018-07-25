@@ -53,6 +53,7 @@ static int opt3002_sample_fetch(struct device *dev, enum sensor_channel chan)
 	__ASSERT_NO_MSG(chan == SENSOR_CHAN_ALL || chan == SENSOR_CHAN_LIGHT);
 
 	opt3002_write_reg(drv_data, OPT3002_REG_CONFIG, OPT3002_CONFIG_RESET | OPT3002_CONF_MODE);
+	// Set by default to maximum conversion time + security
 	k_sleep(1000);
 	if(opt3002_read_reg(drv_data, OPT3002_REG_RESULT, rx_buf) > 0){
 		SYS_LOG_DBG("Failed to read result register!");

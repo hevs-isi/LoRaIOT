@@ -10,7 +10,7 @@ struct analogmic_data analogmic_driver;
 /* will be used to sample the microphone output with the internal adc */
 static int analogmic_sample_fetch(struct device *dev, enum sensor_channel chan)
 {
-	struct analogmic_data *drv_data = dev->driver_data;
+	//struct analogmic_data *drv_data = dev->driver_data;
 
 	return 0;
 }
@@ -33,16 +33,10 @@ static const struct sensor_driver_api analogmic_driver_api = {
 
 static int analogmic_init(struct device *dev)
 {
-
-	/*struct analogmic_data *drv_data = dev->driver_data;
-
-
 	if (analogmic_init_interrupt(dev) < 0) {
 		SYS_LOG_DBG("Failed to initialize interrupt");
 		return -EIO;
 	}
-*/
-
 
 	return 0;
 }

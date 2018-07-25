@@ -11,18 +11,19 @@
 #include <kernel.h>
 #include <gpio.h>
 #include <sensor.h>
+#include <lpcomp.h>
 
 struct analogmic_data {
 
-	struct device *gpio;
-	struct gpio_callback gpio_cb;
+	struct device *comp;
+	lpcomp_callback_handler_t lpcomp_cb;
 
 	sensor_trigger_handler_t handler;
 	struct sensor_trigger trigger;
 
 #if defined(CONFIG_ANALOGMIC_TRIGGER_OWN_THREAD)
 	K_THREAD_STACK_MEMBER(thread_stack, CONFIG_ANALOGMIC_THREAD_STACK_SIZE);
-	struct k_sem gpio_sem;
+	struct k_sem comp_sem;
 	struct k_thread thread;
 #elif defined(CONFIG_ANALOGMIC_TRIGGER_GLOBAL_THREAD)
 	struct k_work work;

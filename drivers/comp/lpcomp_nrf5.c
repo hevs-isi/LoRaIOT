@@ -23,6 +23,18 @@
 
 #include "nrf_common.h"
 
+#ifdef CONFIG_LPCOMP_NRF5
+DEVICE_DECLARE(lpcomp_nrf5);
+#endif
+
+struct lpcomp_nrf5_data {
+	lpcomp_callback_handler_t callback;
+};
+
+static struct lpcomp_nrf5_data lpcomp_nrf5_dev_data = {
+	.callback = NULL,
+};
+
 
 /** Configuration data */
 /*struct lpcomp_nrf5_config {
@@ -50,8 +62,15 @@ static int lpcomp_nrf5_config(struct device *dev, u32_t pin, int flags)
 
 void lpcomp_event_handler(nrf_lpcomp_event_t event)
 {
+	struct device *dev;
+	struct lpcomp_nrf5_data *dev_data;
 
 	SYS_LOG_DBG("LPCOMP event");
+
+	dev = DEVICE_GET(lpcomp_nrf5);
+	dev_data = ((struct lpcomp_nrf5_data *)(dev)->driver_data);
+
+	dev_data->callback();
 
 	if (event == NRF_LPCOMP_EVENT_CROSS)
 	{
@@ -69,10 +88,21 @@ static void lpcomp_nrf5_disable(struct device *dev)
 	nrfx_lpcomp_disable();
 }
 
+/** Set the callback function */
+static void lpcomp_nrf5_set_callback(struct device *dev, lpcomp_callback_handler_t cb)
+{
+
+	struct lpcomp_nrf5_data * const dev_data = \
+				((struct lpcomp_nrf5_data * const)(dev)->driver_data);
+
+	dev_data->callback = cb;
+}
+
 
 static const struct lpcomp_driver_api lpcomp_nrf5_drv_api_funcs = {
 	.enable = lpcomp_nrf5_enable,
 	.disable = lpcomp_nrf5_disable,
+	.set_callback = lpcomp_nrf5_set_callback,
 };
 
 
@@ -95,7 +125,7 @@ static int lpcomp_nrf5_init(struct device *dev)
 
 	return 0;
 }
-
+/*
 static const nrfx_lpcomp_config_t lpcomp_nrf5_cfg = {
 		.hal    = { (nrf_lpcomp_ref_t)NRFX_LPCOMP_CONFIG_REFERENCE ,    \
 					(nrf_lpcomp_detect_t)NRFX_LPCOMP_CONFIG_DETECTION,  \
@@ -103,10 +133,18 @@ static const nrfx_lpcomp_config_t lpcomp_nrf5_cfg = {
 		.input  = (nrf_lpcomp_input_t)NRFX_LPCOMP_CONFIG_INPUT,         \
 		.interrupt_priority = NRFX_LPCOMP_CONFIG_IRQ_PRIORITY           \
 };
+*/
 
+static const nrfx_lpcomp_config_t lpcomp_nrf5_cfg = {
+		.hal    = { (nrf_lpcomp_ref_t)NRF_LPCOMP_REF_SUPPLY_3_8 ,    \
+					(nrf_lpcomp_detect_t)NRF_LPCOMP_DETECT_CROSS,  \
+					(nrf_lpcomp_hysteresis_t)NRF_LPCOMP_HYST_NOHYST }, \
+		.input  = (nrf_lpcomp_input_t)NRF_LPCOMP_INPUT_5,         \
+		.interrupt_priority = 0           \
+};
 
 DEVICE_AND_API_INIT(lpcomp_nrf5, CONFIG_LPCOMP_NRF5_DEV_NAME, lpcomp_nrf5_init,
-		    NULL, &lpcomp_nrf5_cfg,
+		    &lpcomp_nrf5_dev_data, &lpcomp_nrf5_cfg,
 		    POST_KERNEL, CONFIG_LPCOMP_NRF5_INIT_PRIORITY,
 		    &lpcomp_nrf5_drv_api_funcs);
 

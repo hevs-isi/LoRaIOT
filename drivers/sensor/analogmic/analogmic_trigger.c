@@ -9,11 +9,11 @@
 #include <kernel.h>
 #include <sensor.h>
 
-
-
 #include "analogmic.h"
 
 static k_tid_t tid;
+
+extern struct analogmic_data analogmic_driver;
 
 int analogmic_attr_set(struct device *dev,
 		    enum sensor_channel chan,
@@ -21,6 +21,21 @@ int analogmic_attr_set(struct device *dev,
 		    const struct sensor_value *val)
 {
 	return 0;
+}
+
+static void analogmic_lpcomp_callback()
+{
+	// TODO: find the proper way to use the line bellow
+	/*struct analogmic_data *drv_data =
+		CONTAINER_OF(cb, struct analogmic_data, lpcomp_cb);*/
+
+	SYS_LOG_DBG("analogmic_lpcomp_callback");
+
+#if defined(CONFIG_PYD1588_TRIGGER_OWN_THREAD)
+	k_sem_give(&analogmic_driver.comp_sem);
+#elif defined(CONFIG_PYD1588_TRIGGER_GLOBAL_THREAD)
+	k_work_submit(&drv_data->work);
+#endif
 }
 
 static void analogmic_thread_cb(void *arg)
@@ -34,7 +49,6 @@ static void analogmic_thread_cb(void *arg)
 		drv_data->handler(dev, &drv_data->trigger);
 	}
 
-
 }
 
 #ifdef CONFIG_ANALOGMIC_TRIGGER_OWN_THREAD
@@ -46,7 +60,8 @@ static void analogmic_thread(int dev_ptr, int unused)
 	ARG_UNUSED(unused);
 
 	while (1) {
-		k_sem_take(&drv_data->gpio_sem, K_FOREVER);
+		SYS_LOG_DBG("Sound thread waiting semaphore");
+		k_sem_take(&drv_data->comp_sem, K_FOREVER);
 		analogmic_thread_cb(dev);
 	}
 }
@@ -66,21 +81,17 @@ int analogmic_trigger_set(struct device *dev,
 		       const struct sensor_trigger *trig,
 		       sensor_trigger_handler_t handler)
 {
-	//struct analogmic_data *drv_data = dev->driver_data;
+	struct analogmic_data *drv_data = dev->driver_data;
 
 	if (trig->type != SENSOR_TRIG_TAP) {
 		return -ENOTSUP;
 	}
 
-	/*
-	gpio_pin_disable_callback(drv_data->dl_gpio, CONFIG_ANALOGMIC_OUT_GPIO_PIN_NUM);
+	//gpio_pin_disable_callback(drv_data->dl_gpio, CONFIG_ANALOGMIC_OUT_GPIO_PIN_NUM);
 	drv_data->handler = handler;
 	drv_data->trigger = *trig;
-	gpio_pin_enable_callback(drv_data->dl_gpio, CONFIG_ANALOGMIC_DL_GPIO_PIN_NUM);
-	*/
-
-	SYS_LOG_DBG("Motion trigger set");
-
+	//gpio_pin_enable_callback(drv_data->dl_gpio, CONFIG_ANALOGMIC_DL_GPIO_PIN_NUM);
+	SYS_LOG_DBG("Sound trigger set");
 	return 0;
 }
 
@@ -92,52 +103,15 @@ int analogmic_init_interrupt(struct device *dev)
 		return 0;
 	}
 
-	/*
-	nrf_lpcomp_config_t config = {
-			NRF_LPCOMP_REF_SUPPLY_3_8,
-			NRF_LPCOMP_DETECT_CROSS,
-			NRF_LPCOMP_HYST_NOHYST
-	};
+	drv_data->comp = device_get_binding(CONFIG_LPCOMP_NRF5_DEV_NAME);
+	lpcomp_callback_set(drv_data->comp, (lpcomp_callback_handler_t)analogmic_lpcomp_callback);
+	lpcomp_enable(drv_data->comp);
 
-	nrfx_lpcomp_config_t xconfig = {config, NRF_LPCOMP_INPUT_5, 0};
-
-
-	IRQ_CONNECT(NRF5_IRQ_LPCOMP_IRQn, 0, nrfx_lpcomp_irq_handler, NULL, 0);
-	irq_enable(NRF5_IRQ_LPCOMP_IRQn);
-
-	lpcomp_error = nrfx_lpcomp_init(&xconfig, lpcomp_event_handler);
-	if(lpcomp_error != NRFX_SUCCESS){
-		SYS_LOG_ERR("Error initializing LPCOMP: %d", lpcomp_error);
-	}
-	nrfx_lpcomp_enable();*/
-
-
-	/*
-	drv_data->dl_gpio = device_get_binding(CONFIG_ANALOGMIC_DL_GPIO_DEV_NAME);
-	if (drv_data->dl_gpio == NULL) {
-		SYS_LOG_DBG("Failed to get pointer to %s device!",
-		    CONFIG_ANALOGMIC_DL_GPIO_DEV_NAME);
-		return -EINVAL;
-	}
-
-	gpio_pin_configure(drv_data->dl_gpio, CONFIG_ANALOGMIC_DL_GPIO_PIN_NUM,
-			   GPIO_DIR_IN | GPIO_INT | GPIO_INT_EDGE |
-			   GPIO_INT_ACTIVE_HIGH);
-
-	gpio_init_callback(&drv_data->gpio_cb,
-			   analogmic_gpio_callback,
-			   BIT(CONFIG_ANALOGMIC_DL_GPIO_PIN_NUM));
-
-	if (gpio_add_callback(drv_data->dl_gpio, &drv_data->gpio_cb) < 0) {
-		SYS_LOG_DBG("Failed to set gpio callback!");
-		return -EIO;
-	}*/
-
-	SYS_LOG_DBG("Init trigger!");
+	SYS_LOG_DBG("Init analogmic trigger!");
 
 #if defined(CONFIG_ANALOGMIC_TRIGGER_OWN_THREAD)
 
-	k_sem_init(&drv_data->gpio_sem, 0, UINT_MAX);
+	k_sem_init(&drv_data->comp_sem, 0, UINT_MAX);
 
 	tid = k_thread_create(&drv_data->thread, drv_data->thread_stack,
 			CONFIG_ANALOGMIC_THREAD_STACK_SIZE,

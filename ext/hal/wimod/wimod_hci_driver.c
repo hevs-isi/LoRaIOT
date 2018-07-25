@@ -8,9 +8,12 @@
 #include <wimod_hci_driver.h>
 #include "crc16.h"
 #include "wimod_slip.h"
-#include <console/uart_pipe.h>
+//#include <console/uart_pipe.h>
+#include <uart.h>
 
 #include <string.h>
+
+static struct device *uart_dev;
 
 //------------------------------------------------------------------------------
 //
@@ -53,11 +56,12 @@ static wimod_hci_msglayer_t  HCI;
 
 // reserve one tx_buffer
 static u8_t tx_buffer[sizeof( wimod_hci_message_t ) * 2 + 2];
-
+static u8_t rx_buffer[30];
 
 static u8_t *upipe_rx(u8_t *buf, size_t *off)
 {
-	return 0;
+	*off = 0;
+	return buf;
 }
 
 //------------------------------------------------------------------------------
@@ -68,9 +72,50 @@ static u8_t *upipe_rx(u8_t *buf, size_t *off)
 //
 //------------------------------------------------------------------------------
 
+static void uart_isr(struct device *dev)
+{
+	int got;
+	uart_irq_update(dev);
+	static int i;
+
+	/*
+	while (uart_irq_update(dev) &&
+		       uart_irq_is_pending(dev)) {
+
+			u8_t byte;
+			int rx;
+
+			if (!uart_irq_rx_ready(dev)) {
+				continue;
+			}
+
+
+			rx = uart_fifo_read(dev, &rx_buffer[i], 1);
+			if (rx < 0) {
+				return;
+			}
+			i++;
+	}*/
+
+	got = 1;
+
+/*
+	if (uart_irq_is_pending(dev)) {
+		if (uart_irq_rx_ready(dev)) {
+			//got = uart_fifo_read(uart_dev, rx_buffer, 1);
+			if (got <= 0) {
+				return;
+			}
+		}
+	}*/
+
+}
+
 bool wimod_hci_init(wimod_hci_cb_rx_message   cb_rx_message,
                	    wimod_hci_message_t*      rx_message)
 {
+
+	u8_t c;
     // init error counter
     HCI.crc_errors = 0;
 
@@ -86,7 +131,17 @@ bool wimod_hci_init(wimod_hci_cb_rx_message   cb_rx_message,
     // init first RxBuffer to SAP_ID of HCI message, size without 16-Bit length Field
     slip_set_rx_buffer(&rx_message->sap_id, sizeof(wimod_hci_message_t) - sizeof(u16_t));
 
-    uart_pipe_register(rxsplipbuf, sizeof(rxsplipbuf), upipe_rx);
+    //uart_pipe_register(rxsplipbuf, sizeof(rxsplipbuf), upipe_rx);
+    uart_dev = device_get_binding("UART_0");
+    uart_irq_callback_set(uart_dev, uart_isr);
+
+    /* Drain the fifo */
+	/*while (uart_irq_rx_ready(uart_dev)) {
+		uart_fifo_read(uart_dev, &c, 1);
+	}*/
+
+
+    uart_irq_rx_enable(uart_dev);
 
     return 0;
 
@@ -144,15 +199,26 @@ int wimod_hci_send_message(wimod_hci_message_t* tx_message)
     {
         // send wakeup chars
         for(i= 0; i < 40; i++){
-        	uart_pipe_send(&buf[0], 1);
+        	//uart_pipe_send(&buf[0], 1);
+        	uart_poll_out(uart_dev, buf[0]);
         }
 
         // 4. send octet sequence over serial device
+        for(i= 0; i < tx_length; i++){
+			//uart_pipe_send(&buf[0], 1);
+			uart_poll_out(uart_dev, tx_buffer[i]);
+		}
+
+
+
+        /*
         if (!uart_pipe_send(tx_buffer, tx_length))
         {
             // return ok
             return 0;
-        }
+        }*/
+
+
     }
 
     // error - SLIP layer couldn't encode message - buffer to small ?
