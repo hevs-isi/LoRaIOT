@@ -170,7 +170,6 @@ void rtt_register_input(struct k_fifo *avail, struct k_fifo *lines,
 
 /* RTT console */
 
-/* Need to set */
 SYS_INIT(rtt_console_init,
 		POST_KERNEL,
 		CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);

@@ -23,7 +23,17 @@ struct sensor_pwr_ctrl_cfg {
 	s8_t i2c_channel;
 };
 
+struct led_blink_data {
+	u8_t led;
+	u32_t period;
+	u32_t duration;
+};
+
+
 static u8_t vddh_active;
+static struct device *led_dev;
+static u32_t led_status;
+static struct led_blink_data led_data;
 
 static const struct sensor_pwr_ctrl_cfg pwr_ctrl_cfg[] = {
 #if CONFIG_SHTC1
@@ -196,7 +206,95 @@ u8_t get_vddh_status(void)
 	return vddh_active;
 }
 
+static void led_blink(void *arg1, void *arg2, void *arg3)
+{
+	ARG_UNUSED(arg3);
 
-DEVICE_INIT(vdd_pwr_ctrl, "SENSOR_PWR_CTRL", pwr_ctrl_init, NULL, pwr_ctrl_cfg,
+	while (1) {
+		/*if(cnt % 2){
+			VDDH_DEACTIVATE();
+		} else {
+			VDDH_ACTIVATE();
+		}*/
+
+		led_toggle(led_data.led);
+		k_sleep(led_data.period);
+
+
+	}
+}
+
+
+K_THREAD_DEFINE(led_blinking_thread_id, 128, led_blink, NULL, NULL, NULL,
+		0, 0, K_NO_WAIT);
+
+
+void led_blink_timeout(struct k_timer *timer_id)
+{
+	k_thread_suspend(led_blinking_thread_id);
+}
+K_TIMER_DEFINE(led_blink_timer, led_blink_timeout, NULL);
+
+
+void led_on(u8_t led)
+{
+	gpio_pin_write(led_dev, led, 0);
+	led_status |= 1 << led;
+}
+
+void led_off(u8_t led)
+{
+	gpio_pin_write(led_dev, led, 1);
+	led_status &= ~(1 << led);
+}
+
+void led_toggle(u8_t led)
+{
+	if(led_status & (1 << led)){
+		led_off(led);
+	} else {
+		led_on(led);
+	}
+}
+
+void blink_led(u8_t led, u32_t period_ms, u32_t duration_ms)
+{
+	led_off(LED_GREEN);
+	led_off(LED_BLUE);
+	led_off(LED_RED);
+
+	led_data.led = led;
+	led_data.period = period_ms;
+	led_data.duration = duration_ms;
+
+	k_timer_start(&led_blink_timer, duration_ms, 0);
+	k_thread_resume(led_blinking_thread_id);
+
+}
+
+static int board_init(struct device *dev)
+{
+	pwr_ctrl_init(dev);
+
+	led_dev = device_get_binding(LEDS_PORT);
+
+	/* Set LED pins as output */
+	gpio_pin_configure(led_dev, LED_GREEN, GPIO_DIR_OUT);
+	gpio_pin_configure(led_dev, LED_BLUE, GPIO_DIR_OUT);
+	gpio_pin_configure(led_dev, LED_RED, GPIO_DIR_OUT);
+
+	// turn off
+	gpio_pin_write(led_dev, LED_GREEN, 1);
+	gpio_pin_write(led_dev, LED_BLUE, 1);
+	gpio_pin_write(led_dev, LED_RED, 1);
+
+	//k_thread_start(led_blinking_thread_id);
+	k_thread_suspend(led_blinking_thread_id);
+
+	return 0;
+}
+
+
+DEVICE_INIT(vdd_pwr_ctrl, "SENSOR_PWR_CTRL", board_init, NULL, pwr_ctrl_cfg,
 	    POST_KERNEL, 5);
 

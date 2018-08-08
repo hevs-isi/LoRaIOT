@@ -23,9 +23,13 @@
 #include "wimod_hci_driver.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define MAKEWORD(lo,hi) ((lo)|((hi) << 8))
 #define MAKELONG(lo,hi) ((lo)|((hi) << 16))
+
+const char appEui[] = "70B3D57ED0010F8B";
+const char appKey[] = "7F8BC5F8A59B05A2B1BDE8B84E6D62A4";
 
 //------------------------------------------------------------------------------
 //
@@ -73,6 +77,9 @@ wimod_hci_message_t tx_message;
 // reserve one Rx-Message
 wimod_hci_message_t rx_message;
 
+// network join callback function
+static join_network_cb join_callback;
+
 //------------------------------------------------------------------------------
 //
 //  Section Const
@@ -117,6 +124,20 @@ static const id_string_t wimod_lorawan_status_strings[] =
 //
 //------------------------------------------------------------------------------
 
+
+static void memset64( void * dest, u64_t value, uintptr_t size )
+{
+  uintptr_t i;
+  for( i = 0; i < (size & (~7)); i+=8 )
+  {
+    memcpy( ((char*)dest) + i, &value, 8 );
+  }
+  for( ; i < size; i++ )
+  {
+    ((char*)dest)[i] = ((char*)&value)[i&7];
+  }
+}
+
 //------------------------------------------------------------------------------
 //
 //  Init
@@ -129,6 +150,18 @@ bool wimod_lorawan_init()
 {
     // init HCI layer
     return wimod_hci_init(wimod_lorawan_process_rx_msg, &rx_message);
+}
+
+
+int wimod_lorawan_factory_reset()
+{
+    // 1. init header
+    tx_message.sap_id = LORAWAN_SAP_ID;
+    tx_message.msg_id = LORAWAN_MSG_FACTORY_RESET_REQ;
+    tx_message.length = 0;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
 }
 
 //------------------------------------------------------------------------------
@@ -169,6 +202,51 @@ int wimod_lorawan_get_firmware_version()
     return wimod_hci_send_message(&tx_message);
 }
 
+int wimod_lorawan_get_device_eui()
+{
+    // 1. init header
+    tx_message.sap_id = LORAWAN_SAP_ID;
+    tx_message.msg_id = LORAWAN_MSG_GET_DEVICE_EUI_REQ ;
+    tx_message.length = 0;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
+}
+
+
+int wimod_lorawan_set_join_param_request()
+{
+	const char *pos;
+	size_t i;
+	char buf[5];
+
+    // 1. init header
+    tx_message.sap_id = LORAWAN_SAP_ID;
+    tx_message.msg_id = LORAWAN_MSG_SET_JOIN_PARAM_REQ;
+    tx_message.length = 24;
+
+    pos = appEui;
+    for (i = 0; i < 8; i++) {
+    	sprintf(buf, "0x%c%c", pos[0+2*i], pos[1+2*i]);
+    	tx_message.payload[i] = strtol(buf, NULL, 0);
+    }
+
+    pos = appKey;
+	for (i = 0; i < 16; i++) {
+		sprintf(buf, "0x%c%c", pos[0+2*i], pos[1+2*i]);
+		tx_message.payload[8+i] = strtol(buf, NULL, 0);
+	}
+
+/*
+    memset64(tx_message.payload, 0x8B0F01D07ED5B370, 8);
+	memset64(&tx_message.payload[8], 0xA2059BA5F8C58B7F, 8);
+	memset64(&tx_message.payload[16], 0xA4626D4EB8E8BDB1, 8);
+*/
+
+    // 2. send HCI message with payload
+    return wimod_hci_send_message(&tx_message);
+}
+
 //------------------------------------------------------------------------------
 //
 //  JoinNetworkRequest
@@ -177,14 +255,49 @@ int wimod_lorawan_get_firmware_version()
 //
 //------------------------------------------------------------------------------
 
-int wimod_lorawan_join_network_request()
+int wimod_lorawan_join_network_request(join_network_cb cb)
 {
     // 1. init header
     tx_message.sap_id = LORAWAN_SAP_ID;
     tx_message.msg_id = LORAWAN_MSG_JOIN_NETWORK_REQ;
     tx_message.length = 0;
 
+    join_callback = cb;
+
     // 2. send HCI message with payload
+    return wimod_hci_send_message(&tx_message);
+}
+
+int wimod_lorawan_get_nwk_status()
+{
+    // 1. init header
+    tx_message.sap_id = LORAWAN_SAP_ID;
+    tx_message.msg_id = LORAWAN_MSG_GET_NWK_STATUS_REQ ;
+    tx_message.length = 0;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
+}
+
+int wimod_lorawan_set_rstack_config()
+{
+    // 1. init header
+    tx_message.sap_id = LORAWAN_SAP_ID;
+    tx_message.msg_id = LORAWAN_MSG_SET_RSTACK_CONFIG_REQ ;
+    tx_message.length = 7;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
+}
+
+int wimod_lorawan_get_rstack_config()
+{
+    // 1. init header
+    tx_message.sap_id = LORAWAN_SAP_ID;
+    tx_message.msg_id = LORAWAN_MSG_GET_RSTACK_CONFIG_REQ ;
+    tx_message.length = 0;
+
+    // 2. send HCI message without payload
     return wimod_hci_send_message(&tx_message);
 }
 
@@ -351,6 +464,57 @@ static void wimod_lorawan_devmgmt_firmware_version_rsp(wimod_hci_message_t* rx_m
     }
 }
 
+static void wimod_lorawan_device_eui_rsp(wimod_hci_message_t* rx_msg)
+{
+	u32_t eui_lsb;
+	u32_t eui_msb;
+	wimod_lorawan_show_response("device EUI response",
+			wimod_device_mgmt_status_strings, rx_msg->payload[0]);
+
+	eui_lsb = MAKELONG(MAKEWORD(rx_msg->payload[8], rx_msg->payload[7]),
+			MAKEWORD(rx_msg->payload[6], rx_msg->payload[5]));
+	eui_msb = MAKELONG(MAKEWORD(rx_msg->payload[4], rx_msg->payload[3]),
+			MAKEWORD(rx_msg->payload[2], rx_msg->payload[1]));
+
+	printf("64-Bit Device EUI: 0x%x%x\n", eui_msb, eui_lsb);
+}
+
+static void wimod_lorawan_process_nwk_status_rsp(wimod_hci_message_t* rx_msg)
+{
+	u32_t device_address;
+
+	wimod_lorawan_show_response("network status response",
+			wimod_device_mgmt_status_strings, rx_msg->payload[0]);
+
+	printf("Network Status: 0x%02X\n", rx_msg->payload[1]);
+
+	if(rx_msg->length > 2){
+
+		device_address = MAKELONG(MAKEWORD(rx_msg->payload[5], rx_msg->payload[4]),
+					MAKEWORD(rx_msg->payload[3], rx_msg->payload[2]));
+
+		printf("Device Address: %d\n", device_address);
+		printf("Data Rate Index: %d\n", rx_msg->payload[6]);
+		printf("Power Level: %d\n", rx_msg->payload[7]);
+		printf("Max Payload Size: %d\n", rx_msg->payload[8]);
+	}
+}
+
+static void wimod_lorawan_process_rstack_config_rsp(wimod_hci_message_t* rx_msg)
+{
+	wimod_lorawan_show_response("radio stack config response",
+			wimod_device_mgmt_status_strings, rx_msg->payload[0]);
+
+	printf("Default Data Rate Index: %d\n", rx_msg->payload[1]);
+	printf("Default TX Power Level: %d\n", rx_msg->payload[2]);
+	printf("Options: 0x%02X\n", rx_msg->payload[3]);
+	printf("Power Saving Mode: %d\n", rx_msg->payload[4]);
+	printf("Number of Retransmissions: %d\n", rx_msg->payload[5]);
+	printf("Band Index: %d\n", rx_msg->payload[6]);
+	printf("Header MAC Cmd Capacity: %d\n", rx_msg->payload[7] & 0xFF);
+
+}
+
 //------------------------------------------------------------------------------
 //
 //  Process_LoRaWAN_Message
@@ -363,8 +527,20 @@ static void wimod_lorawan_process_lorawan_message(wimod_hci_message_t* rx_msg)
 {
     switch(rx_msg->msg_id)
     {
-        case    LORAWAN_MSG_JOIN_NETWORK_RSP:
-                wimod_lorawan_show_response("join network response", wimod_lorawan_status_strings, rx_msg->payload[0]);
+    	case    LORAWAN_MSG_GET_DEVICE_EUI_RSP:
+				wimod_lorawan_device_eui_rsp(rx_msg);
+				break;
+
+    	case    LORAWAN_MSG_JOIN_NETWORK_RSP:
+				wimod_lorawan_show_response("join network response", wimod_lorawan_status_strings, rx_msg->payload[0]);
+				break;
+
+    	case    LORAWAN_MSG_FACTORY_RESET_RSP:
+				wimod_lorawan_show_response("factory reset response", wimod_lorawan_status_strings, rx_msg->payload[0]);
+				break;
+
+        case    LORAWAN_MSG_SET_JOIN_PARAM_RSP:
+                wimod_lorawan_show_response("set join param response", wimod_lorawan_status_strings, rx_msg->payload[0]);
                 break;
 
         case    LORAWAN_MSG_SEND_UDATA_RSP:
@@ -375,9 +551,25 @@ static void wimod_lorawan_process_lorawan_message(wimod_hci_message_t* rx_msg)
                 wimod_lorawan_show_response("send C-Data response", wimod_lorawan_status_strings, rx_msg->payload[0]);
                 break;
 
-        case    LORAWAN_MSG_JOIN_TRANSMIT_IND:
+        case    LORAWAN_MSG_GET_NWK_STATUS_RSP:
+				wimod_lorawan_process_nwk_status_rsp(rx_msg);
+				break;
+
+        case    LORAWAN_MSG_GET_RSTACK_CONFIG_RSP:
+        		wimod_lorawan_process_rstack_config_rsp(rx_msg);
+				break;
+
+        case    LORAWAN_MSG_JOIN_NETWORK_TX_IND:
                 wimod_lorawan_process_join_tx_indication(rx_msg);
                 break;
+
+        case    LORAWAN_MSG_SEND_UDATA_TX_IND:
+        		wimod_lorawan_show_response("send U-Data TX indication", wimod_lorawan_status_strings, rx_msg->payload[0]);
+				break;
+
+        case    LORAWAN_MSG_SEND_CDATA_TX_IND:
+        		wimod_lorawan_show_response("send C-Data TX indication", wimod_lorawan_status_strings, rx_msg->payload[0]);
+				break;
 
         case    LORAWAN_MSG_JOIN_NETWORK_IND:
                 wimod_lorawan_process_join_network_indication(rx_msg);
@@ -391,8 +583,11 @@ static void wimod_lorawan_process_lorawan_message(wimod_hci_message_t* rx_msg)
                 wimod_lorawan_process_c_data_rx_indication(rx_msg);
                 break;
 
-        case    LORAWAN_MSG_RECV_NODATA_IND:
+        case    LORAWAN_MSG_RECV_NO_DATA_IND:
                 printf("no data received indication\n\r");
+                if(rx_msg->payload[0] == 1){
+                	printf("Error Code: 0x%02X\n\r", rx_msg->payload[1]);
+                }
                 break;
 
         default:
@@ -442,6 +637,8 @@ void wimod_lorawan_process_join_network_indication(wimod_hci_message_t* rx_msg)
                                   MAKEWORD(rx_msg->payload[3],rx_msg->payload[4]));
 
         printf("join network accept event - DeviceAddress:0x%08X\n\r", address);
+
+        (*join_callback)();
     }
     else if (rx_msg->payload[0] == 1)
     {
@@ -451,6 +648,8 @@ void wimod_lorawan_process_join_network_indication(wimod_hci_message_t* rx_msg)
         printf("join network accept event - DeviceAddress:0x%08X, ChnIdx:%d, DR:%d, RSSI:%d, SNR:%d, RxSlot:%d\n\r", address,
                (int)rx_msg->payload[5], (int)rx_msg->payload[6], (int)rx_msg->payload[7],
                (int)rx_msg->payload[8], (int)rx_msg->payload[9]);
+
+        (*join_callback)();
     }
     else
     {
@@ -477,7 +676,7 @@ void wimod_lorawan_process_u_data_rx_indication(wimod_hci_message_t* rx_msg)
     if (payload_size >= 1)
     {
         printf("U-Data rx event: port:0x%02X\n\rapp-payload:", rx_msg->payload[1]);
-        for(int i = 1; i < payload_size;)
+        for(int i = 1; i < payload_size; i++)
             printf("%02X ", rx_msg->payload[1+i]);
         printf("\n\r");
     }

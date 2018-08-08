@@ -3,9 +3,10 @@
 #include <kernel.h>
 #include <device.h>
 #include <console/uart_pipe.h>
+#include <wimod_hci_driver.h>
+#include <wimod_lorawan_api.h>
 
 #include "im881a.h"
-#include <wimod_hci_driver.h>
 
 static struct device *lora_im881a_dev;
 
@@ -46,7 +47,7 @@ void im881_send()
 	//u8_t buf[1] = { 'a' };
 
 	tx_msg.sap_id     = 0x01;
-	tx_msg.msg_id     = 0x01;
+	tx_msg.msg_id     = DEVMGMT_MSG_GET_DEVICE_INFO_REQ;
 	tx_msg.length     = 0;
 
 

@@ -75,10 +75,10 @@ static u8_t *upipe_rx(u8_t *buf, size_t *off)
 static void uart_isr(struct device *dev)
 {
 	int got;
-	uart_irq_update(dev);
+	//uart_irq_update(dev);
 	static int i;
 
-	/*
+
 	while (uart_irq_update(dev) &&
 		       uart_irq_is_pending(dev)) {
 
@@ -90,25 +90,26 @@ static void uart_isr(struct device *dev)
 			}
 
 
-			rx = uart_fifo_read(dev, &rx_buffer[i], 1);
+			rx = uart_fifo_read(dev, &byte, 1);
 			if (rx < 0) {
 				return;
 			}
+			slip_decode_data(&byte, 1);
 			i++;
-	}*/
+	}
 
-	got = 1;
+	//got = 1;
 
 /*
 	if (uart_irq_is_pending(dev)) {
 		if (uart_irq_rx_ready(dev)) {
-			//got = uart_fifo_read(uart_dev, rx_buffer, 1);
+			got = uart_fifo_read(uart_dev, rx_buffer, 1);
 			if (got <= 0) {
 				return;
 			}
 		}
-	}*/
-
+	}
+*/
 }
 
 bool wimod_hci_init(wimod_hci_cb_rx_message   cb_rx_message,
@@ -125,6 +126,7 @@ bool wimod_hci_init(wimod_hci_cb_rx_message   cb_rx_message,
     // save rx_message
     HCI.rx_message = rx_message;
 
+
     // init SLIP
     slip_init(wimod_hci_process_rx_message);
 
@@ -136,9 +138,9 @@ bool wimod_hci_init(wimod_hci_cb_rx_message   cb_rx_message,
     uart_irq_callback_set(uart_dev, uart_isr);
 
     /* Drain the fifo */
-	/*while (uart_irq_rx_ready(uart_dev)) {
+	while (uart_irq_rx_ready(uart_dev)) {
 		uart_fifo_read(uart_dev, &c, 1);
-	}*/
+	}
 
 
     uart_irq_rx_enable(uart_dev);

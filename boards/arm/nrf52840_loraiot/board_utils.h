@@ -12,6 +12,9 @@
 
 void power_sensor(const char *name, u8_t power);
 void enable_high_voltage(u8_t status);
-
+void led_on(u8_t led);
+void led_off(u8_t led);
+void led_toggle(u8_t led);
+void blink_led(u8_t led, u32_t period_ms, u32_t duration_ms);
 
 #endif /* __BOARD_UTILS_H */
