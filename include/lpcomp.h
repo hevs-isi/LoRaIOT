@@ -78,6 +78,7 @@ static inline void _impl_lpcomp_enable(struct device *dev)
 
 	api->enable(dev);
 }
+
 __syscall void lpcomp_disable(struct device *dev);
 
 static inline void _impl_lpcomp_disable(struct device *dev)
@@ -87,9 +88,9 @@ static inline void _impl_lpcomp_disable(struct device *dev)
 	api->disable(dev);
 }
 
-//__syscall void lpcomp_callback_set(struct device *dev, lpcomp_callback_t cb);
+__syscall void lpcomp_callback_set(struct device *dev, lpcomp_callback_handler_t cb);
 
-static inline void lpcomp_callback_set(struct device *dev,
+static inline void _impl_lpcomp_callback_set(struct device *dev,
 					lpcomp_callback_handler_t cb)
 {
 	const struct lpcomp_driver_api *api =

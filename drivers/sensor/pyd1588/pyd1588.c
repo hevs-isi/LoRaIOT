@@ -9,11 +9,11 @@ struct pyd1588_data pyd1588_driver;
 
 static void configure_pir_sensor(struct k_timer *timer_id)
 {
-	pyd1588_write_config(&pyd1588_driver, PYD1588_CONF_THRESHOLD_128 |
-			PYD1588_CONF_MODE_WAKEUP |
+	pyd1588_write_config(&pyd1588_driver, PYD1588_CONF_THRESHOLD_16 |
+			PYD1588_CONF_MODE_WAKEUP | PYD1588_CONF_PDM_SIGN_NOCHG |
 			PYD1588_CONF_WINDOW_8S |
 			PYD1588_CONF_BLIND_TIME_8S);
-	//pyd1588_write_config(drv_data, 0x00304D10);
+	//pyd1588_write_config(&pyd1588_driver, 0x00304D10);
 	SYS_LOG_INF("Write config");
 }
 
@@ -189,7 +189,6 @@ static int pyd1588_init(struct device *dev)
 
 	// give some time to the sensor to settle before sending configuration
 	k_timer_start(&configure_delay, K_SECONDS(5), 0);
-
 
 	return 0;
 }

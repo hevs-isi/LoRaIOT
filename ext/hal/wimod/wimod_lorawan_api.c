@@ -206,7 +206,7 @@ int wimod_lorawan_get_device_eui()
 {
     // 1. init header
     tx_message.sap_id = LORAWAN_SAP_ID;
-    tx_message.msg_id = LORAWAN_MSG_GET_DEVICE_EUI_REQ ;
+    tx_message.msg_id = LORAWAN_MSG_GET_DEVICE_EUI_REQ;
     tx_message.length = 0;
 
     // 2. send HCI message without payload
@@ -272,7 +272,18 @@ int wimod_lorawan_get_nwk_status()
 {
     // 1. init header
     tx_message.sap_id = LORAWAN_SAP_ID;
-    tx_message.msg_id = LORAWAN_MSG_GET_NWK_STATUS_REQ ;
+    tx_message.msg_id = LORAWAN_MSG_GET_NWK_STATUS_REQ;
+    tx_message.length = 0;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
+}
+
+int wimod_lorawan_get_rstack_config()
+{
+    // 1. init header
+    tx_message.sap_id = LORAWAN_SAP_ID;
+    tx_message.msg_id = LORAWAN_MSG_GET_RSTACK_CONFIG_REQ;
     tx_message.length = 0;
 
     // 2. send HCI message without payload
@@ -283,19 +294,16 @@ int wimod_lorawan_set_rstack_config()
 {
     // 1. init header
     tx_message.sap_id = LORAWAN_SAP_ID;
-    tx_message.msg_id = LORAWAN_MSG_SET_RSTACK_CONFIG_REQ ;
-    tx_message.length = 7;
+    tx_message.msg_id = LORAWAN_MSG_SET_RSTACK_CONFIG_REQ;
+    tx_message.length = 6;
 
-    // 2. send HCI message without payload
-    return wimod_hci_send_message(&tx_message);
-}
-
-int wimod_lorawan_get_rstack_config()
-{
-    // 1. init header
-    tx_message.sap_id = LORAWAN_SAP_ID;
-    tx_message.msg_id = LORAWAN_MSG_GET_RSTACK_CONFIG_REQ ;
-    tx_message.length = 0;
+    tx_message.payload[0] = 3;
+    tx_message.payload[1] = 14;
+    tx_message.payload[2] = 0x03;
+    tx_message.payload[3] = 0x01;
+    tx_message.payload[4] = 7;
+    tx_message.payload[5] = 1;
+    //tx_message.payload[6] = 8;
 
     // 2. send HCI message without payload
     return wimod_hci_send_message(&tx_message);
@@ -508,10 +516,16 @@ static void wimod_lorawan_process_rstack_config_rsp(wimod_hci_message_t* rx_msg)
 	printf("Default Data Rate Index: %d\n", rx_msg->payload[1]);
 	printf("Default TX Power Level: %d\n", rx_msg->payload[2]);
 	printf("Options: 0x%02X\n", rx_msg->payload[3]);
-	printf("Power Saving Mode: %d\n", rx_msg->payload[4]);
+	printf("\tAdaptive Data Rate: %s\n", (rx_msg->payload[3] & 0x01) ? "enabled" : "disabled");
+	printf("\tDuty Cycle Control: %s\n", (rx_msg->payload[3] & 0x02) ? "enabled" : "disabled");
+	printf("\tDevice Class: %s\n", (rx_msg->payload[3] & 0x04) ? "C" : "A");
+	printf("\tRF packet output format: %s\n", (rx_msg->payload[3] & 0x40) ? "extended" : "standard");
+	printf("\tRx MAC Command Forwarding: %s\n", (rx_msg->payload[3] & 0x80) ? "enabled" : "disabled");
+	printf("Power Saving Mode: %s\n", rx_msg->payload[4] ? "automatic" : "off");
 	printf("Number of Retransmissions: %d\n", rx_msg->payload[5]);
 	printf("Band Index: %d\n", rx_msg->payload[6]);
-	printf("Header MAC Cmd Capacity: %d\n", rx_msg->payload[7] & 0xFF);
+	// not available in 1.11 specs
+	//printf("Header MAC Cmd Capacity: %d\n", rx_msg->payload[7] & 0xFF);
 
 }
 
@@ -542,6 +556,10 @@ static void wimod_lorawan_process_lorawan_message(wimod_hci_message_t* rx_msg)
         case    LORAWAN_MSG_SET_JOIN_PARAM_RSP:
                 wimod_lorawan_show_response("set join param response", wimod_lorawan_status_strings, rx_msg->payload[0]);
                 break;
+
+        case    LORAWAN_MSG_SET_RSTACK_CONFIG_RSP:
+				wimod_lorawan_show_response("set rstack response", wimod_lorawan_status_strings, rx_msg->payload[0]);
+				break;
 
         case    LORAWAN_MSG_SEND_UDATA_RSP:
                 wimod_lorawan_show_response("send U-Data response", wimod_lorawan_status_strings, rx_msg->payload[0]);

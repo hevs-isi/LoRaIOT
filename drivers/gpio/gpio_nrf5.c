@@ -19,6 +19,8 @@
 #include "nrf_common.h"
 #include "gpio_utils.h"
 
+#include <nrfx_gpiote.h>
+
 #if defined(CONFIG_SOC_SERIES_NRF51X)
 #define GPIOTE_CHAN_COUNT (4)
 #elif defined(CONFIG_SOC_SERIES_NRF52X)
@@ -270,11 +272,14 @@ static int gpio_nrf5_config(struct device *dev,
 		gpiote_chan_mask |= BIT(i);
 
 		/* configure GPIOTE channel */
-		config |= GPIOTE_CFG_EVT;
+		//config |= GPIOTE_CFG_EVT;
 		config |= GPIOTE_CFG_PIN(pin);
 		config |= GPIOTE_CFG_PORT(port);
 
 		gpiote->CONFIG[i] = config;
+
+		// clear the latch register
+		gpio->LATCH = 0xFFFFFFFF;
 	}
 
 
@@ -337,9 +342,10 @@ static int gpio_nrf5_enable_callback(struct device *dev,
 
 		data->pin_callback_enables |= BIT(pin);
 		/* clear event before any interrupt triggers */
-		gpiote->EVENTS_IN[i] = 0;
+		//gpiote->EVENTS_IN[i] = 0;
 		/* enable interrupt for the GPIOTE channel */
-		gpiote->INTENSET = BIT(i);
+		//gpiote->INTENSET = BIT(i);
+		gpiote->INTENSET = BIT(31);
 	} else {
 		return -ENOTSUP;
 	}
@@ -363,7 +369,8 @@ static int gpio_nrf5_disable_callback(struct device *dev,
 
 		data->pin_callback_enables &= ~(BIT(pin));
 		/* disable interrupt for the GPIOTE channel */
-		gpiote->INTENCLR = BIT(i);
+		//gpiote->INTENCLR = BIT(i);
+		gpiote->INTENCLR = BIT(31);
 	} else {
 		return -ENOTSUP;
 	}
@@ -399,29 +406,52 @@ static void gpio_nrf5_port_isr(void *arg)
 	u32_t enabled_int;
 	int i;
 
-	for (i = 0; i < GPIOTE_CHAN_COUNT; i++) {
-		if (gpiote->EVENTS_IN[i]) {
-			int port = GPIOTE_CFG_PORT_GET(gpiote->CONFIG[i]);
-			int pin = GPIOTE_CFG_PIN_GET(gpiote->CONFIG[i]);
+	dev = DEVICE_GET(gpio_nrf5_P0);
+	volatile struct _gpio *gpio = GPIO_STRUCT(dev);
 
-			gpiote->EVENTS_IN[i] = 0;
 
-			switch (port) {
-#if defined(CONFIG_GPIO_NRF5_P0)
-			case 0:
-				int_status_p0 |= BIT(pin);
-				break;
-#endif /* CONFIG_GPIO_NRF5_P0 */
 
-#if defined(CONFIG_GPIO_NRF5_P1)
-			case 1:
-				int_status_p1 |= BIT(pin);
-				break;
-#endif /* CONFIG_GPIO_NRF5_P1 */
+	if(gpiote->EVENTS_PORT){
+		gpiote->EVENTS_PORT = 0;
 
-			default:
-				/* NOTE: unknown port, ignore it */
-				break;
+		// the pin that have met the criteria set in the .SENSE register
+		int_status_p0 |= gpio->LATCH;
+
+		/*
+		for(i=0;i<31;i++){
+
+			if(nrf_gpio_pin_read(i)){
+				int_status_p0 |= BIT(i);
+			}
+		}*/
+
+
+	} else {
+
+		for (i = 0; i < GPIOTE_CHAN_COUNT; i++) {
+			if (gpiote->EVENTS_IN[i]) {
+				int port = GPIOTE_CFG_PORT_GET(gpiote->CONFIG[i]);
+				int pin = GPIOTE_CFG_PIN_GET(gpiote->CONFIG[i]);
+
+				gpiote->EVENTS_IN[i] = 0;
+
+				switch (port) {
+	#if defined(CONFIG_GPIO_NRF5_P0)
+				case 0:
+					int_status_p0 |= BIT(pin);
+					break;
+	#endif /* CONFIG_GPIO_NRF5_P0 */
+
+	#if defined(CONFIG_GPIO_NRF5_P1)
+				case 1:
+					int_status_p1 |= BIT(pin);
+					break;
+	#endif /* CONFIG_GPIO_NRF5_P1 */
+
+				default:
+					/* NOTE: unknown port, ignore it */
+					break;
+				}
 			}
 		}
 	}

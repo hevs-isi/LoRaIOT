@@ -58,7 +58,7 @@ static void pyd1588_thread_cb(void *arg)
 
 	gpio_pin_configure(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM,
 				   GPIO_DIR_IN | GPIO_INT | GPIO_INT_EDGE |
-				   GPIO_INT_ACTIVE_HIGH);
+				   GPIO_INT_ACTIVE_HIGH | (2 << 16));
 
 	gpio_pin_enable_callback(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM);
 
@@ -128,11 +128,13 @@ int pyd1588_init_interrupt(struct device *dev)
 
 	gpio_pin_configure(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM,
 			   GPIO_DIR_IN | GPIO_INT | GPIO_INT_EDGE |
-			   GPIO_INT_ACTIVE_HIGH);
+			   GPIO_INT_ACTIVE_HIGH | (2 << 16));
+
 
 	gpio_init_callback(&drv_data->gpio_cb,
 			   pyd1588_gpio_callback,
 			   BIT(CONFIG_PYD1588_DL_GPIO_PIN_NUM));
+
 
 	if (gpio_add_callback(drv_data->dl_gpio, &drv_data->gpio_cb) < 0) {
 		SYS_LOG_DBG("Failed to set gpio callback!");

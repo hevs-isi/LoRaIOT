@@ -35,6 +35,12 @@ static struct lpcomp_nrf5_data lpcomp_nrf5_dev_data = {
 	.callback = NULL,
 };
 
+static u8_t lpcomp_status;
+
+enum {
+	INITIALIZED,
+	ON
+};
 
 /** Configuration data */
 /*struct lpcomp_nrf5_config {
@@ -80,12 +86,18 @@ void lpcomp_event_handler(nrf_lpcomp_event_t event)
 
 static void lpcomp_nrf5_enable(struct device *dev)
 {
-	nrfx_lpcomp_enable();
+	if(lpcomp_status == INITIALIZED){
+		nrfx_lpcomp_enable();
+		lpcomp_status = ON;
+	}
 }
 
 static void lpcomp_nrf5_disable(struct device *dev)
 {
-	nrfx_lpcomp_disable();
+	if(lpcomp_status == ON){
+		nrfx_lpcomp_disable();
+		lpcomp_status = INITIALIZED;
+	}
 }
 
 /** Set the callback function */

@@ -31,9 +31,9 @@ static void analogmic_lpcomp_callback()
 
 	SYS_LOG_DBG("analogmic_lpcomp_callback");
 
-#if defined(CONFIG_PYD1588_TRIGGER_OWN_THREAD)
+#if defined(CONFIG_ANALOGMIC_TRIGGER_OWN_THREAD)
 	k_sem_give(&analogmic_driver.comp_sem);
-#elif defined(CONFIG_PYD1588_TRIGGER_GLOBAL_THREAD)
+#elif defined(CONFIG_ANALOGMIC_TRIGGER_GLOBAL_THREAD)
 	k_work_submit(&drv_data->work);
 #endif
 }
@@ -87,25 +87,45 @@ int analogmic_trigger_set(struct device *dev,
 		return -ENOTSUP;
 	}
 
-	//gpio_pin_disable_callback(drv_data->dl_gpio, CONFIG_ANALOGMIC_OUT_GPIO_PIN_NUM);
+	//lpcomp_disable(drv_data->comp);
 	drv_data->handler = handler;
 	drv_data->trigger = *trig;
-	//gpio_pin_enable_callback(drv_data->dl_gpio, CONFIG_ANALOGMIC_DL_GPIO_PIN_NUM);
+	//lpcomp_enable(drv_data->comp);
+
 	SYS_LOG_DBG("Sound trigger set");
 	return 0;
 }
 
+static void enable_interrupt(struct k_timer *timer_id)
+{
+#if CONFIG_LPCOMP_NRF5
+	lpcomp_enable(analogmic_driver.comp);
+#endif
+}
+
+K_TIMER_DEFINE(interrupt_delay, enable_interrupt, NULL);
+
 int analogmic_init_interrupt(struct device *dev)
 {
 	struct analogmic_data *drv_data = dev->driver_data;
+#if CONFIG_LPCOMP_NRF5
+	drv_data->comp = device_get_binding(CONFIG_LPCOMP_NRF5_DEV_NAME);
+#endif
+	// delay the activation of the low power comparator
+	// otherwise an interrupt is fired when the microphone is powered on
+	k_timer_start(&interrupt_delay, K_SECONDS(2), 0);
 
 	if(tid){
+#if CONFIG_LPCOMP_NRF5
+		// disable the comparator the next time the microphone is powered on
+		lpcomp_disable(drv_data->comp);
+#endif
 		return 0;
 	}
 
-	drv_data->comp = device_get_binding(CONFIG_LPCOMP_NRF5_DEV_NAME);
+#if CONFIG_LPCOMP_NRF5
 	lpcomp_callback_set(drv_data->comp, (lpcomp_callback_handler_t)analogmic_lpcomp_callback);
-	lpcomp_enable(drv_data->comp);
+#endif
 
 	SYS_LOG_DBG("Init analogmic trigger!");
 

@@ -41,3 +41,5 @@ tags
 .xxproject
 .envrc
 .vscode
+.settings/
+/core

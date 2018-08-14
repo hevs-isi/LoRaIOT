@@ -15,6 +15,8 @@
 
 #include <board_utils.h>
 
+#define NB_LEDS		3
+
 struct sensor_pwr_ctrl_cfg {
 	const char *name;
 	const char *port;
@@ -27,13 +29,20 @@ struct led_blink_data {
 	u8_t led;
 	u32_t period;
 	u32_t duration;
+	struct k_timer timer;
+	struct k_thread thread_data;
+	k_thread_stack_t *thread_stack;
+	u8_t active;
 };
 
+K_THREAD_STACK_DEFINE(led_blink_stack1, 256);
+K_THREAD_STACK_DEFINE(led_blink_stack2, 256);
+K_THREAD_STACK_DEFINE(led_blink_stack3, 256);
 
 static u8_t vddh_active;
 static struct device *led_dev;
 static u32_t led_status;
-static struct led_blink_data led_data;
+static struct led_blink_data led_data[NB_LEDS];
 
 static const struct sensor_pwr_ctrl_cfg pwr_ctrl_cfg[] = {
 #if CONFIG_SHTC1
@@ -125,19 +134,34 @@ static int pwr_ctrl_init(struct device *dev)
 	gpio_pin_write(gpio, EN_VDDH_PIN, 0);
 
 
+	gpio = device_get_binding(CONFIG_GPIO_NRF5_P0_DEV_NAME);
+	gpio_pin_configure(gpio, 11, GPIO_DIR_OUT);
+	gpio_pin_write(gpio, 11, 0);
+
+
+	gpio_pin_configure(gpio, 4, GPIO_DIR_OUT);
+	gpio_pin_write(gpio, 4, 0);
+
+	gpio_pin_configure(gpio, 5, GPIO_DIR_OUT);
+	gpio_pin_write(gpio, 5, 0);
+
+	gpio_pin_configure(gpio, CCS_POWER_PIN, GPIO_DIR_IN | GPIO_PUD_PULL_UP);
+	//gpio_pin_write(gpio, CCS_POWER_PIN, 0);
+
+
 	return 0;
 }
 
 void power_sensor(const char *name, u8_t power){
 	struct device *gpio;
 	struct device *dev;
-	u8_t i;
+	u8_t i, found=0;
 	u8_t buf[1];
 
 	// power on/off the sensor and de/activate the corresponding I2C channel
 	for(i=0;i<sizeof(pwr_ctrl_cfg)/sizeof(pwr_ctrl_cfg[0]);i++){
 		if(strcmp(name, pwr_ctrl_cfg[i].name) == 0){
-
+			found = 1;
 			// turn on device before I2C switch configuration
 			// (bug when turned off before disabling I2C channel)
 			if(power){
@@ -189,6 +213,10 @@ void power_sensor(const char *name, u8_t power){
 		}
 	}
 
+	if(!found){
+		SYS_LOG_ERR("Sensor %s not found!", name);
+	}
+
 }
 
 void enable_high_voltage(u8_t status)
@@ -208,33 +236,45 @@ u8_t get_vddh_status(void)
 
 static void led_blink(void *arg1, void *arg2, void *arg3)
 {
+	ARG_UNUSED(arg2);
 	ARG_UNUSED(arg3);
 
-	while (1) {
+	struct led_blink_data *one_led_data = arg1;
+
+	SYS_LOG_DBG("Start thread for led blinking %d\n", one_led_data->led);
+
+	while (one_led_data->active) {
 		/*if(cnt % 2){
 			VDDH_DEACTIVATE();
 		} else {
 			VDDH_ACTIVATE();
 		}*/
 
-		led_toggle(led_data.led);
-		k_sleep(led_data.period);
 
-
+		led_toggle(one_led_data->led);
+		k_sleep(one_led_data->period);
 	}
+	led_off(one_led_data->led);
 }
 
 
-K_THREAD_DEFINE(led_blinking_thread_id, 128, led_blink, NULL, NULL, NULL,
-		0, 0, K_NO_WAIT);
+/*
+K_THREAD_DEFINE(led_blinking_thread_id, 1024, led_blink, NULL, NULL, NULL,
+		K_PRIO_PREEMPT(0), 0, K_NO_WAIT);*/
 
 
 void led_blink_timeout(struct k_timer *timer_id)
 {
-	k_thread_suspend(led_blinking_thread_id);
-}
-K_TIMER_DEFINE(led_blink_timer, led_blink_timeout, NULL);
+	u8_t i;
 
+	for(i=0;i<NB_LEDS;i++){
+		if(timer_id == &led_data[i].timer){
+			led_data[i].active = 0;
+			break;
+		}
+	}
+
+}
 
 void led_on(u8_t led)
 {
@@ -259,16 +299,30 @@ void led_toggle(u8_t led)
 
 void blink_led(u8_t led, u32_t period_ms, u32_t duration_ms)
 {
-	led_off(LED_GREEN);
-	led_off(LED_BLUE);
-	led_off(LED_RED);
+	u8_t i;
 
-	led_data.led = led;
-	led_data.period = period_ms;
-	led_data.duration = duration_ms;
+	for(i=0;i<NB_LEDS;i++){
+		if(led == led_data[i].led){
 
-	k_timer_start(&led_blink_timer, duration_ms, 0);
-	k_thread_resume(led_blinking_thread_id);
+			if(led_data[i].active){
+				break;
+			}
+
+			led_data[i].period = period_ms;
+			led_data[i].duration = duration_ms;
+			led_data[i].active = 1;
+
+			k_thread_create(&led_data[i].thread_data, led_data[i].thread_stack,
+					K_THREAD_STACK_SIZEOF(led_data[i].thread_stack),
+					(k_thread_entry_t)led_blink,
+					&led_data[i], NULL, NULL, K_PRIO_COOP(0), 0, K_NO_WAIT);
+
+			k_timer_start(&led_data[i].timer, duration_ms, 0);
+			SYS_LOG_DBG("Blink led %d\n", led_data[i].led);
+			break;
+		}
+
+	}
 
 }
 
@@ -288,8 +342,17 @@ static int board_init(struct device *dev)
 	gpio_pin_write(led_dev, LED_BLUE, 1);
 	gpio_pin_write(led_dev, LED_RED, 1);
 
-	//k_thread_start(led_blinking_thread_id);
-	k_thread_suspend(led_blinking_thread_id);
+	led_data[0].led = LED_GREEN;
+	led_data[1].led = LED_BLUE;
+	led_data[2].led = LED_RED;
+
+	led_data[0].thread_stack = led_blink_stack1;
+	led_data[1].thread_stack = led_blink_stack2;
+	led_data[2].thread_stack = led_blink_stack3;
+
+	k_timer_init(&led_data[0].timer, led_blink_timeout, NULL);
+	k_timer_init(&led_data[1].timer, led_blink_timeout, NULL);
+	k_timer_init(&led_data[2].timer, led_blink_timeout, NULL);
 
 	return 0;
 }

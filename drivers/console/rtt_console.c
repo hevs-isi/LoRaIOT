@@ -147,12 +147,12 @@ static int rtt_console_init(struct device *arg)
 	__printk_hook_install(rtt_console_out);
 	__stdout_hook_install(rtt_console_out);
 
-
+#if CONFIG_CONSOLE_SHELL
 	k_thread_create(&rttterm_thread_data, rttterm_stack,
 				K_THREAD_STACK_SIZEOF(rttterm_stack),
 				(k_thread_entry_t)RTT_terminal,
 				NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, 0);
-
+#endif
 
 
 	SYS_LOG_INF("RTT console initialized\n");
