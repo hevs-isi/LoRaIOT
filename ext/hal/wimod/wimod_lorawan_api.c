@@ -656,7 +656,9 @@ void wimod_lorawan_process_join_network_indication(wimod_hci_message_t* rx_msg)
 
         printf("join network accept event - DeviceAddress:0x%08X\n\r", address);
 
-        (*join_callback)();
+        if(join_callback){
+        	(*join_callback)();
+        }
     }
     else if (rx_msg->payload[0] == 1)
     {
@@ -667,7 +669,9 @@ void wimod_lorawan_process_join_network_indication(wimod_hci_message_t* rx_msg)
                (int)rx_msg->payload[5], (int)rx_msg->payload[6], (int)rx_msg->payload[7],
                (int)rx_msg->payload[8], (int)rx_msg->payload[9]);
 
-        (*join_callback)();
+        if(join_callback){
+        	(*join_callback)();
+        }
     }
     else
     {

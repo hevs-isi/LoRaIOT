@@ -134,7 +134,7 @@ bool wimod_hci_init(wimod_hci_cb_rx_message   cb_rx_message,
     slip_set_rx_buffer(&rx_message->sap_id, sizeof(wimod_hci_message_t) - sizeof(u16_t));
 
     //uart_pipe_register(rxsplipbuf, sizeof(rxsplipbuf), upipe_rx);
-    uart_dev = device_get_binding("UART_0");
+    uart_dev = device_get_binding(CONFIG_LORA_IM881A_UART_DRV_NAME);
     uart_irq_callback_set(uart_dev, uart_isr);
 
     /* Drain the fifo */

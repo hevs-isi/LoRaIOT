@@ -38,6 +38,7 @@ static struct lpcomp_nrf5_data lpcomp_nrf5_dev_data = {
 static u8_t lpcomp_status;
 
 enum {
+	UNINITIALIZED,
 	INITIALIZED,
 	ON
 };
@@ -135,6 +136,8 @@ static int lpcomp_nrf5_init(struct device *dev)
 		return 1;
 	}
 
+	lpcomp_status = INITIALIZED;
+
 	return 0;
 }
 /*
@@ -148,7 +151,7 @@ static const nrfx_lpcomp_config_t lpcomp_nrf5_cfg = {
 */
 
 static const nrfx_lpcomp_config_t lpcomp_nrf5_cfg = {
-		.hal    = { (nrf_lpcomp_ref_t)NRF_LPCOMP_REF_SUPPLY_3_8 ,    \
+		.hal    = { (nrf_lpcomp_ref_t)NRF_LPCOMP_REF_SUPPLY_5_8 ,    \
 					(nrf_lpcomp_detect_t)NRF_LPCOMP_DETECT_CROSS,  \
 					(nrf_lpcomp_hysteresis_t)NRF_LPCOMP_HYST_NOHYST }, \
 		.input  = (nrf_lpcomp_input_t)NRF_LPCOMP_INPUT_5,         \

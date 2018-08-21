@@ -36,6 +36,7 @@
 #define	PYD1588_CONF_BLIND_TIME_4S		(7 << 13)
 #define	PYD1588_CONF_BLIND_TIME_8S		(15 << 13)
 #define	PYD1588_CONF_THRESHOLD_0		(0 << 17)
+#define	PYD1588_CONF_THRESHOLD_2		(2 << 17)
 #define	PYD1588_CONF_THRESHOLD_4		(4 << 17)
 #define	PYD1588_CONF_THRESHOLD_8		(8 << 17)
 #define	PYD1588_CONF_THRESHOLD_16		(16 << 17)
@@ -84,6 +85,8 @@ int pyd1588_trigger_set(struct device *dev,
 		       sensor_trigger_handler_t handler);
 
 int pyd1588_init_interrupt(struct device *dev);
+
+void pyd1588_reset_interrupt(struct device *dev);
 
 
 #define SYS_LOG_DOMAIN "PYD1588"

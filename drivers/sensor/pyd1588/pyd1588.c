@@ -5,16 +5,21 @@
 #include <sensor.h>
 #include <misc/__assert.h>
 
+
+
 struct pyd1588_data pyd1588_driver;
 
 static void configure_pir_sensor(struct k_timer *timer_id)
 {
-	pyd1588_write_config(&pyd1588_driver, PYD1588_CONF_THRESHOLD_16 |
+	struct device *dev;
+	dev = device_get_binding(CONFIG_PYD1588_NAME);
+	pyd1588_write_config(&pyd1588_driver, PYD1588_CONF_THRESHOLD_128 |
 			PYD1588_CONF_MODE_WAKEUP | PYD1588_CONF_PDM_SIGN_NOCHG |
-			PYD1588_CONF_WINDOW_8S |
-			PYD1588_CONF_BLIND_TIME_8S);
+			PYD1588_CONF_WINDOW_2S | PYD1588_CONF_PULSE_CNT_2 |
+			PYD1588_CONF_BLIND_TIME_05S);
 	//pyd1588_write_config(&pyd1588_driver, 0x00304D10);
 	SYS_LOG_INF("Write config");
+	pyd1588_reset_interrupt(dev);
 }
 
 K_TIMER_DEFINE(configure_delay, configure_pir_sensor, NULL);
@@ -186,6 +191,7 @@ static int pyd1588_init(struct device *dev)
 		SYS_LOG_DBG("Failed to initialize interrupt");
 		return -EIO;
 	}
+
 
 	// give some time to the sensor to settle before sending configuration
 	k_timer_start(&configure_delay, K_SECONDS(5), 0);

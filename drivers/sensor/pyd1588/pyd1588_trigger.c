@@ -22,6 +22,19 @@ int pyd1588_attr_set(struct device *dev,
 	return 0;
 }
 
+void pyd1588_reset_interrupt(struct device *dev)
+{
+	struct pyd1588_data *drv_data = dev->driver_data;
+	gpio_pin_configure(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM, GPIO_DIR_OUT);
+	gpio_pin_write(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM, 0);
+
+	gpio_pin_configure(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM,
+				   GPIO_DIR_IN | GPIO_INT | GPIO_INT_EDGE |
+				   GPIO_INT_ACTIVE_HIGH | (2 << 16));
+
+	gpio_pin_enable_callback(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM);
+}
+
 static void pyd1588_gpio_callback(struct device *dev,
 				 struct gpio_callback *cb, u32_t pins)
 {
@@ -46,21 +59,14 @@ static void pyd1588_thread_cb(void *arg)
 
 	SYS_LOG_DBG("Motion detected");
 
-	pyd1588_read(drv_data);
+	//pyd1588_read(drv_data);
 
 	if (drv_data->handler != NULL) {
 		drv_data->handler(dev, &drv_data->trigger);
 	}
 
 	// reset interrupt
-	gpio_pin_configure(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM, GPIO_DIR_OUT);
-	gpio_pin_write(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM, 0);
-
-	gpio_pin_configure(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM,
-				   GPIO_DIR_IN | GPIO_INT | GPIO_INT_EDGE |
-				   GPIO_INT_ACTIVE_HIGH | (2 << 16));
-
-	gpio_pin_enable_callback(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM);
+	//pyd1588_reset_interrupt(dev);
 
 }
 
@@ -114,22 +120,26 @@ int pyd1588_init_interrupt(struct device *dev)
 {
 	struct pyd1588_data *drv_data = dev->driver_data;
 
+	drv_data->dl_gpio = device_get_binding(CONFIG_PYD1588_DL_GPIO_DEV_NAME);
+
 	if(tid){
+		//gpio_pin_disable_callback(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM);
 		return 0;
 	}
 
 	/* setup gpio interrupt */
-	drv_data->dl_gpio = device_get_binding(CONFIG_PYD1588_DL_GPIO_DEV_NAME);
 	if (drv_data->dl_gpio == NULL) {
 		SYS_LOG_DBG("Failed to get pointer to %s device!",
 		    CONFIG_PYD1588_DL_GPIO_DEV_NAME);
 		return -EINVAL;
 	}
 
+/*
 	gpio_pin_configure(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM,
 			   GPIO_DIR_IN | GPIO_INT | GPIO_INT_EDGE |
-			   GPIO_INT_ACTIVE_HIGH | (2 << 16));
+			   GPIO_INT_ACTIVE_HIGH | (2 << 16));*/
 
+	//gpio_pin_disable_callback(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM);
 
 	gpio_init_callback(&drv_data->gpio_cb,
 			   pyd1588_gpio_callback,
@@ -140,6 +150,10 @@ int pyd1588_init_interrupt(struct device *dev)
 		SYS_LOG_DBG("Failed to set gpio callback!");
 		return -EIO;
 	}
+
+
+	gpio_pin_disable_callback(drv_data->dl_gpio, CONFIG_PYD1588_DL_GPIO_PIN_NUM);
+	//pyd1588_reset_interrupt(dev);
 
 	SYS_LOG_DBG("Init trigger!");
 

@@ -177,7 +177,7 @@ int wimod_lorawan_get_device_eui();
 int wimod_lorawan_set_join_param_request();
 
 // join network
-int wimod_lorawan_join_network_request();
+int wimod_lorawan_join_network_request(join_network_cb cb);
 
 // send unconfirmed radio data
 int wimod_lorawan_send_u_radio_data(u8_t port, u8_t* data, int length);

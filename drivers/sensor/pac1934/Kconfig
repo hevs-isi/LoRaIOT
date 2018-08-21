@@ -1,0 +1,41 @@
+# Kconfig - PAC1934 temperature and humidity sensor configuration options
+
+#
+# Copyright (c) 2016 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menuconfig PAC1934
+	bool
+	prompt "PAC1934 Power Monitor"
+	depends on I2C
+	default n
+	help
+	  Enable driver for PAC1934 power monitor device.
+
+config PAC1934_NAME
+	string
+	prompt "Driver name"
+	default "PAC1934"
+	depends on PAC1934
+	help
+	  Device name with which the PAC1934 sensor is identified.
+
+config PAC1934_I2C_ADDR
+	hex "PAC1934 I2C address"
+	depends on PAC1934
+	default "0x10"
+	help
+	  I2C address of the PAC1934 device.
+
+config PAC1934_I2C_MASTER_DEV_NAME
+	string
+	prompt "I2C master where PAC1934 is connected"
+	depends on PAC1934
+	default "I2C_0"
+	help
+	  Specify the device name of the I2C master device to which the
+	  PAC1934 chip is connected.
+	  
+	  

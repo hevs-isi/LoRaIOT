@@ -41,6 +41,7 @@ add_subdirectory_ifdef(CONFIG_SHTC1         shtc1)
 add_subdirectory_ifdef(CONFIG_OPT3002       opt3002)
 add_subdirectory_ifdef(CONFIG_PYD1588       pyd1588)
 add_subdirectory_ifdef(CONFIG_ANALOGMIC     analogmic)
+add_subdirectory_ifdef(CONFIG_PAC1934       pac1934)
 
 zephyr_library_ifdef(CONFIG_USERSPACE)
 zephyr_library_sources_ifdef(CONFIG_USERSPACE sensor_handlers.c)

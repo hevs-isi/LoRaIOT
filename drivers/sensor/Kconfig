@@ -126,4 +126,6 @@ source "drivers/sensor/pyd1588/Kconfig"
 
 source "drivers/sensor/analogmic/Kconfig"
 
+source "drivers/sensor/pac1934/Kconfig"
+
 endif # SENSOR

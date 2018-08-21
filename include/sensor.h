@@ -140,10 +140,18 @@ enum sensor_channel {
 
 	/** Voltage, in volts **/
 	SENSOR_CHAN_VOLTAGE,
+	SENSOR_CHAN_VOLTAGE_1,
+	SENSOR_CHAN_VOLTAGE_2,
+	SENSOR_CHAN_VOLTAGE_3,
+	SENSOR_CHAN_VOLTAGE_4,
 	/** Current, in amps **/
 	SENSOR_CHAN_CURRENT,
+	SENSOR_CHAN_CURRENT_1,
+	SENSOR_CHAN_CURRENT_2,
+	SENSOR_CHAN_CURRENT_3,
+	SENSOR_CHAN_CURRENT_4,
 
-	/** All channels. */
+		/** All channels. */
 	SENSOR_CHAN_ALL,
 };
 
