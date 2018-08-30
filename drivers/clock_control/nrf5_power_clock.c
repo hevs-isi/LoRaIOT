@@ -184,6 +184,7 @@ static int _k32src_start(struct device *dev, clock_control_subsys_t sub_system)
 	/* Start and spin-wait until clock settles */
 	NRF_CLOCK->TASKS_LFCLKSTART = 1;
 
+
 	while (NRF_CLOCK->EVENTS_LFCLKSTARTED == 0) {
 		__WFE();
 		__SEV();
@@ -211,7 +212,7 @@ static int _k32src_start(struct device *dev, clock_control_subsys_t sub_system)
 		int err;
 
 		/* Set the Calibration Timer Initial Value */
-		NRF_CLOCK->CTIV = 16;	/* 4s in 0.25s units */
+		NRF_CLOCK->CTIV = 120;	/* 30s in 0.25s units */
 
 		/* Enable DONE and CTTO IRQs */
 		NRF_CLOCK->INTENSET =

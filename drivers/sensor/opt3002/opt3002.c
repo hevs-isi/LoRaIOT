@@ -54,7 +54,7 @@ static int opt3002_sample_fetch(struct device *dev, enum sensor_channel chan)
 
 	opt3002_write_reg(drv_data, OPT3002_REG_CONFIG, OPT3002_CONFIG_RESET | OPT3002_CONF_MODE);
 	// Set by default to maximum conversion time + security
-	k_sleep(1000);
+	k_sleep(2000);
 	if(opt3002_read_reg(drv_data, OPT3002_REG_RESULT, rx_buf) > 0){
 		SYS_LOG_DBG("Failed to read result register!");
 	}
@@ -107,6 +107,9 @@ static int opt3002_init(struct device *dev)
 		    CONFIG_OPT3002_I2C_MASTER_DEV_NAME);
 		return -EINVAL;
 	}
+
+	// gives sensor time to start
+	k_sleep(10);
 
 #ifdef CONFIG_OPT3002_TRIGGER
 	if (opt3002_init_interrupt(dev) < 0) {

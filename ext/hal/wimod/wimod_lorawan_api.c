@@ -48,6 +48,12 @@ static void
 wimod_lorawan_devmgmt_firmware_version_rsp(wimod_hci_message_t* rx_msg);
 
 static void
+wimod_lorawan_get_rtc_rsp(wimod_hci_message_t* rx_msg);
+
+static void
+wimod_lorawan_get_rtc_alarm_rsp(wimod_hci_message_t* rx_msg);
+
+static void
 wimod_lorawan_process_lorawan_message(wimod_hci_message_t* rx_msg);
 
 static void
@@ -196,6 +202,44 @@ int wimod_lorawan_get_firmware_version()
     // 1. init header
     tx_message.sap_id = DEVMGMT_SAP_ID;
     tx_message.msg_id = DEVMGMT_MSG_GET_FW_VERSION_REQ;
+    tx_message.length = 0;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
+}
+
+int wimod_lorawan_get_rtc()
+{
+    // 1. init header
+    tx_message.sap_id = DEVMGMT_SAP_ID;
+    tx_message.msg_id = DEVMGMT_MSG_GET_RTC_REQ;
+    tx_message.length = 0;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
+}
+
+int wimod_lorawan_set_rtc()
+{
+    // 1. init header
+    tx_message.sap_id = DEVMGMT_SAP_ID;
+    tx_message.msg_id = DEVMGMT_MSG_SET_RTC_REQ;
+    tx_message.length = 4;
+
+    tx_message.payload[0] = 0;
+    tx_message.payload[1] = 0;
+    tx_message.payload[2] = 0;
+    tx_message.payload[3] = 0;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
+}
+
+int wimod_lorawan_get_rtc_alarm()
+{
+    // 1. init header
+    tx_message.sap_id = DEVMGMT_SAP_ID;
+    tx_message.msg_id = DEVMGMT_MSG_GET_RTC_ALARM_REQ;
     tx_message.length = 0;
 
     // 2. send HCI message without payload
@@ -433,6 +477,18 @@ static void wimod_lorawan_process_devmgmt_message(wimod_hci_message_t* rx_msg)
                 wimod_lorawan_devmgmt_firmware_version_rsp(rx_msg);
                 break;
 
+        case    DEVMGMT_MSG_GET_RTC_RSP:
+				wimod_lorawan_get_rtc_rsp(rx_msg);
+				break;
+
+        case    DEVMGMT_MSG_SET_RTC_RSP:
+        		wimod_lorawan_show_response("set rtc response", wimod_device_mgmt_status_strings, rx_msg->payload[0]);
+				break;
+
+        case    DEVMGMT_MSG_GET_RTC_ALARM_RSP:
+				wimod_lorawan_get_rtc_alarm_rsp(rx_msg);
+				break;
+
         default:
                 printf("unhandled DeviceMgmt message received - msg_id : 0x%02X\n\r", (u8_t)rx_msg->msg_id);
                 break;
@@ -469,6 +525,32 @@ static void wimod_lorawan_devmgmt_firmware_version_rsp(wimod_hci_message_t* rx_m
             rx_msg->payload[rx_msg->length] = 0;
             printf("firmware-content: %s\n\r", &rx_msg->payload[15]);
         }
+    }
+}
+
+static void wimod_lorawan_get_rtc_rsp(wimod_hci_message_t* rx_msg)
+{
+    u32_t rtc_value;
+
+    wimod_lorawan_show_response("get rtc response", wimod_device_mgmt_status_strings, rx_msg->payload[0]);
+
+    if (rx_msg->payload[0] == DEVMGMT_STATUS_OK)
+    {
+    	rtc_value = MAKELONG(MAKEWORD(rx_msg->payload[4], rx_msg->payload[3]),
+    				MAKEWORD(rx_msg->payload[2], rx_msg->payload[1]));
+
+    	printf("RTC: %d\n\r", rtc_value);
+    }
+}
+
+static void wimod_lorawan_get_rtc_alarm_rsp(wimod_hci_message_t* rx_msg)
+{
+    wimod_lorawan_show_response("get rtc alarm response", wimod_device_mgmt_status_strings, rx_msg->payload[0]);
+
+    if (rx_msg->payload[0] == DEVMGMT_STATUS_OK)
+    {
+    	printf("Alarm Status: %d\n\r", rx_msg->payload[1]);
+    	printf("Options: %d\n\r", rx_msg->payload[2]);
     }
 }
 

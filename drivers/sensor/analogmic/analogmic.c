@@ -33,6 +33,7 @@ static const struct sensor_driver_api analogmic_driver_api = {
 
 static int analogmic_init(struct device *dev)
 {
+
 	if (analogmic_init_interrupt(dev) < 0) {
 		SYS_LOG_DBG("Failed to initialize interrupt");
 		return -EIO;

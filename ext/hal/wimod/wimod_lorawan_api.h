@@ -192,6 +192,9 @@ int wimod_lorawan_get_nwk_status();
 
 int wimod_lorawan_set_rstack_config();
 int wimod_lorawan_get_rstack_config();
+int wimod_lorawan_get_rtc();
+int wimod_lorawan_set_rtc();
+int wimod_lorawan_get_rtc_alarm();
 
 #endif // WIMOD_LORAWAN_API_H
 

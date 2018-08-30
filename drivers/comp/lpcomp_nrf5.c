@@ -158,6 +158,7 @@ static const nrfx_lpcomp_config_t lpcomp_nrf5_cfg = {
 		.interrupt_priority = 0           \
 };
 
+
 DEVICE_AND_API_INIT(lpcomp_nrf5, CONFIG_LPCOMP_NRF5_DEV_NAME, lpcomp_nrf5_init,
 		    &lpcomp_nrf5_dev_data, &lpcomp_nrf5_cfg,
 		    POST_KERNEL, CONFIG_LPCOMP_NRF5_INIT_PRIORITY,

@@ -15,6 +15,7 @@
 
 #include <board_utils.h>
 #include <lpcomp.h>
+#include <nrf_lpcomp.h>
 
 #define NB_LEDS		3
 
@@ -31,14 +32,12 @@ struct led_blink_data {
 	u32_t period;
 	u32_t duration;
 	struct k_timer timer;
-	struct k_thread thread_data;
-	k_thread_stack_t *thread_stack;
+	struct k_work work;
 	u8_t active;
 };
 
-K_THREAD_STACK_DEFINE(led_blink_stack1, 256);
-K_THREAD_STACK_DEFINE(led_blink_stack2, 256);
-K_THREAD_STACK_DEFINE(led_blink_stack3, 256);
+K_THREAD_STACK_DEFINE(led_blinking_stack, 256);
+static struct k_work_q led_blinking_work_q;
 
 static u8_t vddh_active;
 static struct device *led_dev;
@@ -145,8 +144,7 @@ static int pwr_ctrl_init(struct device *dev)
 	gpio_pin_configure(gpio, 4, GPIO_DIR_OUT);
 	gpio_pin_write(gpio, 4, 0);
 
-	gpio_pin_configure(gpio, 5, GPIO_DIR_OUT);
-	gpio_pin_write(gpio, 5, 0);
+	gpio_pin_configure(gpio, 5, GPIO_DIR_IN);
 
 	gpio_pin_configure(gpio, CCS_POWER_PIN, GPIO_DIR_IN | GPIO_PUD_PULL_UP);
 	//gpio_pin_write(gpio, CCS_POWER_PIN, 0);
@@ -241,9 +239,7 @@ void power_sensor(const char *name, u8_t power){
 #if CONFIG_LPCOMP_NRF5
 static void enable_interrupt(struct k_timer *timer_id)
 {
-	struct device *lpcomp;
-	lpcomp = device_get_binding(CONFIG_LPCOMP_NRF5_DEV_NAME);
-	lpcomp_enable(lpcomp);
+	nrf_lpcomp_int_enable(LPCOMP_INTENSET_CROSS_Msk);
 }
 
 K_TIMER_DEFINE(lpcomp_interrupt_delay, enable_interrupt, NULL);
@@ -252,13 +248,6 @@ K_TIMER_DEFINE(lpcomp_interrupt_delay, enable_interrupt, NULL);
 void enable_high_voltage(u8_t status)
 {
 	struct device *gpio;
-	struct device *lpcomp;
-
-#if CONFIG_LPCOMP_NRF5
-	// the microphone threshold is configured with the low voltage
-	// we need to disable interrupt when the power supply change
-	lpcomp = device_get_binding(CONFIG_LPCOMP_NRF5_DEV_NAME);
-#endif
 
 	if(status){
 		gpio = device_get_binding(DISABLE_BOOST_PORT);
@@ -267,7 +256,7 @@ void enable_high_voltage(u8_t status)
 		// wait boost converter to settle
 		k_busy_wait(1000);
 #if CONFIG_LPCOMP_NRF5
-		lpcomp_disable(lpcomp);
+		nrf_lpcomp_int_disable(LPCOMP_INTENSET_CROSS_Msk);
 #endif
 	}
 
@@ -281,7 +270,7 @@ void enable_high_voltage(u8_t status)
 		gpio_pin_configure(gpio, DISABLE_BOOST_PIN, GPIO_DIR_IN | GPIO_PUD_PULL_DOWN);
 #if CONFIG_LPCOMP_NRF5
 		// power supply takes time to drop to lower voltage -> delay interrupt enable
-		k_timer_start(&lpcomp_interrupt_delay, K_SECONDS(3), 0);
+		k_timer_start(&lpcomp_interrupt_delay, K_SECONDS(1), 0);
 #endif
 
 	}
@@ -294,12 +283,10 @@ u8_t get_vddh_status(void)
 	return vddh_active;
 }
 
-static void led_blink(void *arg1, void *arg2, void *arg3)
+static void led_blink_work(struct k_work *item)
 {
-	ARG_UNUSED(arg2);
-	ARG_UNUSED(arg3);
-
-	struct led_blink_data *one_led_data = arg1;
+	struct led_blink_data *one_led_data =
+	        CONTAINER_OF(item, struct led_blink_data, work);
 
 	SYS_LOG_DBG("Start thread for led blinking %d\n", one_led_data->led);
 
@@ -312,12 +299,6 @@ static void led_blink(void *arg1, void *arg2, void *arg3)
 		VDDH_DEACTIVATE();
 	}
 }
-
-
-/*
-K_THREAD_DEFINE(led_blinking_thread_id, 1024, led_blink, NULL, NULL, NULL,
-		K_PRIO_PREEMPT(0), 0, K_NO_WAIT);*/
-
 
 void led_blink_timeout(struct k_timer *timer_id)
 {
@@ -372,15 +353,11 @@ void blink_led(u8_t led, u32_t period_ms, u32_t duration_ms)
 			led_data[i].duration = duration_ms;
 			led_data[i].active = 1;
 
-
 			if( NOT_IN_DEBUG() ){
 				VDDH_ACTIVATE();
 			}
 
-			k_thread_create(&led_data[i].thread_data, led_data[i].thread_stack,
-					K_THREAD_STACK_SIZEOF(led_data[i].thread_stack),
-					(k_thread_entry_t)led_blink,
-					&led_data[i], NULL, NULL, K_PRIO_COOP(0), 0, K_NO_WAIT);
+			k_work_submit(&led_data[i].work);
 
 			k_timer_start(&led_data[i].timer, duration_ms, 0);
 			SYS_LOG_DBG("Blink led %d\n", led_data[i].led);
@@ -411,13 +388,16 @@ static int board_init(struct device *dev)
 	led_data[1].led = LED_BLUE;
 	led_data[2].led = LED_RED;
 
-	led_data[0].thread_stack = led_blink_stack1;
-	led_data[1].thread_stack = led_blink_stack2;
-	led_data[2].thread_stack = led_blink_stack3;
-
 	k_timer_init(&led_data[0].timer, led_blink_timeout, NULL);
 	k_timer_init(&led_data[1].timer, led_blink_timeout, NULL);
 	k_timer_init(&led_data[2].timer, led_blink_timeout, NULL);
+
+	k_work_q_start(&led_blinking_work_q, led_blinking_stack,
+	               K_THREAD_STACK_SIZEOF(led_blinking_stack), 30);
+
+	k_work_init(&led_data[0].work, led_blink_work);
+	k_work_init(&led_data[1].work, led_blink_work);
+	k_work_init(&led_data[2].work, led_blink_work);
 
 	return 0;
 }

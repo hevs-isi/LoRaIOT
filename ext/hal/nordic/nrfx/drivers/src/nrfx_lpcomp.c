@@ -155,7 +155,7 @@ void nrfx_lpcomp_enable(void)
 
 void nrfx_lpcomp_disable(void)
 {
-    NRFX_ASSERT(m_state == NRFX_DRV_STATE_POWERED_ON);
+    //NRFX_ASSERT(m_state == NRFX_DRV_STATE_POWERED_ON);
     nrf_lpcomp_disable();
     nrf_lpcomp_task_trigger(NRF_LPCOMP_TASK_STOP);
     m_state = NRFX_DRV_STATE_INITIALIZED;

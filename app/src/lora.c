@@ -25,6 +25,36 @@ static int shell_cmd_info(int argc, char *argv[])
 	return 0;
 }
 
+static int shell_cmd_get_rtc(int argc, char *argv[])
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	wimod_lorawan_get_rtc();
+
+	return 0;
+}
+
+static int shell_cmd_set_rtc(int argc, char *argv[])
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	wimod_lorawan_set_rtc();
+
+	return 0;
+}
+
+static int shell_cmd_get_rtc_alarm(int argc, char *argv[])
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	wimod_lorawan_get_rtc_alarm();
+
+	return 0;
+}
+
 static int shell_factory_reset(int argc, char *argv[])
 {
 	ARG_UNUSED(argc);
@@ -130,6 +160,9 @@ static int shell_send_cdata(int argc, char *argv[])
 
 static struct shell_cmd commands[] = {
 	{ "firmware", shell_cmd_info, NULL },
+	{ "get_rtc", shell_cmd_get_rtc, NULL },
+	{ "set_rtc", shell_cmd_set_rtc, NULL },
+	{ "get_rtc_alarm", shell_cmd_get_rtc_alarm, NULL },
 	{ "factory", shell_factory_reset, NULL },
 	{ "deveui", shell_cmd_deveui, NULL },
 	{ "set", shell_cmd_setparam, NULL },
@@ -145,12 +178,16 @@ static struct shell_cmd commands[] = {
 
 void disable_uart()
 {
-	*(uart_cfg->base + 0x500) = 0;
+	if( NOT_IN_DEBUG() ){
+		*(uart_cfg->base + 0x500) = 0;
+	}
 }
 
 void enable_uart()
 {
-	*(uart_cfg->base + 0x500) = 4UL;
+	if( NOT_IN_DEBUG() ){
+		*(uart_cfg->base + 0x500) = 4UL;
+	}
 }
 
 void join_callback()
