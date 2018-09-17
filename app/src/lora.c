@@ -205,11 +205,13 @@ void lora_init()
 	uart = device_get_binding(CONFIG_LORA_IM881A_UART_DRV_NAME);
 	uart_cfg = (struct uart_device_config *)(uart->config->config_info);
 
+	/* BUG: couldn't launch the debug when the function 'uart_irq_rx_enable' is called tool quickly */
+	k_busy_wait(1000000);
+
 	wimod_lorawan_init();
 
 	wimod_lorawan_join_network_request(join_callback);
 
 	disable_uart();
-
 
 }

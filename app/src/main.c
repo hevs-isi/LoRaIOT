@@ -36,6 +36,7 @@
 
 #include <power.h>
 #include <soc_power.h>
+#include <board.h>
 
 
 #define POWER_MANAGEMENT	0
@@ -126,6 +127,7 @@ static void printer_thread()
 {
 	struct device *dev;
 	struct sensor_value temp_value;
+	int inc = 0;
 
 	//dev = device_get_binding(CONFIG_PYD1588_NAME);
 	for (;;) {
@@ -137,7 +139,7 @@ static void printer_thread()
 		//i2c_burst_read_addr(dev, 0x5a, tx_buf, 1, rx_buf, 2);
 
 #if CONFIG_SEGGER_SYSTEMVIEW
-		SEGGER_SYSVIEW_PrintfHost("Hello world %d", inc++);
+		//SEGGER_SYSVIEW_PrintfHost("Hello world %d", inc++);
 #endif
 		//printk("Printer thread says hello\n");
 		//SYS_LOG_ERR("This is an error!");
@@ -332,23 +334,28 @@ void main(void)
 	lora_init();
 #endif
 
+
+	//SYS_LOG_ERR("This is an error!");
+
 /*
 	tid_tmp = k_thread_create(&printer_thread_data, printer_stack,
 				K_THREAD_STACK_SIZEOF(printer_stack),
 				(k_thread_entry_t)led_blink2,
 				NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, 0);*/
 #if CONFIG_SEGGER_SYSTEMVIEW
-	sysview_addTaskName(tid_tmp, "Led");
+	//sysview_addTaskName(tid_tmp, "Led");
 #endif
 
 /*
 	tid_tmp = k_thread_create(&printer2_thread_data, printer2_stack,
 				K_THREAD_STACK_SIZEOF(printer2_stack),
 				(k_thread_entry_t)printer_thread,
-				NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, K_SECONDS(15));*/
+				NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, K_SECONDS(0));
 #if CONFIG_SEGGER_SYSTEMVIEW
-	sysview_addTaskName(tid_tmp, "Sensor");
+	sysview_addTaskName(tid_tmp, "Main thread");
 #endif
+*/
+
 /*
 	tid_tmp = k_thread_create(&rttterm_thread_data, rttterm_stack,
 				K_THREAD_STACK_SIZEOF(rttterm_stack),

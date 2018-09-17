@@ -2,7 +2,6 @@ include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
 project(NONE)
 
 target_sources(app PRIVATE src/main.c)
-#target_sources(app PRIVATE src/sysview.c)
 zephyr_sources_ifdef(CONFIG_SEGGER_SYSTEMVIEW src/sysview.c)
 zephyr_sources_ifdef(CONFIG_LORA src/lora.c)
 target_sources(app PRIVATE src/sensors.c)

@@ -135,13 +135,16 @@ bool wimod_hci_init(wimod_hci_cb_rx_message   cb_rx_message,
 
     //uart_pipe_register(rxsplipbuf, sizeof(rxsplipbuf), upipe_rx);
     uart_dev = device_get_binding(CONFIG_LORA_IM881A_UART_DRV_NAME);
-    uart_irq_callback_set(uart_dev, uart_isr);
+
+    uart_irq_rx_disable(uart_dev);
+    //uart_irq_tx_disable(uart_dev);
 
     /* Drain the fifo */
 	while (uart_irq_rx_ready(uart_dev)) {
 		uart_fifo_read(uart_dev, &c, 1);
 	}
 
+	uart_irq_callback_set(uart_dev, uart_isr);
 
     uart_irq_rx_enable(uart_dev);
 

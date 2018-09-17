@@ -14,11 +14,14 @@
 #include <sensor.h>
 #include <lpcomp.h>
 
+#if CONFIG_SEGGER_SYSTEMVIEW
+#include <systemview/SEGGER_SYSVIEW.h>
+#include "sysview.h"
+#endif
+
 #if CONFIG_LORA
 #include <wimod_lorawan_api.h>
 #endif
-
-//#define MOTION_BLIND_TIME	10	// seconds
 
 #define SOUND_DETECTION_WINDOW		180 // seconds
 #define SOUND_BLIND_TIME			120	// seconds
@@ -57,6 +60,11 @@ void disable_sound_detection(struct k_timer *timer_id)
 	SENSOR_DEACTIVATE(CONFIG_ANALOGMIC_NAME);
 	SENSOR_ACTIVATE(CONFIG_PYD1588_NAME);
 	blink_led(LED_RED, MSEC_PER_SEC/2, K_SECONDS(3));
+
+#if CONFIG_SEGGER_SYSTEMVIEW
+    SEGGER_SYSVIEW_PrintfHost("Microphone disabled. Motion enabled.");
+#endif
+
 #if CONFIG_LORA
 	lmsg.data[0] = 0x30;
 	lmsg.size = 1;
@@ -70,6 +78,9 @@ void enable_sound_detection(struct k_timer *timer_id)
 {
 	SENSOR_ACTIVATE(CONFIG_ANALOGMIC_NAME);
 	SYS_LOG_INF("Sound detection re-enabled\n");
+#if CONFIG_SEGGER_SYSTEMVIEW
+    SEGGER_SYSVIEW_PrintfHost("Microphone enabled for %d", SOUND_DETECTION_WINDOW);
+#endif
 	k_timer_start(&sound_detection_timeout, K_SECONDS(SOUND_DETECTION_WINDOW), 0);
 }
 K_TIMER_DEFINE(sound_timeout, enable_sound_detection, NULL);
@@ -83,6 +94,10 @@ static void motion_handler(struct device *dev, struct sensor_trigger *trig)
 	SENSOR_DEACTIVATE(CONFIG_PYD1588_NAME);
 #if CONFIG_ANALOGMIC
 	k_timer_start(&sound_timeout, K_SECONDS(SOUND_BLIND_TIME), 0);
+#endif
+
+#if CONFIG_SEGGER_SYSTEMVIEW
+    SEGGER_SYSVIEW_PrintfHost("Motion detected");
 #endif
 
 #if CONFIG_LORA
@@ -100,6 +115,7 @@ static struct sensor_trigger sound_trig;
 static void sound_handler(struct device *dev, struct sensor_trigger *trig)
 {
 	SYS_LOG_INF("Sound detected 2\n");
+	k_timer_stop(&sound_detection_timeout);
 
 #if CONFIG_LPCOMP_NRF5
 	struct device *lpcomp;
@@ -111,6 +127,10 @@ static void sound_handler(struct device *dev, struct sensor_trigger *trig)
 
 	SENSOR_DEACTIVATE(CONFIG_ANALOGMIC_NAME);
 	k_timer_start(&sound_timeout, K_SECONDS(SOUND_BLIND_TIME), 0);
+
+#if CONFIG_SEGGER_SYSTEMVIEW
+    SEGGER_SYSVIEW_PrintfHost("Sound detected");
+#endif
 
 #if CONFIG_LORA
 	lmsg.data[0] = 0x20;
@@ -188,7 +208,6 @@ static void periodic_app()
 
 		/* Temperature & Humidity */
 		/***********************************************************************/
-		VDDH_ACTIVATE();
 		SENSOR_ACTIVATE(CONFIG_SHTC1_NAME);
 
 		dev = device_get_binding(CONFIG_SHTC1_NAME);
@@ -210,6 +229,8 @@ static void periodic_app()
 		value = (int)(temp*100);
 		tx_data[3] = value >> 8;
 		tx_data[4] = value;
+
+		VDDH_ACTIVATE();
 
 		/* Light */
 		/***********************************************************************/
@@ -280,9 +301,9 @@ static void periodic_app()
 	}
 }
 
-
 K_THREAD_DEFINE(app_thread_id, 1024, app, NULL, NULL, NULL,
-		K_PRIO_PREEMPT(0), 0, K_NO_WAIT);
+        K_PRIO_PREEMPT(0), 0, K_NO_WAIT);
+
 
 K_THREAD_DEFINE(periodic_app_thread_id, 1024, periodic_app, NULL, NULL, NULL,
 		K_PRIO_PREEMPT(10), 0, K_SECONDS(5));

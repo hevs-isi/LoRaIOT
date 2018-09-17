@@ -90,12 +90,14 @@ static void publish_task(u32_t *event_data)
 
 static void send_system_desc(void)
 {
-	SEGGER_SYSVIEW_SendSysDesc("N=ZephyrSysViewSample");
-	SEGGER_SYSVIEW_SendSysDesc("D=" CONFIG_BOARD " "
-				   CONFIG_SOC " " CONFIG_ARCH);
+	SEGGER_SYSVIEW_SendSysDesc("N=LoRaIoT");
+	SEGGER_SYSVIEW_SendSysDesc("D=" CONFIG_BOARD " " CONFIG_SOC " " CONFIG_ARCH);
 	SEGGER_SYSVIEW_SendSysDesc("O=Zephyr");
+	SEGGER_SYSVIEW_SendSysDesc("I#16=Power Clock");
+	SEGGER_SYSVIEW_SendSysDesc("I#18=UART0");
+	SEGGER_SYSVIEW_SendSysDesc("I#22=GPIOTE");
 	SEGGER_SYSVIEW_SendSysDesc("I#33=RTC1");
-
+	SEGGER_SYSVIEW_SendSysDesc("I#35=LPCOMP");
 
 }
 
