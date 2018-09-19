@@ -25,6 +25,26 @@ static int shell_cmd_info(int argc, char *argv[])
 	return 0;
 }
 
+static int shell_cmd_custom(int argc, char *argv[])
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    wimod_lorawan_set_op_mode();
+
+    return 0;
+}
+
+static int shell_cmd_getmode(int argc, char *argv[])
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    wimod_lorawan_get_op_mode();
+
+    return 0;
+}
+
 static int shell_cmd_get_rtc(int argc, char *argv[])
 {
 	ARG_UNUSED(argc);
@@ -160,6 +180,8 @@ static int shell_send_cdata(int argc, char *argv[])
 
 static struct shell_cmd commands[] = {
 	{ "firmware", shell_cmd_info, NULL },
+	{ "custom", shell_cmd_custom, NULL },
+	{ "getmode", shell_cmd_getmode, NULL },
 	{ "get_rtc", shell_cmd_get_rtc, NULL },
 	{ "set_rtc", shell_cmd_set_rtc, NULL },
 	{ "get_rtc_alarm", shell_cmd_get_rtc_alarm, NULL },

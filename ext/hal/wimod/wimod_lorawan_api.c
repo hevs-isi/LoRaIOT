@@ -48,6 +48,9 @@ static void
 wimod_lorawan_devmgmt_firmware_version_rsp(wimod_hci_message_t* rx_msg);
 
 static void
+wimod_lorawan_get_opmode_rsp(wimod_hci_message_t* rx_msg);
+
+static void
 wimod_lorawan_get_rtc_rsp(wimod_hci_message_t* rx_msg);
 
 static void
@@ -208,6 +211,29 @@ int wimod_lorawan_get_firmware_version()
     return wimod_hci_send_message(&tx_message);
 }
 
+int wimod_lorawan_set_op_mode()
+{
+    // 1. init header
+    tx_message.sap_id = DEVMGMT_SAP_ID;
+    tx_message.msg_id = DEVMGMT_MSG_SET_OPMODE_REQ ;
+    tx_message.length = 1;
+    tx_message.payload[0] = LORAWAN_OPERATION_MODE_CUSTOMER;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
+}
+
+int wimod_lorawan_get_op_mode()
+{
+    // 1. init header
+    tx_message.sap_id = DEVMGMT_SAP_ID;
+    tx_message.msg_id = DEVMGMT_MSG_GET_OPMODE_REQ  ;
+    tx_message.length = 0;
+
+    // 2. send HCI message without payload
+    return wimod_hci_send_message(&tx_message);
+}
+
 int wimod_lorawan_get_rtc()
 {
     // 1. init header
@@ -341,13 +367,13 @@ int wimod_lorawan_set_rstack_config()
     tx_message.msg_id = LORAWAN_MSG_SET_RSTACK_CONFIG_REQ;
     tx_message.length = 6;
 
-    tx_message.payload[0] = 3;
-    tx_message.payload[1] = 14;
-    tx_message.payload[2] = 0x03;
+    tx_message.payload[0] = 0;
+    tx_message.payload[1] = 16;
+    tx_message.payload[2] = 0x01;
     tx_message.payload[3] = 0x01;
     tx_message.payload[4] = 7;
     tx_message.payload[5] = 1;
-    //tx_message.payload[6] = 8;
+    tx_message.payload[6] = 15;
 
     // 2. send HCI message without payload
     return wimod_hci_send_message(&tx_message);
@@ -477,6 +503,14 @@ static void wimod_lorawan_process_devmgmt_message(wimod_hci_message_t* rx_msg)
                 wimod_lorawan_devmgmt_firmware_version_rsp(rx_msg);
                 break;
 
+        case    DEVMGMT_MSG_SET_OPMODE_RSP:
+                wimod_lorawan_show_response("set opmode response", wimod_device_mgmt_status_strings, rx_msg->payload[0]);
+                break;
+
+        case    DEVMGMT_MSG_GET_OPMODE_RSP:
+                wimod_lorawan_get_opmode_rsp(rx_msg);
+                break;
+
         case    DEVMGMT_MSG_GET_RTC_RSP:
 				wimod_lorawan_get_rtc_rsp(rx_msg);
 				break;
@@ -526,6 +560,12 @@ static void wimod_lorawan_devmgmt_firmware_version_rsp(wimod_hci_message_t* rx_m
             printf("firmware-content: %s\n\r", &rx_msg->payload[15]);
         }
     }
+}
+
+static void wimod_lorawan_get_opmode_rsp(wimod_hci_message_t* rx_msg)
+{
+    wimod_lorawan_show_response("get opmode response", wimod_device_mgmt_status_strings, rx_msg->payload[0]);
+    printf("Operation mode: %d\n\r", rx_msg->payload[1]);
 }
 
 static void wimod_lorawan_get_rtc_rsp(wimod_hci_message_t* rx_msg)
@@ -607,8 +647,24 @@ static void wimod_lorawan_process_rstack_config_rsp(wimod_hci_message_t* rx_msg)
 	printf("Number of Retransmissions: %d\n", rx_msg->payload[5]);
 	printf("Band Index: %d\n", rx_msg->payload[6]);
 	// not available in 1.11 specs
-	//printf("Header MAC Cmd Capacity: %d\n", rx_msg->payload[7] & 0xFF);
+	printf("Header MAC Cmd Capacity: %d\n", rx_msg->payload[7] & 0xFF);
 
+}
+
+static void wimod_lorawan_process_send_data_rsp(wimod_hci_message_t* rx_msg)
+{
+    u32_t time_remaining_ms;
+
+    wimod_lorawan_show_response("send C-Data response",
+            wimod_device_mgmt_status_strings, rx_msg->payload[0]);
+
+    if(rx_msg->length > 1){
+
+        time_remaining_ms = MAKELONG(MAKEWORD(rx_msg->payload[1], rx_msg->payload[2]),
+                    MAKEWORD(rx_msg->payload[3], rx_msg->payload[4]));
+
+        printf("Channel blocked. Time remaining (ms): %d\n", time_remaining_ms);
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -648,7 +704,8 @@ static void wimod_lorawan_process_lorawan_message(wimod_hci_message_t* rx_msg)
                 break;
 
         case    LORAWAN_MSG_SEND_CDATA_RSP:
-                wimod_lorawan_show_response("send C-Data response", wimod_lorawan_status_strings, rx_msg->payload[0]);
+                wimod_lorawan_process_send_data_rsp(rx_msg);
+                //wimod_lorawan_show_response("send C-Data response", wimod_lorawan_status_strings, rx_msg->payload[0]);
                 break;
 
         case    LORAWAN_MSG_GET_NWK_STATUS_RSP:

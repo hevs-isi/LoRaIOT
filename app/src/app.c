@@ -51,6 +51,8 @@ void disable_sound_detection(struct k_timer *timer_id)
 	// No detection during SOUND_DETECTION_WINDOW seconds:
 	// disable the microphone and re-enable back the motion detector
 
+    SYS_LOG_INF("Microphone disabled. Motion re-enabled.\n");
+
 #if CONFIG_LPCOMP_NRF5
 	struct device *lpcomp;
 	lpcomp = device_get_binding(CONFIG_LPCOMP_NRF5_DEV_NAME);
@@ -62,7 +64,7 @@ void disable_sound_detection(struct k_timer *timer_id)
 	blink_led(LED_RED, MSEC_PER_SEC/2, K_SECONDS(3));
 
 #if CONFIG_SEGGER_SYSTEMVIEW
-    SEGGER_SYSVIEW_PrintfHost("Microphone disabled. Motion enabled.");
+    SEGGER_SYSVIEW_PrintfHost("Microphone disabled. Motion re-enabled.");
 #endif
 
 #if CONFIG_LORA

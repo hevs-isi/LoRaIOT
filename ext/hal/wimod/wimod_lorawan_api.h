@@ -156,6 +156,9 @@ typedef void (*join_network_cb)();
 #define LORAWAN_MSG_GET_LINKADRREQ_CONFIG_REQ  0x3D
 #define LORAWAN_MSG_GET_LINKADRREQ_CONFIG_RSP  0x3E
 
+#define LORAWAN_OPERATION_MODE_DEFAULT      0
+#define LORAWAN_OPERATION_MODE_CUSTOMER     3
+
 //------------------------------------------------------------------------------
 //
 //  Function Prototypes
@@ -172,6 +175,9 @@ int wimod_lorawan_send_ping();
 
 // get firmware Version
 int wimod_lorawan_get_firmware_version();
+
+int wimod_lorawan_set_op_mode();
+int wimod_lorawan_get_op_mode();
 
 int wimod_lorawan_get_device_eui();
 int wimod_lorawan_set_join_param_request();
