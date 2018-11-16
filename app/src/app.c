@@ -30,6 +30,7 @@
 #if CONFIG_LORA
 K_THREAD_STACK_DEFINE(lora_msg_stack, 1024);
 static struct k_work_q lora_msg_work_q;
+static u8_t sound_activated;
 
 struct lora_msg {
 	u8_t port;
@@ -60,6 +61,7 @@ void disable_sound_detection(struct k_timer *timer_id)
 #endif
 
 	SENSOR_DEACTIVATE(CONFIG_ANALOGMIC_NAME);
+	sound_activated = 0;
 	SENSOR_ACTIVATE(CONFIG_PYD1588_NAME);
 	blink_led(LED_RED, MSEC_PER_SEC/2, K_SECONDS(3));
 
@@ -79,6 +81,7 @@ K_TIMER_DEFINE(sound_detection_timeout, disable_sound_detection, NULL);
 void enable_sound_detection(struct k_timer *timer_id)
 {
 	SENSOR_ACTIVATE(CONFIG_ANALOGMIC_NAME);
+	sound_activated = 1;
 	SYS_LOG_INF("Sound detection re-enabled\n");
 #if CONFIG_SEGGER_SYSTEMVIEW
     SEGGER_SYSVIEW_PrintfHost("Microphone enabled for %d", SOUND_DETECTION_WINDOW);
@@ -152,6 +155,8 @@ static void lora_msg_send(struct k_work *item)
 	enable_uart();
 	wimod_lorawan_send_c_radio_data(msg->port, msg->data, msg->size);
 	disable_uart();
+
+	VDDH_DEACTIVATE();
 
 }
 #endif
@@ -232,8 +237,6 @@ static void periodic_app()
 		tx_data[3] = value >> 8;
 		tx_data[4] = value;
 
-		VDDH_ACTIVATE();
-
 		/* Light */
 		/***********************************************************************/
 		SENSOR_ACTIVATE(CONFIG_OPT3002_NAME);
@@ -298,8 +301,21 @@ static void periodic_app()
 		k_work_submit(&lmsg.work);
 #endif
 
-		VDDH_DEACTIVATE();
+		// BUG: Patch: need to deactivate the microphone while sending lora message.
+		// Somehow the voltage drops below 1.8V when the a lora packet is sent while
+		// the microphone is activated.
+		if(sound_activated){
+		    SENSOR_ACTIVATE(CONFIG_ANALOGMIC_NAME);
+		}
 		k_sleep(MSEC_PER_SEC*300);
+		if(sound_activated){
+#if CONFIG_LPCOMP_NRF5
+            struct device *lpcomp;
+            lpcomp = device_get_binding(CONFIG_LPCOMP_NRF5_DEV_NAME);
+            lpcomp_disable(lpcomp);
+#endif
+		    SENSOR_DEACTIVATE(CONFIG_ANALOGMIC_NAME);
+		}
 	}
 }
 

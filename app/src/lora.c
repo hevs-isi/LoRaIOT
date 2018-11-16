@@ -216,6 +216,7 @@ void join_callback()
 {
 	SYS_LOG_INF("LoRaWAN Network joined.\n");
 	//blink_led(LED_GREEN, MSEC_PER_SEC/4, K_SECONDS(3));
+	VDDH_DEACTIVATE();
 }
 
 
@@ -227,8 +228,10 @@ void lora_init()
 	uart = device_get_binding(CONFIG_LORA_IM881A_UART_DRV_NAME);
 	uart_cfg = (struct uart_device_config *)(uart->config->config_info);
 
-	/* BUG: couldn't launch the debug when the function 'uart_irq_rx_enable' is called tool quickly */
+	/* BUG: couldn't launch the debug when the function 'uart_irq_rx_enable' is called too quickly */
 	k_busy_wait(1000000);
+
+	VDDH_ACTIVATE();
 
 	wimod_lorawan_init();
 

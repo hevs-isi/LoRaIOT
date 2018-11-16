@@ -111,6 +111,7 @@ static int shell_cmd_voltage(int argc, char *argv[])
 	struct sensor_value sense_value;
 	int ret;
 
+	//VDDH_ACTIVATE();
 	SENSOR_ACTIVATE(CONFIG_PAC1934_NAME);
 
 	//pac1934_read_register(PAC1934_REG_PRODUCT_ID, d, 1);
@@ -122,6 +123,7 @@ static int shell_cmd_voltage(int argc, char *argv[])
 		return ret;
 	}
 	SENSOR_DEACTIVATE(CONFIG_PAC1934_NAME);
+	//VDDH_DEACTIVATE();
 
 	ret = sensor_channel_get(dev, SENSOR_CHAN_VOLTAGE_1, &sense_value);
 	printf("Primary battery: %.3f\n", sensor_value_to_double(&sense_value));
@@ -147,6 +149,7 @@ static int shell_cmd_current(int argc, char *argv[])
 	struct sensor_value sense_value;
 	int ret;
 
+	//VDDH_ACTIVATE();
 	SENSOR_ACTIVATE(CONFIG_PAC1934_NAME);
 
 	dev = device_get_binding(CONFIG_PAC1934_NAME);
@@ -156,6 +159,7 @@ static int shell_cmd_current(int argc, char *argv[])
 		return ret;
 	}
 	SENSOR_DEACTIVATE(CONFIG_PAC1934_NAME);
+	//VDDH_DEACTIVATE();
 
 	ret = sensor_channel_get(dev, SENSOR_CHAN_CURRENT_1, &sense_value);
 	printf("Primary battery current: %.6f\n", sensor_value_to_double(&sense_value));

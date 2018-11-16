@@ -334,7 +334,6 @@ void main(void)
 	lora_init();
 #endif
 
-
 	//SYS_LOG_ERR("This is an error!");
 
 /*

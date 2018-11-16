@@ -154,7 +154,7 @@ static const nrfx_lpcomp_config_t lpcomp_nrf5_cfg = {
 		.hal    = { (nrf_lpcomp_ref_t)NRF_LPCOMP_REF_SUPPLY_5_8 ,    \
 					(nrf_lpcomp_detect_t)NRF_LPCOMP_DETECT_CROSS,  \
 					(nrf_lpcomp_hysteresis_t)NRF_LPCOMP_HYST_NOHYST }, \
-		.input  = (nrf_lpcomp_input_t)NRF_LPCOMP_INPUT_5,         \
+		.input  = (nrf_lpcomp_input_t)NRF_LPCOMP_INPUT_1,         \
 		.interrupt_priority = 0           \
 };
 

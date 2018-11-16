@@ -1,27 +1,10 @@
-/** @file
- *  @brief LoRa HCI driver API.
- */
 
-/*
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-#ifndef __LORA_WIMOD_HCI_DRIVER_H
-#define __LORA_WIMOD_HCI_DRIVER_H
+#ifndef LORA_WIMOD_HCI_DRIVER_H
+#define LORA_WIMOD_HCI_DRIVER_H
 
 #include <kernel.h>
 #include <zephyr/types.h>
 
-/**
- * @brief HCI drivers
- * @defgroup wimod_hci_driver HCI drivers
- * @ingroup lora
- * @{
- */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define WIMOD_HCI_MSG_HEADER_SIZE       2
 #define WIMOD_HCI_MSG_PAYLOAD_SIZE      300
@@ -63,12 +46,4 @@ int wimod_hci_send_message(wimod_hci_message_t* tx_message);
 // Receiver Process
 void wimod_hci_process();
 
-#ifdef __cplusplus
-}
-#endif
-
-/**
- * @}
- */
-
-#endif /* __LORA_WIMOD_HCI_DRIVER_H */
+#endif /* LORA_WIMOD_HCI_DRIVER_H */

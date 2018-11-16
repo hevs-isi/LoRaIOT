@@ -2,7 +2,7 @@
 #ifndef __LORA_WIMOD_SLIP_H
 #define __LORA_WIMOD_SLIP_H
 
-#include <zephyr/types.h>
+#include <kernel.h>
 
 // SLIP Protocol Characters
 #define SLIP_END					0xC0
@@ -18,6 +18,21 @@
 
 // SLIP message receiver callback
 typedef u8_t* (*slip_cb_rx_message_t)(u8_t* message, int length);
+
+typedef struct {
+    // Decoder
+    int rx_state;
+    int rx_index;
+    int rx_buf_size;
+    u8_t* rx_buffer;
+    slip_cb_rx_message_t cb_rx_message;
+
+    // Encoder
+    int tx_index;
+    int tx_buf_size;
+    u8_t* tx_buffer;
+} slip_t;
+
 
 // Init SLIP layer
 void slip_init(slip_cb_rx_message_t cb_rx_message);

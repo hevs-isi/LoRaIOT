@@ -5,10 +5,9 @@
 //
 //------------------------------------------------------------------------------
 
-#include <wimod_hci_driver.h>
+#include "wimod_hci_driver.h"
 #include "crc16.h"
 #include "wimod_slip.h"
-//#include <console/uart_pipe.h>
 #include <uart.h>
 
 #include <string.h>

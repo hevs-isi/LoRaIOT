@@ -5,17 +5,6 @@
 #include <kernel.h>
 #include <zephyr/types.h>
 
-
-// helper struct for ID -> string conversion
-typedef struct
-{
-    int         id;
-    const char* string;
-} id_string_t;
-
-typedef void (*join_network_cb)();
-
-
 //------------------------------------------------------------------------------
 //
 //  Endpoint (SAP) Identifier
@@ -158,6 +147,17 @@ typedef void (*join_network_cb)();
 
 #define LORAWAN_OPERATION_MODE_DEFAULT      0
 #define LORAWAN_OPERATION_MODE_CUSTOMER     3
+
+
+
+// helper struct for ID -> string conversion
+typedef struct
+{
+    int         id;
+    const char* string;
+} id_string_t;
+
+typedef void (*join_network_cb)();
 
 //------------------------------------------------------------------------------
 //

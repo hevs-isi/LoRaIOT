@@ -1,5 +1,5 @@
 if(CONFIG_LORA_WIMOD)
-  zephyr_include_directories(./)
+  zephyr_include_directories(.)
 
   zephyr_sources(
     wimod_hci_driver.c

@@ -19,17 +19,27 @@
 //
 //------------------------------------------------------------------------------
 
-#include "wimod_lorawan_api.h"
-#include "wimod_hci_driver.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "wimod_hci_driver.h"
+#include "wimod_lorawan_api.h"
+
 
 #define MAKEWORD(lo,hi) ((lo)|((hi) << 8))
 #define MAKELONG(lo,hi) ((lo)|((hi) << 16))
 
+
+
+// Values appEui and appKey only used with the command 'set'.
+// Then this information is stored in the LoRa module.
+
 const char appEui[] = "70B3D57ED0010F8B";
-const char appKey[] = "7F8BC5F8A59B05A2B1BDE8B84E6D62A4";
+//const char appKey[] = "7F8BC5F8A59B05A2B1BDE8B84E6D62A4";
+//const char appKey[] = "C34ABE27F798991EC7E6AF612FE2AC64";
+const char appKey[] = "FAEB835AE4443C194AD5E0A9CB817C51";
+
+
 
 //------------------------------------------------------------------------------
 //
@@ -88,6 +98,7 @@ wimod_hci_message_t rx_message;
 
 // network join callback function
 static join_network_cb join_callback;
+
 
 //------------------------------------------------------------------------------
 //

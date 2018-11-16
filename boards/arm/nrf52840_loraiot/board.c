@@ -147,6 +147,10 @@ static int pwr_ctrl_init(struct device *dev)
 	gpio_pin_configure(gpio, 5, GPIO_DIR_IN);
 
 	gpio_pin_configure(gpio, CCS_POWER_PIN, GPIO_DIR_IN | GPIO_PUD_PULL_UP);
+
+	// configure PM_ALERT pin as input with pull up
+	gpio = device_get_binding(CONFIG_GPIO_NRF5_P1_DEV_NAME);
+	gpio_pin_configure(gpio, 8, GPIO_DIR_IN | GPIO_PUD_PULL_UP);
 	//gpio_pin_write(gpio, CCS_POWER_PIN, 0);
 
 	/*gpio_pin_configure(gpio, 29, GPIO_DIR_OUT);
