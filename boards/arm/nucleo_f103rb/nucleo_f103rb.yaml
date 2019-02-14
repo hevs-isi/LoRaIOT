@@ -1,0 +1,15 @@
+identifier: nucleo_f103rb
+name: NUCLEO-F103RB
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+ram: 20
+flash: 128
+supported:
+  - gpio
+  - spi
+  - pwm
+  - watchdog

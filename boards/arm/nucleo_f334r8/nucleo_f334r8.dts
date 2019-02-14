@@ -1,0 +1,86 @@
+/*
+ * Copyright (c) 2017 Linaro Limited
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+#include <st/f3/stm32f334X8.dtsi>
+
+/ {
+	model = "STMicroelectronics STM32F334R8-NUCLEO board";
+	compatible = "st,stm32f334r8-nucleo", "st,stm32f334";
+
+	chosen {
+		zephyr,console = &usart2;
+		zephyr,shell-uart = &usart2;
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		green_led_2: led_2 {
+			gpios = <&gpioa 5 GPIO_INT_ACTIVE_HIGH>;
+			label = "User LD2";
+		};
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		user_button: button {
+			label = "User";
+			gpios = <&gpioc 13 GPIO_INT_ACTIVE_LOW>;
+		};
+	};
+
+	aliases {
+		led0 = &green_led_2;
+		sw0 = &user_button;
+	};
+};
+
+&usart1 {
+	current-speed = <115200>;
+	pinctrl-0 = <&usart1_pins_b>;
+	pinctrl-names = "default";
+	status = "ok";
+};
+
+&usart2 {
+	current-speed = <115200>;
+	pinctrl-0 = <&usart2_pins_a>;
+	pinctrl-names = "default";
+	status = "ok";
+};
+
+&usart3 {
+	current-speed = <115200>;
+	pinctrl-0 = <&usart3_pins_a>;
+	pinctrl-names = "default";
+};
+
+arduino_i2c: &i2c1 {
+      status = "ok";
+      clock-frequency = <I2C_BITRATE_FAST>;
+};
+
+arduino_spi: &spi1 {
+	status = "ok";
+};
+
+&timers1 {
+	status = "ok";
+
+	pwm {
+		status = "ok";
+	};
+};
+
+&rtc {
+	status = "ok";
+};
+
+&idwg {
+	status = "ok";
+};

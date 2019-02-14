@@ -1,0 +1,14 @@
+identifier: curie_ble
+name: Intel Curie (nRF51)
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+ram: 16
+supported:
+  - ble
+testing:
+  ignore_tags:
+    - net

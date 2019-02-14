@@ -1,0 +1,4 @@
+tests:
+  kernel.common.timing:
+    min_ram: 16
+    tags: kernel

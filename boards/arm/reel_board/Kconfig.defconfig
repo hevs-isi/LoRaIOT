@@ -1,0 +1,84 @@
+# Kconfig - reel board configuration
+#
+# Copyright (c) 2018 Phytec Messtechnik GmbH
+#
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_REEL_BOARD
+
+config BOARD
+	default "reel_board"
+
+config I2C
+	default y
+
+if I2C
+
+config I2C_0
+	default y
+
+config I2C_1
+	default n
+
+if I2C_0
+
+choice I2C_0_NRF_TYPE
+	default I2C_0_NRF_TWIM
+
+endchoice
+
+endif # I2C_0
+
+if I2C_1
+
+choice I2C_1_NRF_TYPE
+	default I2C_1_NRF_TWIM
+
+endchoice
+
+endif # I2C_1
+
+endif # I2C
+
+if SPI
+
+config SPI_3
+	default y
+
+config SPI_NRFX_RAM_BUFFER_SIZE
+	default 8
+
+if SPI_3
+
+config SPI_3_NRF_RX_DELAY
+	default 1
+
+endif # SPI_3
+
+endif # SPI
+
+if USB
+
+config USB_NRF52840
+	default y
+
+config USB_DEVICE_STACK
+	default y
+
+endif # USB
+
+if IEEE802154
+
+config IEEE802154_NRF5
+	default y
+
+endif # IEEE802154
+
+if BT
+
+config BT_CTLR
+	default y
+
+endif # BT
+
+endif # BOARD_REEL_BOARD

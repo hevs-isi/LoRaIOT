@@ -1,0 +1,9 @@
+sample:
+  description: A basic demo to showcase multi-threading
+    using K_THREAD_DEFINE
+  name: Basic Thread Demo
+tests:
+  test:
+    tags: kernel threads gpio
+    # The filters below are from DTS
+    filter: LED0_GPIO_CONTROLLER and LED1_GPIO_CONTROLLER

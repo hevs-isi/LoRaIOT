@@ -1,0 +1,13 @@
+identifier: qemu_x86
+name: QEMU Emulation for X86
+type: qemu
+simulation: qemu
+arch: x86
+toolchain:
+  - zephyr
+  - xtools
+supported:
+  - pci
+  - netif:slip
+testing:
+  default: true

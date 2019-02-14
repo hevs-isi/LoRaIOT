@@ -1,0 +1,18 @@
+
+if BOARD_NSIM_EM
+
+config BOARD
+	default "nsim_em"
+
+config CPU_ARCEM4
+	default y
+
+if SERIAL
+
+config UART_NSIM
+	default y
+
+endif # SERIAL
+
+
+endif # BOARD_NSIM_EM

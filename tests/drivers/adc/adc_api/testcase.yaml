@@ -1,0 +1,5 @@
+common:
+  tags: peripheral adc
+tests:
+  peripheral.adc:
+    depends_on: adc

@@ -1,0 +1,7 @@
+common:
+  platform_whitelist: native_posix qemu_x86 qemu_cortex_m3
+tests:
+  net.6lo:
+    tags: net 6loWPAN
+    min_ram: 32
+    depends_on: netif

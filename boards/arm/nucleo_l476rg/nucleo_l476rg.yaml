@@ -1,0 +1,18 @@
+identifier: nucleo_l476rg
+name: NUCLEO-L476RG
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+supported:
+  - arduino_i2c
+  - pwm
+  - gpio
+  - spi
+  - i2c
+  - rtc
+  - counter
+ram: 96
+flash: 1024

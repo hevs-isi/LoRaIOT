@@ -1,0 +1,11 @@
+identifier: olimex_stm32_h407
+name: STM32-H407
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+supported:
+  - rtc
+  - counter

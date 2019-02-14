@@ -1,0 +1,8 @@
+sample:
+  name: Button Sample
+tests:
+  test:
+    tags: button gpio
+    # The filters below are from DTS
+    filter: SW0_GPIO_CONTROLLER
+    depends_on: gpio

@@ -1,0 +1,16 @@
+identifier: stm32f469i_disco
+name: STM32F469I-DISCO
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+supported:
+  - arduino_i2c
+  - rtc
+  - counter
+  - i2c
+  - spi
+  - gpio
+  - usb_device
