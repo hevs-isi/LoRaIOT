@@ -6,9 +6,9 @@
 
 #include "test_msgq.h"
 extern struct k_msgq msgq;
-static char __aligned(4) tbuffer[MSG_SIZE * MSGQ_LEN];
-static u32_t send_buf[MSGQ_LEN] = { MSG0, MSG1 };
-static u32_t rec_buf[MSGQ_LEN] = { MSG0, MSG1 };
+static ZTEST_BMEM char __aligned(4) tbuffer[MSG_SIZE * MSGQ_LEN];
+static ZTEST_DMEM u32_t send_buf[MSGQ_LEN] = { MSG0, MSG1 };
+static ZTEST_DMEM u32_t rec_buf[MSGQ_LEN] = { MSG0, MSG1 };
 
 static void attrs_get(struct k_msgq *q)
 {
@@ -37,11 +37,15 @@ static void attrs_get(struct k_msgq *q)
 }
 
 /**
- * @brief Verify zephyr msgq get attributes API.
- * @addtogroup kernel_message_queue
+ * @addtogroup kernel_message_queue_tests
  * @{
  */
 
+/**
+ * @brief Test basic attributes of a message queue
+ *
+ * @see  k_msgq_get_attrs()
+ */
 void test_msgq_attrs_get(void)
 {
 	k_msgq_init(&msgq, tbuffer, MSG_SIZE, MSGQ_LEN);
@@ -49,6 +53,12 @@ void test_msgq_attrs_get(void)
 }
 
 #ifdef CONFIG_USERSPACE
+
+/**
+ * @brief Test basic attributes of a message queue
+ *
+ * @see  k_msgq_get_attrs()
+ */
 void test_msgq_user_attrs_get(void)
 {
 	struct k_msgq *q;

@@ -7,9 +7,13 @@
 #include <device.h>
 #include <init.h>
 #include <kernel.h>
+#include <kernel_structs.h>
 #include <soc.h>
 #include <arch/arc/v2/mpu/arc_core_mpu.h>
-#include <logging/sys_log.h>
+
+#define LOG_LEVEL CONFIG_MPU_LOG_LEVEL
+#include <logging/log.h>
+LOG_MODULE_REGISTER(mpu);
 
 /*
  * @brief Configure MPU for the thread
@@ -44,7 +48,7 @@ void configure_mpu_thread(struct k_thread *thread)
 void configure_mpu_stack_guard(struct k_thread *thread)
 {
 #if defined(CONFIG_USERSPACE)
-	if (thread->thread_base.user_options & K_USER) {
+	if ((thread->thread_base.user_options & K_USER) != 0) {
 		/* the areas before and after the user stack of thread is
 		 * kernel only. These area can be used as stack guard.
 		 * -----------------------
@@ -58,8 +62,9 @@ void configure_mpu_stack_guard(struct k_thread *thread)
 		 * -----------------------
 		 */
 		arc_core_mpu_configure(THREAD_STACK_GUARD_REGION,
-			thread->arch.priv_stack_start - STACK_GUARD_SIZE,
-			STACK_GUARD_SIZE);
+				       thread->arch.priv_stack_start - STACK_GUARD_SIZE,
+				       STACK_GUARD_SIZE);
+		return;
 	}
 #endif
 	arc_core_mpu_configure(THREAD_STACK_GUARD_REGION,
@@ -80,7 +85,7 @@ void configure_mpu_stack_guard(struct k_thread *thread)
  */
 void configure_mpu_user_context(struct k_thread *thread)
 {
-	SYS_LOG_DBG("configure user thread %p's context", thread);
+	LOG_DBG("configure user thread %p's context", thread);
 	arc_core_mpu_configure_user_context(thread);
 }
 
@@ -95,8 +100,8 @@ void configure_mpu_user_context(struct k_thread *thread)
  */
 void configure_mpu_mem_domain(struct k_thread *thread)
 {
-	SYS_LOG_DBG("configure thread %p's domain", thread);
-	arc_core_mpu_configure_mem_domain(thread->mem_domain_info.mem_domain);
+	LOG_DBG("configure thread %p's domain", thread);
+	arc_core_mpu_configure_mem_domain(thread);
 }
 
 int _arch_mem_domain_max_partitions_get(void)
@@ -108,7 +113,7 @@ int _arch_mem_domain_max_partitions_get(void)
  * Reset MPU region for a single memory partition
  */
 void _arch_mem_domain_partition_remove(struct k_mem_domain *domain,
-				       u32_t  partition_id)
+				       u32_t partition_id)
 {
 	ARG_UNUSED(domain);
 

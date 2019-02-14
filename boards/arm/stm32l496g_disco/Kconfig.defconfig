@@ -9,14 +9,38 @@
 if BOARD_STM32L496G_DISCO
 
 config BOARD
-	default stm32l496g_disco
+	default "stm32l496g_disco"
 
 if UART_CONSOLE
 
-config UART_STM32_PORT_2
+config UART_2
 	default y
 
 endif # UART_CONSOLE
+
+if SERIAL
+
+config LPUART_1
+	default y
+
+endif # SERIAL
+
+if I2C
+
+config I2C_1
+	default y
+
+endif # I2C
+
+if SPI
+
+config SPI_STM32_INTERRUPT
+	default y
+
+config SPI_1
+	default y
+
+endif # SPI
 
 if PWM
 

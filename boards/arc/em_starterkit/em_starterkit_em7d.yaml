@@ -4,13 +4,13 @@ type: mcu
 arch: arc
 toolchain:
   - zephyr
-testing:
-  default: true
+  - xtools
 supported:
   - i2c
   - spi
   - gpio
 testing:
+  default: true
   ignore_tags:
     - net
     - bluetooth

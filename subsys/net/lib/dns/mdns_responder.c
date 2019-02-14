@@ -10,10 +10,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#if defined(CONFIG_NET_DEBUG_MDNS_RESPONDER)
-#define SYS_LOG_DOMAIN "mdns"
-#define NET_LOG_ENABLED 1
-#endif
+#include <logging/log.h>
+LOG_MODULE_REGISTER(net_mdns_responder, CONFIG_MDNS_RESPONDER_LOG_LEVEL);
 
 #include <zephyr.h>
 #include <init.h>
@@ -38,7 +36,7 @@
 static struct net_context *ipv4;
 static struct net_context *ipv6;
 
-#define BUF_ALLOC_TIMEOUT MSEC(100)
+#define BUF_ALLOC_TIMEOUT K_MSEC(100)
 
 /* This value is recommended by RFC 1035 */
 #define DNS_RESOLVER_MAX_BUF_SIZE	512
@@ -46,7 +44,7 @@ static struct net_context *ipv6;
 #define DNS_RESOLVER_BUF_CTR	(DNS_RESOLVER_MIN_BUF + \
 				 CONFIG_MDNS_RESOLVER_ADDITIONAL_BUF_CTR)
 
-NET_BUF_POOL_DEFINE(dns_msg_pool, DNS_RESOLVER_BUF_CTR,
+NET_BUF_POOL_DEFINE(mdns_msg_pool, DNS_RESOLVER_BUF_CTR,
 		    DNS_RESOLVER_MAX_BUF_SIZE, 0, NULL);
 
 #if defined(CONFIG_NET_IPV6)
@@ -107,21 +105,44 @@ static int bind_ctx(struct net_context *ctx,
 	return ret;
 }
 
-static void setup_dns_hdr(struct net_pkt *pkt, u16_t answers)
+#define append(pkt, type, value)					\
+	do {								\
+		if (!net_pkt_append_##type##_timeout(pkt, value,	\
+						     BUF_ALLOC_TIMEOUT)) { \
+			ret = -ENOMEM;					\
+			goto drop;					\
+		}							\
+	} while (0)
+
+#define append_all(pkt, size, value)					\
+	do {								\
+		if (!net_pkt_append_all(pkt, size, value,		\
+					BUF_ALLOC_TIMEOUT)) {		\
+			ret = -ENOMEM;					\
+			goto drop;					\
+		}							\
+	} while (0)
+
+static int setup_dns_hdr(struct net_pkt *pkt, u16_t answers)
 {
 	u16_t flags;
+	int ret;
 
 	/* See RFC 1035, ch 4.1.1 for header details */
 
 	flags = BIT(15);  /* This is response */
 	flags |= BIT(10); /* Authoritative Answer */
 
-	net_pkt_append_be16(pkt, 0);       /* Identifier, RFC 6762 ch 18.1 */
-	net_pkt_append_be16(pkt, flags);   /* Flags and codes */
-	net_pkt_append_be16(pkt, 0);       /* Question count */
-	net_pkt_append_be16(pkt, answers); /* Answer RR count */
-	net_pkt_append_be16(pkt, 0);       /* Authority RR count */
-	net_pkt_append_be16(pkt, 0);       /* Additional RR count */
+	append(pkt, be16, 0);       /* Identifier, RFC 6762 ch 18.1 */
+	append(pkt, be16, flags);   /* Flags and codes */
+	append(pkt, be16, 0);       /* Question count */
+	append(pkt, be16, answers); /* Answer RR count */
+	append(pkt, be16, 0);       /* Authority RR count */
+	append(pkt, be16, 0);       /* Additional RR count */
+
+	ret = 0;
+drop:
+	return ret;
 }
 
 static int add_answer(struct net_pkt *pkt, enum dns_rr_type qtype,
@@ -130,6 +151,7 @@ static int add_answer(struct net_pkt *pkt, enum dns_rr_type qtype,
 {
 	char *dot = query->data;
 	char *prev = NULL;
+	int ret;
 
 	while ((dot = strchr(dot, '.'))) {
 		if (!prev) {
@@ -145,25 +167,20 @@ static int add_answer(struct net_pkt *pkt, enum dns_rr_type qtype,
 		*prev = strlen(prev) - 1;
 	}
 
-	if (!net_pkt_append_all(pkt, query->len + 1, query->data,
-				BUF_ALLOC_TIMEOUT)) {
-		return -ENOMEM;
-	}
-
-	net_pkt_append_be16(pkt, qtype);
+	append_all(pkt, query->len + 1, query->data);
+	append(pkt, be16, qtype);
 
 	/* Bit 15 tells to flush the cache */
-	net_pkt_append_be16(pkt, DNS_CLASS_IN | BIT(15));
+	append(pkt, be16, DNS_CLASS_IN | BIT(15));
 
-	net_pkt_append_be32(pkt, ttl);
-	net_pkt_append_be16(pkt, addr_len);
+	append(pkt, be32, ttl);
+	append(pkt, be16, addr_len);
+	append_all(pkt, addr_len, addr);
 
-	if (!net_pkt_append_all(pkt, addr_len, addr,
-				BUF_ALLOC_TIMEOUT)) {
-		return -ENOMEM;
-	}
+	ret = 0;
 
-	return 0;
+drop:
+	return ret;
 }
 
 static struct net_pkt *create_answer(struct net_context *ctx,
@@ -173,6 +190,7 @@ static struct net_pkt *create_answer(struct net_context *ctx,
 				     u16_t addr_len, u8_t *addr)
 {
 	struct net_pkt *pkt;
+	int ret;
 
 	pkt = net_pkt_get_tx(ctx, BUF_ALLOC_TIMEOUT);
 	if (!pkt) {
@@ -181,11 +199,20 @@ static struct net_pkt *create_answer(struct net_context *ctx,
 
 	net_pkt_set_family(pkt, family);
 
-	setup_dns_hdr(pkt, 1);
+	if (setup_dns_hdr(pkt, 1) < 0) {
+		goto drop;
+	}
 
-	add_answer(pkt, qtype, query, MDNS_TTL, addr_len, addr);
+	ret = add_answer(pkt, qtype, query, MDNS_TTL, addr_len, addr);
+	if (ret < 0) {
+		goto drop;
+	}
 
 	return pkt;
+
+drop:
+	net_pkt_unref(pkt);
+	return NULL;
 }
 
 static int send_response(struct net_context *ctx, struct net_pkt *pkt,
@@ -199,10 +226,10 @@ static int send_response(struct net_context *ctx, struct net_pkt *pkt,
 
 	if (qtype == DNS_RR_TYPE_A) {
 #if defined(CONFIG_NET_IPV4)
-		struct in_addr *addr;
+		const struct in_addr *addr;
 
-		/* For IPv4 we take the first address in the interface */
-		addr = &net_pkt_iface(pkt)->ipv4.unicast[0].address.in_addr;
+		addr = net_if_ipv4_select_src_addr(net_pkt_iface(pkt),
+						   &NET_IPV4_HDR(pkt)->src);
 
 		create_ipv4_addr(net_sin(&dst));
 		dst_len = sizeof(struct sockaddr_in);
@@ -304,15 +331,15 @@ static int dns_read(struct net_context *ctx,
 	NET_DBG("Received %d %s from %s", queries,
 		queries > 1 ? "queries" : "query",
 		net_pkt_family(pkt) == AF_INET ?
-		net_sprint_ipv4_addr(&NET_IPV4_HDR(pkt)->src) :
-		net_sprint_ipv6_addr(&NET_IPV6_HDR(pkt)->src));
+		log_strdup(net_sprint_ipv4_addr(&NET_IPV4_HDR(pkt)->src)) :
+		log_strdup(net_sprint_ipv6_addr(&NET_IPV6_HDR(pkt)->src)));
 
 	do {
 		enum dns_rr_type qtype;
 		enum dns_class qclass;
 		u8_t *lquery;
 
-		memset(result->data, 0, net_buf_tailroom(result));
+		(void)memset(result->data, 0, net_buf_tailroom(result));
 		result->len = 0;
 
 		ret = dns_unpack_query(&dns_msg, result, &qtype, &qclass);
@@ -328,7 +355,7 @@ static int dns_read(struct net_context *ctx,
 
 		NET_DBG("[%d] query %s/%s label %s (%d bytes)", queries,
 			qtype == DNS_RR_TYPE_A ? "A" : "AAAA", "IN",
-			result->data, ret);
+			log_strdup(result->data), ret);
 
 		/* If the query matches to our hostname, then send reply.
 		 * We skip the first dot, and make sure there is dot after
@@ -355,6 +382,8 @@ quit:
 
 static void recv_cb(struct net_context *net_ctx,
 		    struct net_pkt *pkt,
+		    union net_ip_header *ip_hdr,
+		    union net_proto_header *proto_hdr,
 		    int status,
 		    void *user_data)
 {
@@ -374,7 +403,7 @@ static void recv_cb(struct net_context *net_ctx,
 		goto quit;
 	}
 
-	dns_data = net_buf_alloc(&dns_msg_pool, BUF_ALLOC_TIMEOUT);
+	dns_data = net_buf_alloc(&mdns_msg_pool, BUF_ALLOC_TIMEOUT);
 	if (!dns_data) {
 		goto quit;
 	}
@@ -399,7 +428,7 @@ static void iface_ipv6_cb(struct net_if *iface, void *user_data)
 	ret = net_ipv6_mld_join(iface, addr);
 	if (ret < 0) {
 		NET_DBG("Cannot join %s IPv6 multicast group (%d)",
-			net_sprint_ipv6_addr(addr), ret);
+			log_strdup(net_sprint_ipv6_addr(addr)), ret);
 	}
 }
 

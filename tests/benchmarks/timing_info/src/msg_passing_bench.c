@@ -61,7 +61,7 @@ k_tid_t producer_w_cxt_switch_tid;
 k_tid_t producer_wo_cxt_switch_tid;
 k_tid_t producer_get_w_cxt_switch_tid;
 k_tid_t consumer_get_w_cxt_switch_tid;
-k_tid_t consumer_tid;
+extern k_tid_t consumer_tid;
 k_tid_t thread_mbox_sync_put_send_tid;
 k_tid_t thread_mbox_sync_put_receive_tid;
 k_tid_t thread_mbox_sync_get_send_tid;
@@ -70,7 +70,6 @@ k_tid_t thread_mbox_async_put_send_tid;
 k_tid_t thread_mbox_async_put_receive_tid;
 
 /* To time thread creation*/
-#define STACK_SIZE 500
 extern K_THREAD_STACK_DEFINE(my_stack_area, STACK_SIZE);
 extern K_THREAD_STACK_DEFINE(my_stack_area_0, STACK_SIZE);
 extern struct k_thread my_thread;
@@ -96,6 +95,17 @@ volatile u64_t time_check;
 int received_data_get;
 int received_data_consumer;
 int data_to_send;
+
+#define MBOX_CHECK(status) { if (status != 0) { \
+		if (status == -ENOMSG) {		      \
+			TC_PRINT("Returned -ENOMSG\n");	      \
+			return;				      \
+		} else {         /* Status will be -EAGAIN */ \
+			TC_PRINT("Returned -EAGAIN\n");	      \
+			return;				      \
+		}					      \
+	}						      \
+}					      \
 
 void msg_passing_bench(void)
 {
@@ -223,7 +233,7 @@ void msg_passing_bench(void)
 	k_sleep(1000); /* make the main thread sleep */
 
 	/*******************************************************************/
-	int single_element_buffer = 0;
+	int single_element_buffer = 0, status;
 	struct k_mbox_msg rx_msg = {
 		.size = sizeof(int),
 		.rx_source_thread = K_ANY,
@@ -232,7 +242,8 @@ void msg_passing_bench(void)
 	TIMING_INFO_PRE_READ();
 	mbox_get_w_cxt_start_time = TIMING_INFO_OS_GET_TIME();
 
-	k_mbox_get(&benchmark_mbox, &rx_msg, &single_element_buffer, 300);
+	status = k_mbox_get(&benchmark_mbox, &rx_msg, &single_element_buffer, 300);
+	MBOX_CHECK(status);
 
 	TIMING_INFO_PRE_READ();
 	mbox_get_w_cxt_end_time = TIMING_INFO_OS_GET_TIME();
@@ -271,44 +282,44 @@ void msg_passing_bench(void)
 
 	/* Only print lower 32bit of time result */
 	PRINT_STATS("Message Queue Put with context switch",
-		(u32_t)((__msg_q_put_w_cxt_end_time -
-			    __msg_q_put_w_cxt_start_time) & 0xFFFFFFFFULL),
-		(u32_t) (total_msg_q_put_w_cxt_time  & 0xFFFFFFFFULL));
+		    (u32_t)((__msg_q_put_w_cxt_end_time -
+			     __msg_q_put_w_cxt_start_time) & 0xFFFFFFFFULL),
+		    (u32_t) (total_msg_q_put_w_cxt_time  & 0xFFFFFFFFULL));
 
 	PRINT_STATS("Message Queue Put without context switch",
-		(u32_t)((__msg_q_put_wo_cxt_end_time -
-			    __msg_q_put_wo_cxt_start_time) & 0xFFFFFFFFULL),
-		(u32_t) (total_msg_q_put_wo_cxt_time  & 0xFFFFFFFFULL));
+		    (u32_t)((__msg_q_put_wo_cxt_end_time -
+			     __msg_q_put_wo_cxt_start_time) & 0xFFFFFFFFULL),
+		    (u32_t) (total_msg_q_put_wo_cxt_time  & 0xFFFFFFFFULL));
 
 	PRINT_STATS("Message Queue get with context switch",
-		(u32_t)((__msg_q_get_w_cxt_end_time -
-			    __msg_q_get_w_cxt_start_time) & 0xFFFFFFFFULL),
-		(u32_t) (total_msg_q_get_w_cxt_time & 0xFFFFFFFFULL));
+		    (u32_t)((__msg_q_get_w_cxt_end_time -
+			     __msg_q_get_w_cxt_start_time) & 0xFFFFFFFFULL),
+		    (u32_t) (total_msg_q_get_w_cxt_time & 0xFFFFFFFFULL));
 
 	PRINT_STATS("Message Queue get without context switch",
-		(u32_t)((msg_q_get_wo_cxt_end_time -
-			    msg_q_get_wo_cxt_start_time) & 0xFFFFFFFFULL),
-		(u32_t) (total_msg_q_get_wo_cxt_time  & 0xFFFFFFFFULL));
+		    (u32_t)((msg_q_get_wo_cxt_end_time -
+			     msg_q_get_wo_cxt_start_time) & 0xFFFFFFFFULL),
+		    (u32_t) (total_msg_q_get_wo_cxt_time  & 0xFFFFFFFFULL));
 
 	PRINT_STATS("MailBox synchronous put",
-		(u32_t)((mbox_sync_put_end_time - mbox_sync_put_start_time)
-			   & 0xFFFFFFFFULL),
-		(u32_t) (total_mbox_sync_put_time  & 0xFFFFFFFFULL));
+		    (u32_t)((mbox_sync_put_end_time - mbox_sync_put_start_time)
+			    & 0xFFFFFFFFULL),
+		    (u32_t) (total_mbox_sync_put_time  & 0xFFFFFFFFULL));
 
 	PRINT_STATS("MailBox synchronous get",
-		(u32_t)((mbox_sync_get_end_time - mbox_sync_get_start_time)
-			   & 0xFFFFFFFFULL),
-		(u32_t) (total_mbox_sync_get_time  & 0xFFFFFFFFULL));
+		    (u32_t)((mbox_sync_get_end_time - mbox_sync_get_start_time)
+			    & 0xFFFFFFFFULL),
+		    (u32_t) (total_mbox_sync_get_time  & 0xFFFFFFFFULL));
 
 	PRINT_STATS("MailBox asynchronous put",
-		(u32_t)((mbox_async_put_end_time - mbox_async_put_start_time)
-			   & 0xFFFFFFFFULL),
-		(u32_t) (total_mbox_async_put_time  & 0xFFFFFFFFULL));
+		    (u32_t)((mbox_async_put_end_time - mbox_async_put_start_time)
+			    & 0xFFFFFFFFULL),
+		    (u32_t) (total_mbox_async_put_time  & 0xFFFFFFFFULL));
 
 	PRINT_STATS("MailBox get without context switch",
-		(u32_t)((mbox_get_w_cxt_end_time - mbox_get_w_cxt_start_time)
-			   & 0xFFFFFFFFULL),
-		(u32_t) (total_mbox_get_w_cxt_time  & 0xFFFFFFFFULL));
+		    (u32_t)((mbox_get_w_cxt_end_time - mbox_get_w_cxt_start_time)
+			    & 0xFFFFFFFFULL),
+		    (u32_t) (total_mbox_get_w_cxt_time  & 0xFFFFFFFFULL));
 
 }
 
@@ -316,7 +327,7 @@ void thread_producer_msgq_w_cxt_switch(void *p1, void *p2, void *p3)
 {
 	int data_to_send = 5050;
 
-	__read_swap_end_time_value = 1;
+	__read_swap_end_time_value = 1U;
 	TIMING_INFO_PRE_READ();
 	__msg_q_put_w_cxt_start_time = (u32_t) TIMING_INFO_OS_GET_TIME();
 	k_msgq_put(&benchmark_q, &data_to_send, K_NO_WAIT);
@@ -351,9 +362,8 @@ void thread_producer_get_msgq_w_cxt_switch(void *p1, void *p2, void *p3)
 
 void thread_consumer_get_msgq_w_cxt_switch(void *p1, void *p2, void *p3)
 {
-	producer_get_w_cxt_switch_tid->base.timeout.delta_ticks_from_prev =
-		_EXPIRED;
-	__read_swap_end_time_value = 1;
+	producer_get_w_cxt_switch_tid->base.timeout.dticks = _EXPIRED;
+	__read_swap_end_time_value = 1U;
 	TIMING_INFO_PRE_READ();
 	__msg_q_get_w_cxt_start_time = TIMING_INFO_OS_GET_TIME();
 	received_data_get =  k_msgq_get(&benchmark_q_get,
@@ -366,7 +376,7 @@ void thread_consumer_get_msgq_w_cxt_switch(void *p1, void *p2, void *p3)
 
 void thread_mbox_sync_put_send(void *p1, void *p2, void *p3)
 {
-	int single_element_buffer = 1234;
+	int single_element_buffer = 1234, status;
 	struct k_mbox_msg tx_msg = {
 		.size = sizeof(int),
 		.info = 5050,
@@ -377,27 +387,31 @@ void thread_mbox_sync_put_send(void *p1, void *p2, void *p3)
 
 	TIMING_INFO_PRE_READ();
 	mbox_sync_put_start_time = TIMING_INFO_OS_GET_TIME();
-	__read_swap_end_time_value = 1;
-	k_mbox_put(&benchmark_mbox, &tx_msg, 300);
+	__read_swap_end_time_value = 1U;
+
+	status = k_mbox_put(&benchmark_mbox, &tx_msg, 300);
+	MBOX_CHECK(status);
+
 	TIMING_INFO_PRE_READ();
 	time_check = TIMING_INFO_OS_GET_TIME();
 }
 
 void thread_mbox_sync_put_receive(void *p1, void *p2, void *p3)
 {
-	int single_element_buffer = 1234;
+	int single_element_buffer = 1234, status;
 	struct k_mbox_msg rx_msg = {
 		.size = sizeof(int),
 		.rx_source_thread = K_ANY,
 		.tx_target_thread = K_ANY
 	};
 
-	k_mbox_get(&benchmark_mbox, &rx_msg, &single_element_buffer, 300);
+	status = k_mbox_get(&benchmark_mbox, &rx_msg, &single_element_buffer, 300);
+	MBOX_CHECK(status);
 }
 
 void thread_mbox_sync_get_send(void *p1, void *p2, void *p3)
 {
-	int single_element_buffer = 1234;
+	int single_element_buffer = 1234, status;
 	struct k_mbox_msg tx_msg = {
 		.size = sizeof(int),
 		.info = 5050,
@@ -406,22 +420,25 @@ void thread_mbox_sync_get_send(void *p1, void *p2, void *p3)
 		.tx_target_thread = K_ANY,
 	};
 
-	k_mbox_put(&benchmark_mbox, &tx_msg, 300);
+	status = k_mbox_put(&benchmark_mbox, &tx_msg, 300);
+	MBOX_CHECK(status);
 }
 
 void thread_mbox_sync_get_receive(void *p1, void *p2, void *p3)
 {
-	int single_element_buffer;
+	int single_element_buffer, status;
 	struct k_mbox_msg rx_msg = {
 		.size = sizeof(int),
 		.rx_source_thread = K_ANY,
 		.tx_target_thread = K_ANY
 	};
 
-	__read_swap_end_time_value = 1;
+	__read_swap_end_time_value = 1U;
 	TIMING_INFO_PRE_READ();
 	mbox_sync_get_start_time = TIMING_INFO_OS_GET_TIME();
-	k_mbox_get(&benchmark_mbox, &rx_msg, &single_element_buffer, 300);
+
+	status = k_mbox_get(&benchmark_mbox, &rx_msg, &single_element_buffer, 300);
+	MBOX_CHECK(status);
 }
 
 void thread_mbox_async_put_send(void *p1, void *p2, void *p3)
@@ -445,13 +462,13 @@ void thread_mbox_async_put_send(void *p1, void *p2, void *p3)
 
 void thread_mbox_async_put_receive(void *p1, void *p2, void *p3)
 {
-	int single_element_buffer;
+	int single_element_buffer, status;
 	struct k_mbox_msg rx_msg = {
 		.size = sizeof(int),
 		.rx_source_thread = K_ANY,
 		.tx_target_thread = K_ANY
 	};
 
-	k_mbox_get(&benchmark_mbox, &rx_msg, &single_element_buffer, 300);
-
+	status = k_mbox_get(&benchmark_mbox, &rx_msg, &single_element_buffer, 300);
+	MBOX_CHECK(status);
 }

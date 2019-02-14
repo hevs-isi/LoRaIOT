@@ -13,6 +13,8 @@
 #ifndef __ZTEST_TEST_H__
 #define __ZTEST_TEST_H__
 
+#include <app_memory/app_memdomain.h>
+
 struct unit_test {
 	const char *name;
 	void (*test)(void);
@@ -139,8 +141,21 @@ static inline void unit_test_noop(void)
  *
  * @param name Name of the testing suite
  */
+
+/* definitions for use with testing application shared memory   */
+#ifdef CONFIG_APP_SHARED_MEM
+#define ZTEST_DMEM	K_APP_DMEM(ztest_mem_partition)
+#define ZTEST_BMEM	K_APP_BMEM(ztest_mem_partition)
+#define ZTEST_SECTION	K_APP_DMEM_SECTION(ztest_mem_partition)
+extern struct k_mem_partition ztest_mem_partition;
+extern struct k_mem_domain ztest_mem_domain;
+#else
+#define ZTEST_DMEM
+#define ZTEST_BMEM
+#define ZTEST_SECTION	.data
+#endif
 #define ztest_test_suite(name, ...) \
-	static struct unit_test _##name[] = { \
+	static ZTEST_DMEM struct unit_test _##name[] = { \
 		__VA_ARGS__, { 0 } \
 	}
 /**

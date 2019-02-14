@@ -3,6 +3,13 @@
 		DEVICE_INIT_SECTIONS()
 	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
 
+#if defined(CONFIG_GEN_ISR_TABLES) && defined(CONFIG_DYNAMIC_INTERRUPTS)
+	SECTION_DATA_PROLOGUE(sw_isr_table, (OPTIONAL),)
+	{
+		*(SW_ISR_TABLE)
+	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
+#endif
+
 	/* verify we don't have rogue .init_<something> initlevel sections */
 	SECTION_DATA_PROLOGUE(initlevel_error, (OPTIONAL), )
 	{
@@ -13,6 +20,13 @@
 	SECTION_DATA_PROLOGUE(initshell, (OPTIONAL),)
 	{
 		SHELL_INIT_SECTIONS()
+	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
+
+	SECTION_DATA_PROLOGUE(log_dynamic_sections, (OPTIONAL),)
+	{
+		__log_dynamic_start = .;
+		KEEP(*(SORT(.log_dynamic_*)));
+		__log_dynamic_end = .;
 	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
 
 	SECTION_DATA_PROLOGUE(_static_thread_area, (OPTIONAL), SUBALIGN(4))
@@ -69,13 +83,6 @@
 		_k_mutex_list_end = .;
 	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
 
-	SECTION_DATA_PROLOGUE(_k_alert_area, (OPTIONAL), SUBALIGN(4))
-	{
-		_k_alert_list_start = .;
-		KEEP(*(SORT_BY_NAME("._k_alert.static.*")))
-		_k_alert_list_end = .;
-	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
-
 	SECTION_DATA_PROLOGUE(_k_queue_area, (OPTIONAL), SUBALIGN(4))
 	{
 		_k_queue_list_start = .;
@@ -109,13 +116,6 @@
 		_k_pipe_list_start = .;
 		KEEP(*(SORT_BY_NAME("._k_pipe.static.*")))
 		_k_pipe_list_end = .;
-	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
-
-	SECTION_DATA_PROLOGUE(_k_work_area, (OPTIONAL), SUBALIGN(4))
-	{
-		_k_work_list_start = .;
-		KEEP(*(SORT_BY_NAME("._k_work.static.*")))
-		_k_work_list_end = .;
 	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
 
 	SECTION_DATA_PROLOGUE(_k_task_list, (OPTIONAL), SUBALIGN(4))
@@ -187,6 +187,34 @@
 		KEEP(*(SORT_BY_NAME(".net_l2.data*")))
 		__net_l2_data_end = .;
 	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
+
+#if defined(CONFIG_USB_DEVICE_STACK)
+	SECTION_DATA_PROLOGUE(usb_descriptor, (OPTIONAL), SUBALIGN(1))
+	{
+		__usb_descriptor_start = .;
+		*(".usb.descriptor")
+		KEEP(*(SORT_BY_NAME(".usb.descriptor*")))
+		__usb_descriptor_end = .;
+	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
+
+	SECTION_DATA_PROLOGUE(usb_data, (OPTIONAL), SUBALIGN(1))
+	{
+		__usb_data_start = .;
+		*(".usb.data")
+		KEEP(*(SORT_BY_NAME(".usb.data*")))
+		__usb_data_end = .;
+	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
+#endif /* CONFIG_USB_DEVICE_STACK */
+
+#if defined(CONFIG_USB_DEVICE_BOS)
+	SECTION_DATA_PROLOGUE(usb_bos_desc, (OPTIONAL), SUBALIGN(1))
+	{
+		__usb_bos_desc_start = .;
+		*(".usb.bos_desc")
+		KEEP(*(SORT_BY_NAME(".usb.bos_desc*")))
+		__usb_bos_desc_end = .;
+	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
+#endif /* CONFIG_USB_DEVICE_BOS */
 
 #ifdef CONFIG_USERSPACE
 	_static_kernel_objects_end = .;

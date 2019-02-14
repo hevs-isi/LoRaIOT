@@ -18,9 +18,6 @@ GTEXT(__swap)
 GTEXT(_irq_do_offload)
 GTEXT(_offload_routine)
 #endif
-#ifdef CONFIG_TIMESLICING
-GTEXT(_update_time_slice_before_swap)
-#endif
 
 /* Allows use of r1/at register, otherwise reserved for assembler use */
 .set noat
@@ -123,14 +120,6 @@ on_irq_stack:
 	 * switch
 	 */
 
-	/*
-	 * Non-preemptible thread ? Do not schedule (see explanation of
-	 * preempt field in kernel_struct.h).
-	 */
-	ldhu r12, _thread_offset_to_preempt(r11)
-	movui r3, _NON_PREEMPT_THRESHOLD
-	bgeu r12, r3, no_reschedule
-
 	/* Call into the kernel to see if a scheduling decision is necessary */
 	ldw  r2, _kernel_offset_to_ready_q_cache(r10)
 	beq  r2, r11, no_reschedule
@@ -147,10 +136,6 @@ on_irq_stack:
 	 * we switched stacks. Restore it to go back to thread stack
 	 */
 	ldw sp, 0(sp)
-
-#ifdef CONFIG_TIMESLICING
-	call _update_time_slice_before_swap
-#endif
 
 	/* Argument to Swap() is estatus since that's the state of the
 	 * status register before the exception happened. When coming

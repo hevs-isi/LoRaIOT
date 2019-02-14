@@ -16,6 +16,7 @@
 #include <bluetooth/hci.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_KEYS)
+#define LOG_MODULE_NAME bt_keys_br
 #include "common/log.h"
 
 #include "hci_core.h"
@@ -67,7 +68,7 @@ void bt_keys_link_key_clear(struct bt_keys_link_key *link_key)
 {
 	BT_DBG("%s", bt_addr_str(&link_key->addr));
 
-	memset(link_key, 0, sizeof(*link_key));
+	(void)memset(link_key, 0, sizeof(*link_key));
 }
 
 void bt_keys_link_key_clear_addr(const bt_addr_t *addr)
@@ -75,7 +76,7 @@ void bt_keys_link_key_clear_addr(const bt_addr_t *addr)
 	struct bt_keys_link_key *key;
 
 	if (!addr) {
-		memset(key_pool, 0, sizeof(key_pool));
+		(void)memset(key_pool, 0, sizeof(key_pool));
 		return;
 	}
 

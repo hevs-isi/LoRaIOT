@@ -4,6 +4,7 @@ type: mcu
 arch: arm
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
 ram: 64
 flash: 512

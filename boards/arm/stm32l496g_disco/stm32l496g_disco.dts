@@ -5,7 +5,7 @@
  */
 
 /dts-v1/;
-#include <st/stm32l496.dtsi>
+#include <st/l4/stm32l496Xg.dtsi>
 
 / {
 	model = "STMicroelectronics STM32L496G-DISCO board";
@@ -13,13 +13,14 @@
 
 	chosen {
 		zephyr,console = &usart2;
+		zephyr,shell-uart = &usart2;
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
 	};
 
 	leds {
 		compatible = "gpio-leds";
-		green_led_2: led@0 {
+		green_led_2: led_2 {
 			gpios = <&gpiob 13 GPIO_INT_ACTIVE_HIGH>;
 			label = "User LD2";
 		};
@@ -27,23 +28,23 @@
 
 	gpio_keys {
 		compatible = "gpio-keys";
-		joy_sel: joystick@0 {
+		joy_sel: joystick_select {
 			label = "joystick select";
 			gpios = <&gpioc 13 GPIO_INT_ACTIVE_LOW>;
 		};
-		joy_down: joystick@1 {
+		joy_down: joystick_down {
 			label = "joystick down";
 			gpios = <&gpioi 10 GPIO_INT_ACTIVE_LOW>;
 		};
-		joy_up: joystick@2 {
+		joy_up: joystick_up {
 			label = "joystick up";
 			gpios = <&gpioi 8 GPIO_INT_ACTIVE_LOW>;
 		};
-		joy_left: joystick@3 {
+		joy_left: joystick_left {
 			label = "joystick left";
 			gpios = <&gpioi 9 GPIO_INT_ACTIVE_LOW>;
 		};
-		joy_right: joystick@4 {
+		joy_right: joystick_right {
 			label = "joystick right";
 			gpios = <&gpiof 11 GPIO_INT_ACTIVE_LOW>;
 		};
@@ -54,6 +55,10 @@
 		sw0 = &joy_sel;
 	};
 };
+
+arduino_i2c: &i2c1 {};
+arduino_spi: &spi1 {};
+arduino_serial: &lpuart1 {};
 
 &usart1 {
 	current-speed = <115200>;
@@ -66,5 +71,33 @@
 	current-speed = <115200>;
 	pinctrl-0 = <&usart2_pins_c>;
 	pinctrl-names = "default";
+	status = "ok";
+};
+
+&lpuart1 {
+	current-speed = <115200>;
+	pinctrl-0 = <&lpuart1_pins_a>;
+	pinctrl-names = "default";
+	status = "ok";
+};
+
+&timers2 {
+	status = "ok";
+
+	pwm {
+		status = "ok";
+	};
+};
+
+&i2c1 {
+	status = "ok";
+	clock-frequency = <I2C_BITRATE_FAST>;
+};
+
+&spi1 {
+	status = "ok";
+};
+
+&rtc {
 	status = "ok";
 };

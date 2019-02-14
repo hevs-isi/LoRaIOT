@@ -5,9 +5,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _TICKER_H_
-#define _TICKER_H_
-
 /** \defgroup Timer API return codes.
 *
 * @{
@@ -95,8 +92,8 @@ u32_t ticker_start(u8_t instance_index, u8_t user_id, u8_t ticker_id,
 		   ticker_timeout_func fp_timeout_func, void *context,
 		   ticker_op_func fp_op_func, void *op_context);
 u32_t ticker_update(u8_t instance_index, u8_t user_id, u8_t ticker_id,
-		    u16_t ticks_drift_plus, u16_t ticks_drift_minus,
-		    u16_t ticks_slot_plus, u16_t ticks_slot_minus, u16_t lazy,
+		    u32_t ticks_drift_plus, u32_t ticks_drift_minus,
+		    u32_t ticks_slot_plus, u32_t ticks_slot_minus, u16_t lazy,
 		    u8_t force, ticker_op_func fp_op_func, void *op_context);
 u32_t ticker_stop(u8_t instance_index, u8_t user_id, u8_t ticker_id,
 		  ticker_op_func fp_op_func, void *op_context);
@@ -109,5 +106,3 @@ u32_t ticker_job_idle_get(u8_t instance_index, u8_t user_id,
 void ticker_job_sched(u8_t instance_index, u8_t user_id);
 u32_t ticker_ticks_now_get(void);
 u32_t ticker_ticks_diff_get(u32_t ticks_now, u32_t ticks_old);
-
-#endif

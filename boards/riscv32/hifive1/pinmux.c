@@ -6,27 +6,45 @@
 
 #include <init.h>
 #include <pinmux.h>
-#include <board.h>
+#include <soc.h>
 
 static int hifive1_pinmux_init(struct device *dev)
 {
 	ARG_UNUSED(dev);
 
-	struct device *p = device_get_binding(CONFIG_PINMUX_FE310_0_NAME);
+	struct device *p = device_get_binding(CONFIG_PINMUX_SIFIVE_0_NAME);
 
 	/* UART0 RX */
-	pinmux_pin_set(p, 16, FE310_PINMUX_IOF0);
+	pinmux_pin_set(p, 16, SIFIVE_PINMUX_IOF0);
 
 	/* UART0 TX */
-	pinmux_pin_set(p, 17, FE310_PINMUX_IOF0);
+	pinmux_pin_set(p, 17, SIFIVE_PINMUX_IOF0);
 
 	/* SPI1 */
-	pinmux_pin_set(p, 2, FE310_PINMUX_IOF0); /* SS0 */
-	pinmux_pin_set(p, 3, FE310_PINMUX_IOF0); /* MOSI */
-	pinmux_pin_set(p, 4, FE310_PINMUX_IOF0); /* MISO */
-	pinmux_pin_set(p, 5, FE310_PINMUX_IOF0); /* SCK */
-	pinmux_pin_set(p, 9, FE310_PINMUX_IOF0); /* SS2 */
-	pinmux_pin_set(p, 10, FE310_PINMUX_IOF0); /* SS3 */
+	pinmux_pin_set(p, 2, SIFIVE_PINMUX_IOF0);  /* CS0 */
+	pinmux_pin_set(p, 3, SIFIVE_PINMUX_IOF0);  /* MOSI */
+	pinmux_pin_set(p, 4, SIFIVE_PINMUX_IOF0);  /* MISO */
+	pinmux_pin_set(p, 5, SIFIVE_PINMUX_IOF0);  /* SCK */
+	pinmux_pin_set(p, 9, SIFIVE_PINMUX_IOF0);  /* CS2 */
+	pinmux_pin_set(p, 10, SIFIVE_PINMUX_IOF0); /* CS3 */
+
+#if defined(CONFIG_PWM)
+
+	/* PWM 0 is not enabled because it conflicts with SPI 1 */
+
+	/* PWM 1 */
+	/* PWM1_0 is not enabled because the driver cannot use it */
+	pinmux_pin_set(p, 19, SIFIVE_PINMUX_IOF1); /* PWM1_1 */
+	pinmux_pin_set(p, 21, SIFIVE_PINMUX_IOF1); /* PWM1_2 */
+	pinmux_pin_set(p, 22, SIFIVE_PINMUX_IOF1); /* PWM1_3 */
+
+	/* PWM 2 */
+	/* PWM2_0 is not enabled because the driver cannot use it */
+	pinmux_pin_set(p, 11, SIFIVE_PINMUX_IOF1); /* PWM2_1 */
+	pinmux_pin_set(p, 12, SIFIVE_PINMUX_IOF1); /* PWM2_2 */
+	pinmux_pin_set(p, 13, SIFIVE_PINMUX_IOF1); /* PWM2_3 */
+
+#endif /* CONFIG_PWM */
 
 	return 0;
 }

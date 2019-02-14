@@ -10,9 +10,9 @@
 #define TIMEOUT 100
 #define PIPE_LEN 8
 
-static unsigned char __aligned(4) data[] = "abcd1234";
+static ZTEST_DMEM unsigned char __aligned(4) data[] = "abcd1234";
 
-__kernel struct k_pipe put_get_pipe;
+struct k_pipe put_get_pipe;
 
 
 static void put_fail(struct k_pipe *p)
@@ -31,14 +31,22 @@ static void put_fail(struct k_pipe *p)
 	zassert_true(wt_byte < 1, NULL);
 }
 
-/*test cases*/
+/**
+ * @brief Test pipe put failure scenario
+ * @ingroup kernel_pipe_tests
+ * @see k_pipe_init(), k_pipe_put()
+ */
 void test_pipe_put_fail(void)
 {
 	k_pipe_init(&put_get_pipe, data, PIPE_LEN);
 
 	put_fail(&put_get_pipe);
 }
-
+/**
+ * @brief Test pipe put by a user thread
+ * @ingroup kernel_pipe_tests
+ * @see k_pipe_put()
+ */
 #ifdef CONFIG_USERSPACE
 void test_pipe_user_put_fail(void)
 {
@@ -66,7 +74,11 @@ static void get_fail(struct k_pipe *p)
 	zassert_true(rd_byte < 1, NULL);
 }
 
-
+/**
+ * @brief Test pipe get failure scenario
+ * @ingroup kernel_pipe_tests
+ * @see k_pipe_init(), k_pipe_get()
+ */
 void test_pipe_get_fail(void)
 {
 	k_pipe_init(&put_get_pipe, data, PIPE_LEN);
@@ -75,6 +87,11 @@ void test_pipe_get_fail(void)
 }
 
 #ifdef CONFIG_USERSPACE
+/**
+ * @brief Test pipe get by a user thread
+ * @ingroup kernel_pipe_tests
+ * @see k_pipe_alloc_init()
+ */
 void test_pipe_user_get_fail(void)
 {
 	struct k_pipe *p = k_object_alloc(K_OBJ_PIPE);
@@ -85,3 +102,8 @@ void test_pipe_user_get_fail(void)
 	get_fail(p);
 }
 #endif
+
+
+/**
+ * @}
+ */

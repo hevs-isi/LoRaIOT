@@ -11,7 +11,6 @@
 
 #include <zephyr.h>
 
-#include <board.h>
 #include <init.h>
 #include <uart.h>
 #include <misc/util.h>
@@ -25,12 +24,13 @@
 #include <bluetooth/hci_driver.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
+#define LOG_MODULE_NAME bt_driver
 #include "common/log.h"
 
 #include "../util.h"
 
-static BT_STACK_NOINIT(tx_stack, 256);
-static BT_STACK_NOINIT(rx_stack, 256);
+static K_THREAD_STACK_DEFINE(tx_stack, 256);
+static K_THREAD_STACK_DEFINE(rx_stack, 256);
 
 static struct k_thread tx_thread_data;
 static struct k_thread rx_thread_data;
@@ -286,7 +286,7 @@ static void h5_send(const u8_t *payload, u8_t type, int len)
 
 	hexdump("<= ", payload, len);
 
-	memset(hdr, 0, sizeof(hdr));
+	(void)memset(hdr, 0, sizeof(hdr));
 
 	/* Set ACK for outgoing packet and stop delayed work */
 	H5_SET_ACK(hdr, h5.tx_ack);
@@ -711,7 +711,7 @@ static void h5_init(void)
 
 	h5.link_state = UNINIT;
 	h5.rx_state = START;
-	h5.tx_win = 4;
+	h5.tx_win = 4U;
 
 	/* TX thread */
 	k_fifo_init(&h5.tx_queue);

@@ -27,9 +27,19 @@
 #include <ksched.h>
 #include <init.h>
 #include <syscall_handler.h>
+#include <tracing.h>
 
 extern struct k_sem _k_sem_list_start[];
 extern struct k_sem _k_sem_list_end[];
+
+/* We use a system-wide lock to synchronize semaphores, which has
+ * unfortunate performance impact vs. using a per-object lock
+ * (semaphores are *very* widely used).  But per-object locks require
+ * significant extra RAM.  A properly spin-aware semaphore
+ * implementation would spin on atomic access to the count variable,
+ * and not a spinlock per se.  Useful optimization for the future...
+ */
+static struct k_spinlock lock;
 
 #ifdef CONFIG_OBJECT_TRACING
 
@@ -57,9 +67,10 @@ SYS_INIT(init_sem_module, PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_OBJECTS);
 void _impl_k_sem_init(struct k_sem *sem, unsigned int initial_count,
 		      unsigned int limit)
 {
-	__ASSERT(limit != 0, "limit cannot be zero");
+	__ASSERT(limit != 0U, "limit cannot be zero");
 	__ASSERT(initial_count <= limit, "count cannot be greater than limit");
 
+	sys_trace_void(SYS_TRACE_ID_SEMA_INIT);
 	sem->count = initial_count;
 	sem->limit = limit;
 	_waitq_init(&sem->wait_q);
@@ -70,6 +81,7 @@ void _impl_k_sem_init(struct k_sem *sem, unsigned int initial_count,
 	SYS_TRACING_OBJ_INIT(k_sem, sem);
 
 	_k_object_init(sem);
+	sys_trace_end_call(SYS_TRACE_ID_SEMA_INIT);
 }
 
 #ifdef CONFIG_USERSPACE
@@ -86,19 +98,21 @@ static inline void handle_poll_events(struct k_sem *sem)
 {
 #ifdef CONFIG_POLL
 	_handle_obj_poll_events(&sem->poll_events, K_POLL_STATE_SEM_AVAILABLE);
+#else
+	ARG_UNUSED(sem);
 #endif
 }
 
 static inline void increment_count_up_to_limit(struct k_sem *sem)
 {
-	sem->count += (sem->count != sem->limit);
+	sem->count += (sem->count != sem->limit) ? 1U : 0U;
 }
 
 static void do_sem_give(struct k_sem *sem)
 {
 	struct k_thread *thread = _unpend_first_thread(&sem->wait_q);
 
-	if (thread) {
+	if (thread != NULL) {
 		_ready_thread(thread);
 		_set_thread_return_value(thread, 0);
 	} else {
@@ -107,35 +121,14 @@ static void do_sem_give(struct k_sem *sem)
 	}
 }
 
-/*
- * This function is meant to be called only by
- * _sys_event_logger_put_non_preemptible(), which itself is really meant to be
- * called only by _sys_k_event_logger_context_switch(), used within a context
- * switch to log the event.
- *
- * WARNING:
- * It must be called with interrupts already locked.
- * It cannot be called for a sempahore part of a group.
- */
-void _sem_give_non_preemptible(struct k_sem *sem)
-{
-	struct k_thread *thread;
-
-	thread = _unpend1_no_timeout(&sem->wait_q);
-	if (!thread) {
-		increment_count_up_to_limit(sem);
-		return;
-	}
-
-	_set_thread_return_value(thread, 0);
-}
-
 void _impl_k_sem_give(struct k_sem *sem)
 {
-	unsigned int key = irq_lock();
+	k_spinlock_key_t key = k_spin_lock(&lock);
 
+	sys_trace_void(SYS_TRACE_ID_SEMA_GIVE);
 	do_sem_give(sem);
-	_reschedule(key);
+	sys_trace_end_call(SYS_TRACE_ID_SEMA_GIVE);
+	_reschedule(&lock, key);
 }
 
 #ifdef CONFIG_USERSPACE
@@ -144,22 +137,28 @@ Z_SYSCALL_HANDLER1_SIMPLE_VOID(k_sem_give, K_OBJ_SEM, struct k_sem *);
 
 int _impl_k_sem_take(struct k_sem *sem, s32_t timeout)
 {
-	__ASSERT(!_is_in_isr() || timeout == K_NO_WAIT, "");
+	__ASSERT(((_is_in_isr() == false) || (timeout == K_NO_WAIT)), "");
 
-	unsigned int key = irq_lock();
+	sys_trace_void(SYS_TRACE_ID_SEMA_TAKE);
+	k_spinlock_key_t key = k_spin_lock(&lock);
 
-	if (likely(sem->count > 0)) {
+	if (likely(sem->count > 0U)) {
 		sem->count--;
-		irq_unlock(key);
+		k_spin_unlock(&lock, key);
+		sys_trace_end_call(SYS_TRACE_ID_SEMA_TAKE);
 		return 0;
 	}
 
 	if (timeout == K_NO_WAIT) {
-		irq_unlock(key);
+		k_spin_unlock(&lock, key);
+		sys_trace_end_call(SYS_TRACE_ID_SEMA_TAKE);
 		return -EBUSY;
 	}
 
-	return _pend_current_thread(key, &sem->wait_q, timeout);
+	sys_trace_end_call(SYS_TRACE_ID_SEMA_TAKE);
+
+	int ret = _pend_curr(&lock, key, &sem->wait_q, timeout);
+	return ret;
 }
 
 #ifdef CONFIG_USERSPACE

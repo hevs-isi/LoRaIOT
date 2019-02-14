@@ -4,17 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __SENSOR_MPU6050_H__
-#define __SENSOR_MPU6050_H__
+#ifndef ZEPHYR_DRIVERS_SENSOR_MPU6050_MPU6050_H_
+#define ZEPHYR_DRIVERS_SENSOR_MPU6050_MPU6050_H_
 
 #include <device.h>
 #include <gpio.h>
 #include <misc/util.h>
 #include <zephyr/types.h>
-
-#define SYS_LOG_DOMAIN "MPU6050"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
 
 #define MPU6050_REG_CHIP_ID		0x75
 #define MPU6050_CHIP_ID			0x68

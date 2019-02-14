@@ -8,11 +8,11 @@
 if BOARD_NUCLEO_L073RZ
 
 config BOARD
-	default nucleo_l073rz
+	default "nucleo_l073rz"
 
 if UART_CONSOLE
 
-config UART_STM32_PORT_2
+config UART_2
 	default y
 
 endif # UART_CONSOLE

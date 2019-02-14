@@ -24,21 +24,21 @@ void test_config_compress_reset(void)
 	cf.cf_fcb.f_sector_cnt = ARRAY_SIZE(fcb_sectors);
 
 	rc = settings_fcb_src(&cf);
-	zassert_true(rc == 0, "can't register FCB as configuration source\n");
+	zassert_true(rc == 0, "can't register FCB as configuration source");
 
 	rc = settings_fcb_dst(&cf);
 	zassert_true(rc == 0,
-		     "can't register FCB as configuration destination\n");
+		     "can't register FCB as configuration destination");
 
 	c2_var_count = 1;
-	memset(elems, 0, sizeof(elems));
+	(void)memset(elems, 0, sizeof(elems));
 
 	for (i = 0; ; i++) {
 		test_config_fill_area(test_ref_value, i);
 		memcpy(val_string, test_ref_value, sizeof(val_string));
 
 		rc = settings_save();
-		zassert_true(rc == 0, "fcb write error\n");
+		zassert_true(rc == 0, "fcb write error");
 
 		if (cf.cf_fcb.f_active.fe_sector == &fcb_sectors[2]) {
 			/*
@@ -46,41 +46,41 @@ void test_config_compress_reset(void)
 			 */
 			break;
 		}
-		memset(val_string, 0, sizeof(val_string));
+		(void)memset(val_string, 0, sizeof(val_string));
 
 		rc = settings_load();
-		zassert_true(rc == 0, "fcb read error\n");
+		zassert_true(rc == 0, "fcb read error");
 		zassert_true(!memcmp(val_string, test_ref_value,
 				     SETTINGS_MAX_VAL_LEN),
-			     "bad value read\n");
+			     "bad value read");
 	}
 
 	fa = cf.cf_fcb.f_active.fe_sector;
 	rc = fcb_append_to_scratch(&cf.cf_fcb);
-	zassert_true(rc == 0, "fcb_append_to_scratch call failure\n");
+	zassert_true(rc == 0, "fcb_append_to_scratch call failure");
 	zassert_true(fcb_free_sector_cnt(&cf.cf_fcb) == 0,
-		     "expected non of free sectors\n");
+		     "expected non of free sectors");
 	zassert_true(fa != cf.cf_fcb.f_active.fe_sector,
-		     "active page should change\n");
+		     "active page should change");
 
 	config_wipe_srcs();
 
-	memset(&cf, 0, sizeof(cf));
+	(void)memset(&cf, 0, sizeof(cf));
 
 	cf.cf_fcb.f_magic = CONFIG_SETTINGS_FCB_MAGIC;
 	cf.cf_fcb.f_sectors = fcb_sectors;
 	cf.cf_fcb.f_sector_cnt = ARRAY_SIZE(fcb_sectors);
 
 	rc = settings_fcb_src(&cf);
-	zassert_true(rc == 0, "can't register FCB as configuration source\n");
+	zassert_true(rc == 0, "can't register FCB as configuration source");
 
 	rc = settings_fcb_dst(&cf);
 	zassert_true(rc == 0,
-		     "can't register FCB as configuration destination\n");
+		     "can't register FCB as configuration destination");
 
 
 	zassert_true(fcb_free_sector_cnt(&cf.cf_fcb) == 1,
-		     "expected one free sector\n");
+		     "expected one free sector");
 	zassert_true(fa == cf.cf_fcb.f_active.fe_sector,
 		   "active sector should become free after garbage collection");
 

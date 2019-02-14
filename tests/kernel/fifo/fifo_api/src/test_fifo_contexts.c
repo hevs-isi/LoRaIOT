@@ -99,7 +99,7 @@ static void tfifo_thread_thread(struct k_fifo *pfifo)
 static void tfifo_thread_isr(struct k_fifo *pfifo)
 {
 	k_sem_init(&end_sema, 0, 1);
-	/**TESTPOINT: thread-isr data passing via fifo*/
+	/**TESTPOINT: isr-thread data passing via fifo*/
 	irq_offload(tIsr_entry_put, pfifo);
 	tfifo_get(pfifo);
 }
@@ -107,7 +107,7 @@ static void tfifo_thread_isr(struct k_fifo *pfifo)
 static void tfifo_isr_thread(struct k_fifo *pfifo)
 {
 	k_sem_init(&end_sema, 0, 1);
-	/**TESTPOINT: isr-thread data passing via fifo*/
+	/**TESTPOINT: thread-isr data passing via fifo*/
 	tfifo_put(pfifo);
 	irq_offload(tIsr_entry_get, pfifo);
 }
@@ -126,8 +126,13 @@ static void tfifo_is_empty(void *p)
 }
 
 /**
- * @addtogroup kernel_fifo
+ * @addtogroup kernel_fifo_tests
  * @{
+ */
+
+/**
+ * @brief Test thread to thread data passing via fifo
+ * @see k_fifo_init(), k_fifo_put(), k_fifo_get(), k_fifo_put_list()
  */
 void test_fifo_thread2thread(void)
 {
@@ -139,6 +144,10 @@ void test_fifo_thread2thread(void)
 	tfifo_thread_thread(&kfifo);
 }
 
+/**
+ * @brief Test isr to thread data passing via fifo
+ * @see k_fifo_init(), k_fifo_put(), k_fifo_get()
+ */
 void test_fifo_thread2isr(void)
 {
 	/**TESTPOINT: init via k_fifo_init*/
@@ -149,6 +158,10 @@ void test_fifo_thread2isr(void)
 	tfifo_thread_isr(&kfifo);
 }
 
+/**
+ * @brief Test thread to isr data passing via fifo
+ * @see k_fifo_init(), k_fifo_put(), k_fifo_get()
+ */
 void test_fifo_isr2thread(void)
 {
 	/**TESTPOINT: test k_fifo_init fifo*/
@@ -159,6 +172,10 @@ void test_fifo_isr2thread(void)
 	tfifo_isr_thread(&kfifo);
 }
 
+/**
+ * @brief Test empty fifo
+ * @see k_fifo_init(), k_fifo_is_empty(), k_fifo_put(), k_fifo_get()
+ */
 void test_fifo_is_empty_thread(void)
 {
 	k_fifo_init(&fifo);
@@ -169,6 +186,10 @@ void test_fifo_is_empty_thread(void)
 	tfifo_is_empty(&fifo);
 }
 
+/**
+ * @brief Test empty fifo in interrupt context
+ * @see k_fifo_init(), fifo_is_empty(), k_fifo_put(), k_fifo_get()
+ */
 void test_fifo_is_empty_isr(void)
 {
 	k_fifo_init(&fifo);

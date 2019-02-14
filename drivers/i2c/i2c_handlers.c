@@ -29,7 +29,7 @@ static u32_t copy_msgs_and_transfer(struct device *dev,
 	/* Validate the buffers in each message struct. Read options require
 	 * that the target buffer be writable
 	 */
-	for (i = 0; i < num_msgs; i++) {
+	for (i = 0U; i < num_msgs; i++) {
 		Z_OOPS(Z_SYSCALL_MEMORY(copy[i].buf, copy[i].len,
 					copy[i].flags & I2C_MSG_READ));
 	}
@@ -57,3 +57,9 @@ Z_SYSCALL_HANDLER(i2c_transfer, dev, msgs, num_msgs, addr)
 				      (u8_t)num_msgs, (u16_t)addr,
 				      ssf);
 }
+
+Z_SYSCALL_HANDLER1_SIMPLE(i2c_slave_driver_register, K_OBJ_DRIVER_I2C,
+			  struct device *);
+
+Z_SYSCALL_HANDLER1_SIMPLE(i2c_slave_driver_unregister, K_OBJ_DRIVER_I2C,
+			  struct device *);

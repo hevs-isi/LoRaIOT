@@ -4,28 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef ZEPHYR_MISC_LIST_GEN_H
-#define ZEPHYR_MISC_LIST_GEN_H
+#ifndef ZEPHYR_INCLUDE_MISC_LIST_GEN_H_
+#define ZEPHYR_INCLUDE_MISC_LIST_GEN_H_
 
 #include <stddef.h>
 #include <stdbool.h>
 #include <misc/util.h>
 
 #define Z_GENLIST_FOR_EACH_NODE(__lname, __l, __sn)			\
-	for (__sn = sys_ ## __lname ## _peek_head(__l); __sn;		\
+	for (__sn = sys_ ## __lname ## _peek_head(__l); __sn != NULL;	\
 	     __sn = sys_ ## __lname ## _peek_next(__sn))
 
 
 #define Z_GENLIST_ITERATE_FROM_NODE(__lname, __l, __sn)			\
 	for (__sn = __sn ? sys_ ## __lname ## _peek_next_no_check(__sn)	\
 			 : sys_ ## __lname ## _peek_head(__l);		\
-	     __sn;							\
+	     __sn != NULL;						\
 	     __sn = sys_ ## __lname ## _peek_next(__sn))
 
 #define Z_GENLIST_FOR_EACH_NODE_SAFE(__lname, __l, __sn, __sns)		\
 	for (__sn = sys_ ## __lname ## _peek_head(__l),			\
 		     __sns = sys_ ## __lname ## _peek_next(__sn);	\
-	     __sn; __sn = __sns,					\
+	     __sn != NULL ; __sn = __sns,				\
 		     __sns = sys_ ## __lname ## _peek_next(__sn))
 
 #define Z_GENLIST_CONTAINER(__ln, __cn, __n)				\
@@ -45,13 +45,13 @@
 #define Z_GENLIST_FOR_EACH_CONTAINER(__lname, __l, __cn, __n)		\
 	for (__cn = Z_GENLIST_PEEK_HEAD_CONTAINER(__lname, __l, __cn,	\
 						  __n);			\
-	     __cn;							\
+	     __cn != NULL;						\
 	     __cn = Z_GENLIST_PEEK_NEXT_CONTAINER(__lname, __cn, __n))
 
 #define Z_GENLIST_FOR_EACH_CONTAINER_SAFE(__lname, __l, __cn, __cns, __n)     \
 	for (__cn = Z_GENLIST_PEEK_HEAD_CONTAINER(__lname, __l, __cn, __n),   \
-	     __cns = Z_GENLIST_PEEK_NEXT_CONTAINER(__lname, __cn, __n); __cn; \
-	     __cn = __cns,						      \
+	     __cns = Z_GENLIST_PEEK_NEXT_CONTAINER(__lname, __cn, __n); \
+	     __cn != NULL; __cn = __cns,				\
 	     __cns = Z_GENLIST_PEEK_NEXT_CONTAINER(__lname, __cn, __n))
 
 #define Z_GENLIST_IS_EMPTY(__lname)					\
@@ -126,15 +126,16 @@
 				     (sys_ ## __nname ## _t *)tail);	\
 }
 
-#define Z_GENLIST_MERGE_LIST(__lname)					\
+#define Z_GENLIST_MERGE_LIST(__lname, __nname)				\
 	static inline void						\
 	sys_ ## __lname ## _merge_ ## __lname (				\
 				sys_ ## __lname ## _t *list,		\
 				sys_ ## __lname ## _t *list_to_append)	\
 	{								\
-		sys_ ## __lname ## _append_list(list,			\
-			sys_ ## __lname ## _peek_head(list_to_append),	\
-			sys_ ## __lname ## _peek_tail(list_to_append));	\
+		sys_ ## __nname ## _t *head, *tail;			\
+		head = sys_ ## __lname ## _peek_head(list_to_append);	\
+		tail = sys_ ## __lname ## _peek_tail(list_to_append);	\
+		sys_ ## __lname ## _append_list(list, head, tail);	\
 		sys_ ## __lname ## _init(list_to_append);		\
 	}
 
@@ -230,4 +231,4 @@
 		return false;						 \
 	}
 
-#endif /* ZEPHYR_MISC_LIST_GEN_H */
+#endif /* ZEPHYR_INCLUDE_MISC_LIST_GEN_H_ */

@@ -19,10 +19,10 @@ int test_frequency(void)
 	end = k_cycle_get_32();
 
 	delta = end - start;
-	pct = (u64_t)delta * 100 / sys_clock_hw_cycles_per_sec;
+	pct = (u64_t)delta * 100 / sys_clock_hw_cycles_per_sec();
 
 	printk("delta: %u  expected: %u  %u%%\n", delta,
-	       sys_clock_hw_cycles_per_sec, pct);
+	       sys_clock_hw_cycles_per_sec(), pct);
 
 	/* Heuristic: if we're more than 10% off, throw an error */
 	if (pct < 90 || pct > 110) {
@@ -33,25 +33,37 @@ int test_frequency(void)
 	return 0;
 }
 
-
+/**
+ * @brief Test monotonic timer
+ *
+ * Validates monotonic timer's clock calibration.
+ *
+ * It reads the System clock’s h/w timer frequency value continuously
+ * using k_cycle_get_32() to verify its working and correctiveness.
+ * It also checks system tick frequency by checking the delta error
+ * between generated and system clock provided HW cycles per sec values.
+ *
+ * @ingroup kernel_timer_tests
+ *
+ * @see k_cycle_get_32(), sys_clock_hw_cycles_per_sec()
+ */
 void test_timer(void)
 {
 	u32_t t_last, t_now, i, errors;
 	s32_t diff;
 
-	errors = 0;
+	errors = 0U;
 
-	TC_PRINT("sys_clock_us_per_tick = %d\n", sys_clock_us_per_tick);
-	TC_PRINT("sys_clock_hw_cycles_per_tick = %d\n",
-		 sys_clock_hw_cycles_per_tick);
-	TC_PRINT("sys_clock_hw_cycles_per_sec = %d\n",
-		 sys_clock_hw_cycles_per_sec);
+	TC_PRINT("sys_clock_hw_cycles_per_tick() = %d\n",
+		 sys_clock_hw_cycles_per_tick());
+	TC_PRINT("sys_clock_hw_cycles_per_sec() = %d\n",
+		 sys_clock_hw_cycles_per_sec());
 
 	TC_START("test monotonic timer");
 
 	t_last = k_cycle_get_32();
 
-	for (i = 0; i < 1000000; i++) {
+	for (i = 0U; i < 1000000; i++) {
 		t_now = k_cycle_get_32();
 
 		if (t_now < t_last) {

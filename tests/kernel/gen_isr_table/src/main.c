@@ -18,24 +18,30 @@ extern u32_t _irq_vector_table[];
 #define ISR1_OFFSET	0
 #define ISR2_OFFSET	1
 
-#if defined(CONFIG_RISCV32) && !defined(CONFIG_SOC_RISCV32_PULPINO)
+#if defined(CONFIG_RISCV32)
+/* RISC-V has very few IRQ lines which can be triggered from software */
 #define ISR3_OFFSET	1
-#define ISR4_OFFSET	5
+#define ISR5_OFFSET	5
 
 #define IRQ_LINE(offset)        offset
 #define TABLE_INDEX(offset)     offset
-#define TRIG_CHECK_SIZE         6
+#define TRIG_CHECK_SIZE		6
 #else
 #define ISR3_OFFSET	2
 #define ISR4_OFFSET	3
+#define ISR5_OFFSET	4
+#define ISR6_OFFSET	5
 
 #define IRQ_LINE(offset)	(CONFIG_NUM_IRQS - ((offset) + 1))
 #define TABLE_INDEX(offset)	(IRQ_TABLE_SIZE - ((offset) + 1))
-#define TRIG_CHECK_SIZE         4
+#define TRIG_CHECK_SIZE         6
 #endif
 
 #define ISR3_ARG	0xb01dface
 #define ISR4_ARG	0xca55e77e
+#define ISR5_ARG	0xf0ccac1a
+#define ISR6_ARG	0xba5eba11
+
 static volatile int trigger_check[TRIG_CHECK_SIZE];
 
 #if defined(CONFIG_ARM)
@@ -50,7 +56,7 @@ void trigger_irq(int irq)
 	NVIC->STIR = irq;
 #endif
 }
-#elif defined(CONFIG_RISCV32) && !defined(CONFIG_SOC_RISCV32_PULPINO)
+#elif defined(CONFIG_RISCV32)
 void trigger_irq(int irq)
 {
 	u32_t mip;
@@ -87,17 +93,33 @@ ISR_DIRECT_DECLARE(isr2)
 
 void isr3(void *param)
 {
-	printk("isr3 ran with parameter %p\n", param);
+	printk("%s ran with parameter %p\n", __func__, param);
 	trigger_check[ISR3_OFFSET]++;
 }
 
-
+#ifdef ISR4_OFFSET
 void isr4(void *param)
 {
-	printk("isr4 ran with parameter %p\n", param);
+	printk("%s ran with parameter %p\n", __func__, param);
 	trigger_check[ISR4_OFFSET]++;
 }
+#endif
 
+void isr5(void *param)
+{
+	printk("%s ran with parameter %p\n", __func__, param);
+	trigger_check[ISR5_OFFSET]++;
+}
+
+#ifdef ISR6_OFFSET
+void isr6(void *param)
+{
+	printk("%s ran with parameter %p\n", __func__, param);
+	trigger_check[ISR6_OFFSET]++;
+}
+#endif
+
+#ifndef CONFIG_CPU_CORTEX_M
 /* Need to turn optimization off. Otherwise compiler may generate incorrect
  * code, not knowing that trigger_irq() affects the value of trigger_check,
  * even if declared volatile.
@@ -107,11 +129,16 @@ void isr4(void *param)
  * accesses to trigger_check around calls to trigger_irq.
  */
 __attribute__((optimize("-O0")))
+#endif
 int test_irq(int offset)
 {
 #ifndef NO_TRIGGER_FROM_SW
 	TC_PRINT("triggering irq %d\n", IRQ_LINE(offset));
 	trigger_irq(IRQ_LINE(offset));
+#ifdef CONFIG_CPU_CORTEX_M
+	__DSB();
+	__ISB();
+#endif
 	if (trigger_check[offset] != 1) {
 		TC_PRINT("interrupt %d didn't run once, ran %d times\n",
 			 IRQ_LINE(offset),
@@ -182,9 +209,28 @@ static int check_sw_isr(void *isr, u32_t arg, int offset)
 }
 #endif
 
+/**
+ * @ingroup kernel_interrupt_tests
+ * @brief test to validate gen_isr_table
+ *
+ * @details initialize two normal and two direct interrupt handler using
+ * IRQ_CONNECT and IRQ_DIRECT_CONNECT api respectively.
+ * For ‘direct’ interrupts, address of handler function will be placed in
+ * the irq vector table. And for 'regular' interrupts , the address of the
+ * common software isr table is placed in the irq vector table.
+ * Software ISR table is an array of struct _isr_table_entry.
+ * And each entry contains the pointer to isr and the corresponding parameters.
+ *
+ * At the end according to architecture, we manually trigger the interrupt.
+ * And all irq handler should get called.
+ *
+ * @see IRQ_DIRECT_CONNECT(), IRQ_CONNECT(), irq_enable()
+ *
+ */
+
 void main(void)
 {
-	int rv;
+	int rv = TC_FAIL;
 
 	TC_START("Test gen_isr_tables");
 
@@ -199,38 +245,54 @@ void main(void)
 	TC_PRINT("isr2 isr=%p irq=%d\n", isr2, IRQ_LINE(ISR2_OFFSET));
 
 	if (check_vector(isr1, ISR1_OFFSET)) {
-		rv = TC_FAIL;
 		goto done;
 	}
 
 	if (check_vector(isr2, ISR2_OFFSET)) {
-		rv = TC_FAIL;
 		goto done;
 	}
 #endif
-
 #ifdef CONFIG_GEN_SW_ISR_TABLE
-	IRQ_CONNECT(IRQ_LINE(ISR3_OFFSET), 1, isr3, ISR3_ARG, 0);
-	IRQ_CONNECT(IRQ_LINE(ISR4_OFFSET), 2, isr4, ISR4_ARG, 0);
-	irq_enable(IRQ_LINE(ISR3_OFFSET));
-	irq_enable(IRQ_LINE(ISR4_OFFSET));
-	TC_PRINT("isr3 isr=%p irq=%d param=%p\n", isr3, IRQ_LINE(ISR3_OFFSET),
-		 (void *)ISR3_ARG);
-	TC_PRINT("isr4 isr=%p irq=%d param=%p\n", isr4, IRQ_LINE(ISR4_OFFSET),
-		 (void *)ISR4_ARG);
 	TC_PRINT("_sw_isr_table at location %p\n", _sw_isr_table);
 
+	IRQ_CONNECT(IRQ_LINE(ISR3_OFFSET), 1, isr3, ISR3_ARG, 0);
+	irq_enable(IRQ_LINE(ISR3_OFFSET));
+	TC_PRINT("isr3 isr=%p irq=%d param=%p\n", isr3, IRQ_LINE(ISR3_OFFSET),
+		 (void *)ISR3_ARG);
 	if (check_sw_isr(isr3, ISR3_ARG, ISR3_OFFSET)) {
-		rv = TC_FAIL;
 		goto done;
 	}
 
+#ifdef ISR4_OFFSET
+	IRQ_CONNECT(IRQ_LINE(ISR4_OFFSET), 1, isr4, ISR4_ARG, 0);
+	irq_enable(IRQ_LINE(ISR4_OFFSET));
+	TC_PRINT("isr4 isr=%p irq=%d param=%p\n", isr4, IRQ_LINE(ISR4_OFFSET),
+		 (void *)ISR4_ARG);
 	if (check_sw_isr(isr4, ISR4_ARG, ISR4_OFFSET)) {
-		rv = TC_FAIL;
 		goto done;
 	}
 #endif
 
+	irq_connect_dynamic(IRQ_LINE(ISR5_OFFSET), 1, isr5, (void *)ISR5_ARG,
+			    0);
+	irq_enable(IRQ_LINE(ISR5_OFFSET));
+	TC_PRINT("isr5 isr=%p irq=%d param=%p\n", isr5, IRQ_LINE(ISR5_OFFSET),
+		 (void *)ISR5_ARG);
+	if (check_sw_isr(isr5, ISR5_ARG, ISR5_OFFSET)) {
+		goto done;
+	}
+
+#ifdef ISR6_OFFSET
+	irq_connect_dynamic(IRQ_LINE(ISR6_OFFSET), 1, isr6, (void *)ISR6_ARG,
+			    0);
+	irq_enable(IRQ_LINE(ISR6_OFFSET));
+	TC_PRINT("isr6 isr=%p irq=%d param=%p\n", isr6, IRQ_LINE(ISR6_OFFSET),
+		 (void *)ISR6_ARG);
+	if (check_sw_isr(isr6, ISR6_ARG, ISR6_OFFSET)) {
+		goto done;
+	}
+#endif
+#endif /* CONFIG_GEN_SW_ISR_TABLE */
 	rv = TC_PASS;
 done:
 	TC_END_RESULT(rv);

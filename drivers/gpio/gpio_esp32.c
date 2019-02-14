@@ -64,7 +64,7 @@ static int convert_int_type(int flags)
 		return 2;	/* Defaults to falling edge. */
 	}
 
-	if ((flags & GPIO_INT_LEVEL) == GPIO_INT_LEVEL) {
+	if ((flags & GPIO_INT_EDGE) == GPIO_INT_LEVEL) {
 		if ((flags & GPIO_INT_ACTIVE_HIGH) == GPIO_INT_ACTIVE_HIGH) {
 			return 5;
 		}
@@ -86,7 +86,7 @@ static int config_interrupt(u32_t pin, int flags)
 	volatile u32_t *reg = gpio_pin_reg(pin);
 	int type = convert_int_type(flags);
 	u32_t v;
-	int key;
+	unsigned int key;
 
 	if (type < 0) {
 		return type;
@@ -210,9 +210,7 @@ static int gpio_esp32_manage_callback(struct device *dev,
 {
 	struct gpio_esp32_data *data = dev->driver_data;
 
-	_gpio_manage_callback(&data->cb, callback, set);
-
-	return 0;
+	return _gpio_manage_callback(&data->cb, callback, set);
 }
 
 static int gpio_esp32_enable_callback(struct device *dev,

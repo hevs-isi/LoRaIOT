@@ -11,19 +11,23 @@
  * Network loopback interface implementation.
  */
 
-#define SYS_LOG_DOMAIN "netlo"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_NETLO_LEVEL
-#include <logging/sys_log.h>
+#define LOG_MODULE_NAME netlo
+#define LOG_LEVEL CONFIG_NET_LOOPBACK_LOG_LEVEL
 
-#include <misc/printk.h>
+#include <logging/log.h>
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <net/net_pkt.h>
 #include <net/buf.h>
 #include <net/net_ip.h>
 #include <net/net_if.h>
 
+#include <net/dummy.h>
+
 int loopback_dev_init(struct device *dev)
 {
+	ARG_UNUSED(dev);
+
 	return 0;
 }
 
@@ -34,13 +38,15 @@ static void loopback_init(struct net_if *iface)
 			     NET_LINK_DUMMY);
 }
 
-static int loopback_send(struct net_if *iface, struct net_pkt *pkt)
+static int loopback_send(struct device *dev, struct net_pkt *pkt)
 {
 	struct net_pkt *cloned;
 	int res;
 
+	ARG_UNUSED(dev);
+
 	if (!pkt->frags) {
-		SYS_LOG_ERR("No data to send");
+		LOG_ERR("No data to send");
 		return -ENODATA;
 	}
 
@@ -69,19 +75,16 @@ static int loopback_send(struct net_if *iface, struct net_pkt *pkt)
 	 * must be dropped. This is very much needed for TCP packets where
 	 * the packet is reference counted in various stages of sending.
 	 */
-	cloned = net_pkt_clone(pkt, MSEC(100));
+	cloned = net_pkt_clone(pkt, K_MSEC(100));
 	if (!cloned) {
 		res = -ENOMEM;
 		goto out;
 	}
 
-	res = net_recv_data(iface, cloned);
+	res = net_recv_data(net_pkt_iface(cloned), cloned);
 	if (res < 0) {
-		SYS_LOG_ERR("Data receive failed.");
-		goto out;
+		LOG_ERR("Data receive failed.");
 	}
-
-	net_pkt_unref(pkt);
 
 out:
 	/* Let the receiving thread run now */
@@ -90,13 +93,14 @@ out:
 	return res;
 }
 
-static struct net_if_api loopback_if_api = {
-	.init = loopback_init,
+static struct dummy_api loopback_api = {
+	.iface_api.init = loopback_init,
+
 	.send = loopback_send,
 };
 
 NET_DEVICE_INIT(loopback, "lo",
 		loopback_dev_init, NULL, NULL,
 		CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,
-		&loopback_if_api, DUMMY_L2,
+		&loopback_api, DUMMY_L2,
 		NET_L2_GET_CTX_TYPE(DUMMY_L2), 536);

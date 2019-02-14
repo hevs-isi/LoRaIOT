@@ -4,4 +4,9 @@ type: mcu
 arch: arm
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
+supported:
+  - netif:wifi
+  - i2c
+  - gpio

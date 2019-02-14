@@ -29,11 +29,7 @@ extern "C" {
 /** Is this TCP context/socket used or not */
 #define NET_TCP_IN_USE BIT(0)
 
-/** Is the final segment sent */
-#define NET_TCP_FINAL_SENT BIT(1)
-
-/** Is the final segment received */
-#define NET_TCP_FINAL_RECV BIT(2)
+/* BIT(1), BIT(2) are unused and available */
 
 /** Is the socket shutdown for read/write */
 #define NET_TCP_IS_SHUTDOWN BIT(3)
@@ -145,19 +141,6 @@ struct net_tcp {
 	/** Last ACK value sent */
 	u32_t sent_ack;
 
-	/** Current retransmit period */
-	u32_t retry_timeout_shift : 5;
-	/** Flags for the TCP */
-	u32_t flags : 8;
-	/** Current TCP state */
-	u32_t state : 4;
-	/* An outbound FIN packet has been sent */
-	u32_t fin_sent : 1;
-	/* An inbound FIN packet has been received */
-	u32_t fin_rcvd : 1;
-	/** Remaining bits in this u32_t */
-	u32_t _padding : 13;
-
 	/** Accept callback to be called when the connection has been
 	 * established.
 	 */
@@ -177,6 +160,19 @@ struct net_tcp {
 	 * Send MSS for the peer
 	 */
 	u16_t send_mss;
+
+	/** Current retransmit period */
+	u32_t retry_timeout_shift : 5;
+	/** Flags for the TCP */
+	u32_t flags : 8;
+	/** Current TCP state */
+	u32_t state : 4;
+	/* An outbound FIN packet has been sent */
+	u32_t fin_sent : 1;
+	/* An inbound FIN packet has been received */
+	u32_t fin_rcvd : 1;
+	/** Remaining bits in this u32_t */
+	u32_t _padding : 13;
 };
 
 typedef void (*net_tcp_cb_t)(struct net_tcp *tcp, void *user_data);
@@ -192,6 +188,7 @@ static inline bool net_tcp_is_used(struct net_tcp *tcp)
  * @brief Register a callback to be called when TCP packet
  * is received corresponding to received packet.
  *
+ * @param family Protocol family
  * @param remote_addr Remote address of the connection end point.
  * @param local_addr Local address of the connection end point.
  * @param remote_port Remote port of the connection end point.
@@ -202,7 +199,8 @@ static inline bool net_tcp_is_used(struct net_tcp *tcp)
  *
  * @return Return 0 if the registration succeed, <0 otherwise.
  */
-static inline int net_tcp_register(const struct sockaddr *remote_addr,
+static inline int net_tcp_register(u8_t family,
+				   const struct sockaddr *remote_addr,
 				   const struct sockaddr *local_addr,
 				   u16_t remote_port,
 				   u16_t local_port,
@@ -210,7 +208,7 @@ static inline int net_tcp_register(const struct sockaddr *remote_addr,
 				   void *user_data,
 				   struct net_conn_handle **handle)
 {
-	return net_conn_register(IPPROTO_TCP, remote_addr, local_addr,
+	return net_conn_register(IPPROTO_TCP, family, remote_addr, local_addr,
 				 remote_port, local_port, cb, user_data,
 				 handle);
 }
@@ -397,33 +395,20 @@ static inline enum net_tcp_state net_tcp_get_state(const struct net_tcp *tcp)
  * @brief Check if the sequence number is valid i.e., it is inside the window.
  *
  * @param tcp TCP context
- * @param pkt Network packet
+ * @param tcp_hdr TCP header pointer
  *
  * @return true if network packet sequence number is valid, false otherwise
  */
-bool net_tcp_validate_seq(struct net_tcp *tcp, struct net_pkt *pkt);
+bool net_tcp_validate_seq(struct net_tcp *tcp, struct net_tcp_hdr *tcp_hdr);
 
 /**
- * @brief Set TCP checksum in network packet.
+ * @brief Finalize TCP packet
  *
  * @param pkt Network packet
- * @param frag Fragment where to start calculating the offset.
- * Typically this is set to pkt->frags by the caller.
  *
- * @return Return the actual fragment where the checksum was written.
+ * @return 0 on success, negative errno otherwise.
  */
-struct net_buf *net_tcp_set_chksum(struct net_pkt *pkt, struct net_buf *frag);
-
-/**
- * @brief Get TCP checksum from network packet.
- *
- * @param pkt Network packet
- * @param frag Fragment where to start calculating the offset.
- * Typically this is set to pkt->frags by the caller.
- *
- * @return Return the checksum in host byte order.
- */
-u16_t net_tcp_get_chksum(struct net_pkt *pkt, struct net_buf *frag);
+int net_tcp_finalize(struct net_pkt *pkt);
 
 /**
  * @brief Parse TCP options from network packet.
@@ -441,15 +426,6 @@ u16_t net_tcp_get_chksum(struct net_pkt *pkt, struct net_buf *frag);
  */
 int net_tcp_parse_opts(struct net_pkt *pkt, int opt_totlen,
 		       struct net_tcp_options *opts);
-
-/**
- * @brief Get TCP header length
- *
- * @param pkt Network packet
- *
- * @return TCP header length
- */
-int tcp_hdr_len(struct net_pkt *pkt);
 
 /**
  * @brief TCP receive function
@@ -550,6 +526,9 @@ int net_tcp_connect(struct net_context *context,
 		    s32_t timeout,
 		    net_context_connect_cb_t cb,
 		    void *user_data);
+
+struct net_tcp_hdr *net_tcp_input(struct net_pkt *pkt,
+				  struct net_pkt_data_access *tcp_access);
 
 #else
 static inline struct net_tcp *net_tcp_alloc(struct net_context *context)
@@ -658,49 +637,16 @@ static inline enum net_tcp_state net_tcp_get_state(const struct net_tcp *tcp)
 }
 
 static inline bool net_tcp_validate_seq(struct net_tcp *tcp,
-					struct net_pkt *pkt)
+					struct net_tcp_hdr *tcp_hdr)
 {
 	ARG_UNUSED(tcp);
-	ARG_UNUSED(pkt);
+	ARG_UNUSED(tcp_hdr);
 	return false;
 }
 
-static inline u16_t net_tcp_get_chksum(struct net_pkt *pkt,
-				       struct net_buf *frag)
+static inline int net_tcp_finalize(struct net_pkt *pkt)
 {
 	ARG_UNUSED(pkt);
-	ARG_UNUSED(frag);
-	return 0;
-}
-
-static inline struct net_buf *net_tcp_set_chksum(struct net_pkt *pkt,
-						 struct net_buf *frag)
-{
-	ARG_UNUSED(pkt);
-	ARG_UNUSED(frag);
-	return NULL;
-}
-
-static inline struct net_tcp_hdr *net_tcp_get_hdr(struct net_pkt *pkt,
-						  struct net_tcp_hdr *hdr)
-{
-	ARG_UNUSED(pkt);
-	ARG_UNUSED(hdr);
-	return NULL;
-}
-
-static inline struct net_tcp_hdr *net_tcp_set_hdr(struct net_pkt *pkt,
-						  struct net_tcp_hdr *hdr)
-{
-	ARG_UNUSED(pkt);
-	ARG_UNUSED(hdr);
-	return NULL;
-}
-
-static inline int tcp_hdr_len(struct net_pkt *pkt)
-{
-	ARG_UNUSED(pkt);
-
 	return 0;
 }
 
@@ -776,6 +722,16 @@ static inline int net_tcp_connect(struct net_context *context,
 	ARG_UNUSED(user_data);
 
 	return -EPROTONOSUPPORT;
+}
+
+static inline
+struct net_tcp_hdr *net_tcp_input(struct net_pkt *pkt,
+				  struct net_pkt_data_access *tcp_access)
+{
+	ARG_UNUSED(pkt);
+	ARG_UNUSED(tcp_access);
+
+	return NULL;
 }
 
 #endif

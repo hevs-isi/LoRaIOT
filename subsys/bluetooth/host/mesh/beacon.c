@@ -16,6 +16,7 @@
 #include <bluetooth/mesh.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_BEACON)
+#define LOG_MODULE_NAME bt_mesh_beacon
 #include "common/log.h"
 
 #include "adv.h"
@@ -33,12 +34,10 @@
 #define BEACON_TYPE_SECURE         0x01
 
 /* 3 transmissions, 20ms interval */
-#define UNPROV_XMIT_COUNT          2
-#define UNPROV_XMIT_INT            20
+#define UNPROV_XMIT                BT_MESH_TRANSMIT(2, 20)
 
 /* 1 transmission, 20ms interval */
-#define PROV_XMIT_COUNT            0
-#define PROV_XMIT_INT              20
+#define PROV_XMIT                  BT_MESH_TRANSMIT(0, 20)
 
 static struct k_delayed_work beacon_timer;
 
@@ -134,8 +133,8 @@ static int secure_beacon_send(void)
 			continue;
 		}
 
-		buf = bt_mesh_adv_create(BT_MESH_ADV_BEACON, PROV_XMIT_COUNT,
-					 PROV_XMIT_INT, K_NO_WAIT);
+		buf = bt_mesh_adv_create(BT_MESH_ADV_BEACON, PROV_XMIT,
+					 K_NO_WAIT);
 		if (!buf) {
 			BT_ERR("Unable to allocate beacon buffer");
 			return -ENOBUFS;
@@ -160,8 +159,7 @@ static int unprovisioned_beacon_send(void)
 
 	BT_DBG("");
 
-	buf = bt_mesh_adv_create(BT_MESH_ADV_BEACON, UNPROV_XMIT_COUNT,
-				 UNPROV_XMIT_INT, K_NO_WAIT);
+	buf = bt_mesh_adv_create(BT_MESH_ADV_BEACON, UNPROV_XMIT, K_NO_WAIT);
 	if (!buf) {
 		BT_ERR("Unable to allocate beacon buffer");
 		return -ENOBUFS;
@@ -187,8 +185,8 @@ static int unprovisioned_beacon_send(void)
 	if (prov->uri) {
 		size_t len;
 
-		buf = bt_mesh_adv_create(BT_MESH_ADV_URI, UNPROV_XMIT_COUNT,
-					 UNPROV_XMIT_INT, K_NO_WAIT);
+		buf = bt_mesh_adv_create(BT_MESH_ADV_URI, UNPROV_XMIT,
+					 K_NO_WAIT);
 		if (!buf) {
 			BT_ERR("Unable to allocate URI buffer");
 			return -ENOBUFS;
@@ -231,7 +229,7 @@ static void update_beacon_observation(void)
 		}
 
 		sub->beacons_last = sub->beacons_cur;
-		sub->beacons_cur = 0;
+		sub->beacons_cur = 0U;
 	}
 }
 
@@ -251,7 +249,7 @@ static void beacon_send(struct k_work *work)
 
 		/* Only resubmit if beaconing is still enabled */
 		if (bt_mesh_beacon_get() == BT_MESH_BEACON_ENABLED ||
-		    bt_mesh.ivu_initiator) {
+		    atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR)) {
 			k_delayed_work_submit(&beacon_timer,
 					      PROVISIONED_INTERVAL);
 		}
@@ -285,8 +283,7 @@ static void secure_beacon_recv(struct net_buf_simple *buf)
 	data = buf->data;
 
 	flags = net_buf_simple_pull_u8(buf);
-	net_id = buf->data;
-	net_buf_simple_pull(buf, 8);
+	net_id = net_buf_simple_pull(buf, 8);
 	iv_index = net_buf_simple_pull_be32(buf);
 	auth = buf->data;
 
@@ -316,8 +313,9 @@ static void secure_beacon_recv(struct net_buf_simple *buf)
 	BT_DBG("net_idx 0x%04x iv_index 0x%08x, current iv_index 0x%08x",
 	       sub->net_idx, iv_index, bt_mesh.iv_index);
 
-	if (bt_mesh.ivu_initiator &&
-	    bt_mesh.iv_update == BT_MESH_IV_UPDATE(flags)) {
+	if (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR) &&
+	    (atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_IN_PROGRESS) ==
+	     BT_MESH_IV_UPDATE(flags))) {
 		bt_mesh_beacon_ivu_initiator(false);
 	}
 
@@ -375,7 +373,7 @@ void bt_mesh_beacon_init(void)
 
 void bt_mesh_beacon_ivu_initiator(bool enable)
 {
-	bt_mesh.ivu_initiator = enable;
+	atomic_set_bit_to(bt_mesh.flags, BT_MESH_IVU_INITIATOR, enable);
 
 	if (enable) {
 		k_work_submit(&beacon_timer.work);
@@ -400,8 +398,8 @@ void bt_mesh_beacon_enable(void)
 			continue;
 		}
 
-		sub->beacons_last = 0;
-		sub->beacons_cur = 0;
+		sub->beacons_last = 0U;
+		sub->beacons_cur = 0U;
 
 		bt_mesh_net_beacon_update(sub);
 	}
@@ -411,7 +409,7 @@ void bt_mesh_beacon_enable(void)
 
 void bt_mesh_beacon_disable(void)
 {
-	if (!bt_mesh.ivu_initiator) {
+	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_IVU_INITIATOR)) {
 		k_delayed_work_cancel(&beacon_timer);
 	}
 }

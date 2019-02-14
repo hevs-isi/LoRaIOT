@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#if defined(CONFIG_NET_DEBUG_TC)
-#define SYS_LOG_DOMAIN "net/tc"
-#define NET_LOG_ENABLED 1
-#endif
+#include <logging/log.h>
+LOG_MODULE_REGISTER(net_tc, CONFIG_NET_TC_LOG_LEVEL);
 
 #include <zephyr.h>
 #include <string.h>
@@ -18,6 +16,7 @@
 
 #include "net_private.h"
 #include "net_stats.h"
+#include "net_tc_mapping.h"
 
 /* Stacks for TX work queue */
 NET_STACK_ARRAY_DEFINE(TX, tx_stack,
@@ -28,7 +27,7 @@ NET_STACK_ARRAY_DEFINE(TX, tx_stack,
 /* Stacks for RX work queue */
 NET_STACK_ARRAY_DEFINE(RX, rx_stack,
 		       CONFIG_NET_RX_STACK_SIZE,
-		       CONFIG_NET_RX_STACK_SIZE + CONFIG_NET_RX_STACK_RPL,
+		       CONFIG_NET_RX_STACK_SIZE,
 		       NET_TC_RX_COUNT);
 
 static struct net_traffic_class tx_classes[NET_TC_TX_COUNT];
@@ -46,108 +45,22 @@ void net_tc_submit_to_rx_queue(u8_t tc, struct net_pkt *pkt)
 
 int net_tx_priority2tc(enum net_priority prio)
 {
-	/*
-	 * Use the example priority -> traffic class mapper found in
-	 * IEEE 802.1Q chapter I.3, chapter 8.6.6 table 8.4 and
-	 * chapter 34.5 table 34-1
-	 *
-	 *  Priority         Acronym   Traffic types
-	 *  0 (lowest)       BK        Background
-	 *  1 (default)      BE        Best effort
-	 *  2                EE        Excellent effort
-	 *  3                CA        Critical applications
-	 *  4                VI        Video, < 100 ms latency and jitter
-	 *  5                VO        Voice, < 10 ms latency and jitter
-	 *  6                IC        Internetwork control
-	 *  7 (highest)      NC        Network control
-	 */
-	/* Priority is the index to this array */
-	static const u8_t tc[] = {
-#if NET_TC_TX_COUNT == 1
-		0, 0, 0, 0, 0, 0, 0, 0
-#endif
-#if NET_TC_TX_COUNT == 2
-		0, 0, 0, 0, 1, 1, 1, 1
-#endif
-#if NET_TC_TX_COUNT == 3
-		0, 0, 0, 0, 1, 1, 2, 2
-#endif
-#if NET_TC_TX_COUNT == 4
-		0, 0, 1, 1, 2, 2, 3, 3
-#endif
-#if NET_TC_TX_COUNT == 5
-		0, 0, 1, 1, 2, 2, 3, 4
-#endif
-#if NET_TC_TX_COUNT == 6
-		0, 1, 2, 2, 3, 3, 4, 5
-#endif
-#if NET_TC_TX_COUNT == 7
-		0, 1, 2, 3, 4, 4, 5, 6
-#endif
-#if NET_TC_TX_COUNT == 8
-		0, 1, 2, 3, 4, 5, 6, 7
-#endif
-	};
-
-	if (prio >= ARRAY_SIZE(tc)) {
+	if (prio > NET_PRIORITY_NC) {
 		/* Use default value suggested in 802.1Q */
 		prio = NET_PRIORITY_BE;
 	}
 
-	return tc[prio];
+	return tx_prio2tc_map[prio];
 }
 
 int net_rx_priority2tc(enum net_priority prio)
 {
-	/*
-	 * Use the example priority -> traffic class mapper found in
-	 * IEEE 802.1Q chapter I.3, chapter 8.6.6 table 8.4 and
-	 * chapter 34.5 table 34-1
-	 *
-	 *  Priority         Acronym   Traffic types
-	 *  0 (lowest)       BK        Background
-	 *  1 (default)      BE        Best effort
-	 *  2                EE        Excellent effort
-	 *  3                CA        Critical applications
-	 *  4                VI        Video, < 100 ms latency and jitter
-	 *  5                VO        Voice, < 10 ms latency and jitter
-	 *  6                IC        Internetwork control
-	 *  7 (highest)      NC        Network control
-	 */
-	/* Priority is the index to this array */
-	static const u8_t tc[] = {
-#if NET_TC_RX_COUNT == 1
-		0, 0, 0, 0, 0, 0, 0, 0
-#endif
-#if NET_TC_RX_COUNT == 2
-		0, 0, 0, 0, 1, 1, 1, 1
-#endif
-#if NET_TC_RX_COUNT == 3
-		0, 0, 0, 0, 1, 1, 2, 2
-#endif
-#if NET_TC_RX_COUNT == 4
-		0, 0, 1, 1, 2, 2, 3, 3
-#endif
-#if NET_TC_RX_COUNT == 5
-		0, 0, 1, 1, 2, 2, 3, 4
-#endif
-#if NET_TC_RX_COUNT == 6
-		0, 1, 2, 2, 3, 3, 4, 5
-#endif
-#if NET_TC_RX_COUNT == 7
-		0, 1, 2, 3, 4, 4, 5, 6
-#endif
-#if NET_TC_RX_COUNT == 8
-		0, 1, 2, 3, 4, 5, 6, 7
-#endif
-	};
-
-	if (prio >= ARRAY_SIZE(tc)) {
+	if (prio > NET_PRIORITY_NC) {
 		/* Use default value suggested in 802.1Q */
 		prio = NET_PRIORITY_BE;
 	}
 
-	return tc[prio];
+	return rx_prio2tc_map[prio];
 }
 
 /* Convert traffic class to thread priority */
@@ -344,9 +257,8 @@ void net_tc_tx_init(void)
 			       tx_stack[i],
 			       K_THREAD_STACK_SIZEOF(tx_stack[i]),
 			       K_PRIO_COOP(thread_priority));
+		k_thread_name_set(&tx_classes[i].work_q.thread, "tx_workq");
 	}
-
-	k_yield();
 }
 
 void net_tc_rx_init(void)
@@ -384,7 +296,6 @@ void net_tc_rx_init(void)
 			       rx_stack[i],
 			       K_THREAD_STACK_SIZEOF(rx_stack[i]),
 			       K_PRIO_COOP(thread_priority));
+		k_thread_name_set(&rx_classes[i].work_q.thread, "rx_workq");
 	}
-
-	k_yield();
 }

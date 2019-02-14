@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __IEEE802154_CC1200_H__
-#define __IEEE802154_CC1200_H__
+#ifndef ZEPHYR_DRIVERS_IEEE802154_IEEE802154_CC1200_H_
+#define ZEPHYR_DRIVERS_IEEE802154_IEEE802154_CC1200_H_
 
 #include <linker/sections.h>
 #include <atomic.h>
@@ -76,7 +76,6 @@ static inline bool _cc1200_instruct(struct cc1200_context *ctx, u8_t addr)
 #define DEFINE_REG_READ(__reg_name, __reg_addr, __ext)			\
 	static inline u8_t read_reg_##__reg_name(struct cc1200_context *ctx) \
 	{								\
-		/*SYS_LOG_DBG("");*/					\
 		return _cc1200_read_single_reg(ctx, __reg_addr, __ext);	\
 	}
 
@@ -84,7 +83,6 @@ static inline bool _cc1200_instruct(struct cc1200_context *ctx, u8_t addr)
 	static inline bool write_reg_##__reg_name(struct cc1200_context *ctx, \
 						  u8_t val)		\
 	{								\
-		/*SYS_LOG_DBG("");*/					\
 		return _cc1200_write_single_reg(ctx, __reg_addr,	\
 						val, __ext);		\
 	}
@@ -109,7 +107,6 @@ DEFINE_REG_READ(num_rxbytes, CC1200_REG_NUM_RXBYTES, true)
 #define DEFINE_STROBE_INSTRUCTION(__ins_name, __ins_addr)		\
 	static inline bool instruct_##__ins_name(struct cc1200_context *ctx) \
 	{								\
-		/*SYS_LOG_DBG("");*/					\
 		return _cc1200_instruct(ctx, __ins_addr);		\
 	}
 
@@ -128,4 +125,4 @@ DEFINE_STROBE_INSTRUCTION(sftx, CC1200_INS_SFTX)
 DEFINE_STROBE_INSTRUCTION(sworrst, CC1200_INS_SWORRST)
 DEFINE_STROBE_INSTRUCTION(snop, CC1200_INS_SNOP)
 
-#endif /* __IEEE802154_CC1200_H__ */
+#endif /* ZEPHYR_DRIVERS_IEEE802154_IEEE802154_CC1200_H_ */

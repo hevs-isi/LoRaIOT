@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _SENSOR_AMG88XX
-#define _SENSOR_AMG88XX
+#ifndef ZEPHYR_DRIVERS_SENSOR_AMG88XX_AMG88XX_H_
+#define ZEPHYR_DRIVERS_SENSOR_AMG88XX_AMG88XX_H_
 
 #include <device.h>
 #include <gpio.h>
@@ -135,10 +135,5 @@ int amg88xx_trigger_set(struct device *dev,
 
 int amg88xx_init_interrupt(struct device *dev);
 #endif /* CONFIG_AMG88XX_TRIGGER */
-
-#define SYS_LOG_DOMAIN "AMG88XX"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-
-#include <logging/sys_log.h>
 
 #endif

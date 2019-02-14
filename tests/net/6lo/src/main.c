@@ -6,6 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(net_test, CONFIG_NET_6LO_LOG_LEVEL);
+
 #include <zephyr.h>
 #include <ztest.h>
 #include <linker/sections.h>
@@ -20,6 +23,7 @@
 #include <net/net_core.h>
 #include <net/net_pkt.h>
 #include <net/net_ip.h>
+#include <net/dummy.h>
 
 #include <tc_util.h>
 
@@ -105,8 +109,6 @@ u8_t dst_mac[8] = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xbb, 0xaa };
 
 /* 6CO contexts */
 static struct net_icmpv6_nd_opt_6co ctx1 = {
-	.type = 0x22,
-	.len = 0x02,
 	.context_len = 0x40,
 	.flag = 0x11,
 	.reserved = 0,
@@ -119,8 +121,6 @@ static struct net_icmpv6_nd_opt_6co ctx1 = {
 		      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 } } }
 
 static struct net_icmpv6_nd_opt_6co ctx2 = {
-	.type = 0x22,
-	.len = 0x03,
 	.context_len = 0x80,
 	.flag = 0x12,
 	.reserved = 0,
@@ -198,14 +198,13 @@ static void net_6lo_iface_init(struct net_if *iface)
 	net_if_set_link_addr(iface, src_mac, 8, NET_LINK_IEEE802154);
 }
 
-static int tester_send(struct net_if *iface, struct net_pkt *pkt)
+static int tester_send(struct device *dev, struct net_pkt *pkt)
 {
-	net_pkt_unref(pkt);
-	return NET_OK;
+	return 0;
 }
 
-static struct net_if_api net_6lo_if_api = {
-	.init = net_6lo_iface_init,
+static struct dummy_api net_6lo_if_api = {
+	.iface_api.init = net_6lo_iface_init,
 	.send = tester_send,
 };
 
@@ -219,8 +218,8 @@ static bool compare_data(struct net_pkt *pkt, struct net_6lo_data *data)
 	struct net_buf *frag;
 	u8_t bytes;
 	u8_t compare;
-	u8_t pos = 0;
-	u8_t offset = 0;
+	u8_t pos = 0U;
+	u8_t offset = 0U;
 	int remaining = data->small ? SIZE_OF_SMALL_DATA : SIZE_OF_LARGE_DATA;
 
 	if (data->nh_udp) {
@@ -295,7 +294,7 @@ static bool compare_data(struct net_pkt *pkt, struct net_6lo_data *data)
 		pos += compare;
 		remaining -= compare;
 		frag = frag->frags;
-		offset = 0;
+		offset = 0U;
 	}
 
 	return true;
@@ -309,7 +308,7 @@ static struct net_pkt *create_pkt(struct net_6lo_data *data)
 	u16_t len;
 	int remaining;
 
-	pkt = net_pkt_get_reserve_tx(0, K_FOREVER);
+	pkt = net_pkt_get_reserve_tx(K_FOREVER);
 	if (!pkt) {
 		return NULL;
 	}
@@ -317,11 +316,11 @@ static struct net_pkt *create_pkt(struct net_6lo_data *data)
 	net_pkt_set_iface(pkt, net_if_get_default());
 	net_pkt_set_ip_hdr_len(pkt, NET_IPV6H_LEN);
 
-	net_pkt_ll_src(pkt)->addr = src_mac;
-	net_pkt_ll_src(pkt)->len = 8;
+	net_pkt_lladdr_src(pkt)->addr = src_mac;
+	net_pkt_lladdr_src(pkt)->len = 8;
 
-	net_pkt_ll_dst(pkt)->addr = dst_mac;
-	net_pkt_ll_dst(pkt)->len = 8;
+	net_pkt_lladdr_dst(pkt)->addr = dst_mac;
+	net_pkt_lladdr_dst(pkt)->len = 8;
 
 	frag = net_pkt_get_frag(pkt, K_FOREVER);
 	if (!frag) {
@@ -341,7 +340,7 @@ static struct net_pkt *create_pkt(struct net_6lo_data *data)
 		net_buf_add(frag, NET_IPV6H_LEN);
 	}
 
-	pos = 0;
+	pos = 0U;
 	remaining = data->small ? SIZE_OF_SMALL_DATA : SIZE_OF_LARGE_DATA;
 
 	if (data->nh_udp) {
@@ -358,8 +357,7 @@ static struct net_pkt *create_pkt(struct net_6lo_data *data)
 	frag->data[4] = len >> 8;
 	frag->data[5] = (u8_t) len;
 
-	data->ipv6.len[0] = len >> 8;
-	data->ipv6.len[1] = (u8_t) len;
+	data->ipv6.len = htons(len);
 
 	if (data->nh_udp) {
 		frag->data[44] = len >> 8;
@@ -397,7 +395,7 @@ static struct net_6lo_data test_data_1 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x00,
 	.ipv6.flow = 0x00,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam00,
@@ -416,7 +414,7 @@ static struct net_6lo_data test_data_2 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x3412,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam01,
@@ -435,7 +433,7 @@ static struct net_6lo_data test_data_3 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x21,
 	.ipv6.flow = 0x3412,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam10,
@@ -454,7 +452,7 @@ static struct net_6lo_data test_data_4 = {
 	.ipv6.vtc = 0x61,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x00,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam00,
@@ -473,7 +471,7 @@ static struct net_6lo_data test_data_5 = {
 	.ipv6.vtc = 0x61,
 	.ipv6.tcflow = 0x23,
 	.ipv6.flow = 0x4567,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam01,
@@ -492,7 +490,7 @@ static struct net_6lo_data test_data_6 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x0,
 	.ipv6.flow = 0x0,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam10,
@@ -511,7 +509,7 @@ static struct net_6lo_data test_data_7 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x0,
 	.ipv6.flow = 0x0,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = 0,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam10,
@@ -526,7 +524,7 @@ static struct net_6lo_data test_data_8 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x0,
 	.ipv6.flow = 0x0,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_ICMPV6,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam10,
@@ -544,7 +542,7 @@ static struct net_6lo_data test_data_9 = {
 	.ipv6.vtc = 0x61,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x00,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam00,
@@ -563,7 +561,7 @@ static struct net_6lo_data test_data_10 = {
 	.ipv6.vtc = 0x61,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x00,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam00,
@@ -582,7 +580,7 @@ static struct net_6lo_data test_data_11 = {
 	.ipv6.vtc = 0x61,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x00,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = 0,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam00,
@@ -597,7 +595,7 @@ static struct net_6lo_data test_data_12 = {
 	.ipv6.vtc = 0x61,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x00,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_ICMPV6,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam00,
@@ -615,7 +613,7 @@ static struct net_6lo_data test_data_13 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x21,
 	.ipv6.flow = 0x3412,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam11,
@@ -634,7 +632,7 @@ static struct net_6lo_data test_data_14 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x00,
 	.ipv6.flow = 0x00,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = NET_IPV6_NEXTHDR_NONE,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam00,
@@ -650,7 +648,7 @@ static struct net_6lo_data test_data_15 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x3412,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam01,
@@ -669,7 +667,7 @@ static struct net_6lo_data test_data_16 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x21,
 	.ipv6.flow = 0x3412,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam10,
@@ -688,7 +686,7 @@ static struct net_6lo_data test_data_17 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x21,
 	.ipv6.flow = 0x3412,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam11,
@@ -707,7 +705,7 @@ static struct net_6lo_data test_data_18 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x3412,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam01,
@@ -726,7 +724,7 @@ static struct net_6lo_data test_data_19 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x3412,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam01,
@@ -745,7 +743,7 @@ static struct net_6lo_data test_data_20 = {
 	.ipv6.vtc = 0x61,
 	.ipv6.tcflow = 0x23,
 	.ipv6.flow = 0x4567,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam01,
@@ -763,7 +761,7 @@ static struct net_6lo_data test_data_21 = {
 	.ipv6.vtc = 0x61,
 	.ipv6.tcflow = 0x23,
 	.ipv6.flow = 0x4567,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam01,
@@ -782,7 +780,7 @@ static struct net_6lo_data test_data_22 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x0,
 	.ipv6.flow = 0x0,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam10,
@@ -801,7 +799,7 @@ static struct net_6lo_data test_data_23 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x0,
 	.ipv6.flow = 0x0,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = 0,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam11,
@@ -816,7 +814,7 @@ static struct net_6lo_data test_data_24 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x20,
 	.ipv6.flow = 0x3412,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sam00,
@@ -835,7 +833,7 @@ static struct net_6lo_data test_data_25 = {
 	.ipv6.vtc = 0x60,
 	.ipv6.tcflow = 0x00,
 	.ipv6.flow = 0x00,
-	.ipv6.len = { 0x00, 0x00 },
+	.ipv6.len = 0,
 	.ipv6.nexthdr = IPPROTO_UDP,
 	.ipv6.hop_limit = 0xff,
 	.ipv6.src = src_sac1_sam00,
@@ -861,16 +859,16 @@ static void test_6lo(struct net_6lo_data *data)
 #if DEBUG > 0
 	TC_PRINT("length before compression %zu\n",
 		 net_pkt_get_len(pkt));
-	net_hexdump_frags("before-compression", pkt, false);
+	net_pkt_hexdump(pkt, "before-compression");
 #endif
 
-	zassert_true(net_6lo_compress(pkt, data->iphc, NULL),
+	zassert_true((net_6lo_compress(pkt, data->iphc) >= 0),
 		     "compression failed");
 
 #if DEBUG > 0
 	TC_PRINT("length after compression %zu\n",
 		 net_pkt_get_len(pkt));
-	net_hexdump_frags("after-compression", pkt, false);
+	net_pkt_hexdump(pkt, "after-compression");
 #endif
 
 	zassert_true(net_6lo_uncompress(pkt),
@@ -878,7 +876,7 @@ static void test_6lo(struct net_6lo_data *data)
 #if DEBUG > 0
 	TC_PRINT("length after uncompression %zu\n",
 	       net_pkt_get_len(pkt));
-	net_hexdump_frags("after-uncompression", pkt, false);
+	net_pkt_hexdump(pkt, "after-uncompression");
 #endif
 
 	zassert_true(compare_data(pkt, data), NULL);

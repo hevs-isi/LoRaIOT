@@ -87,7 +87,7 @@
       (+) Receive an amount of data in non-blocking mode using HAL_SAI_Receive_IT()
       (+) At reception end of transfer HAL_SAI_RxCpltCallback() is executed and user can
           add his own code by customization of function pointer HAL_SAI_RxCpltCallback()
-      (+) In case of flag error, HAL_SAI_ErrorCallback() function is executed and user can 
+      (+) In case of flag error, HAL_SAI_ErrorCallback() function is executed and user can
           add his own code by customization of function pointer HAL_SAI_ErrorCallback()
 
     *** DMA mode IO operation ***
@@ -270,12 +270,12 @@ static void SAI_DMAAbort(DMA_HandleTypeDef *hdma);
   * @brief  Initialize the structure FrameInit, SlotInit and the low part of
   *         Init according to the specified parameters and call the function
   *         HAL_SAI_Init to initialize the SAI block.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *               the configuration information for SAI module.
-  * @param  protocol: one of the supported protocol @ref SAI_Protocol
-  * @param  datasize: one of the supported datasize @ref SAI_Protocol_DataSize
+  * @param  protocol one of the supported protocol @ref SAI_Protocol
+  * @param  datasize one of the supported datasize @ref SAI_Protocol_DataSize
   *                   the configuration information for SAI module.
-  * @param  nbslot: Number of slot.
+  * @param  nbslot Number of slot.
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_InitProtocol(SAI_HandleTypeDef *hsai, uint32_t protocol, uint32_t datasize, uint32_t nbslot)
@@ -301,7 +301,7 @@ HAL_StatusTypeDef HAL_SAI_InitProtocol(SAI_HandleTypeDef *hsai, uint32_t protoco
     status = HAL_ERROR;
     break;
   }
-  
+
   if(status == HAL_OK)
   {
     status = HAL_SAI_Init(hsai);
@@ -313,7 +313,7 @@ HAL_StatusTypeDef HAL_SAI_InitProtocol(SAI_HandleTypeDef *hsai, uint32_t protoco
 /**
   * @brief  Initialize the SAI according to the specified parameters.
   *         in the SAI_InitTypeDef structure and initialize the associated handle.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval HAL status
   */
@@ -328,10 +328,10 @@ HAL_StatusTypeDef HAL_SAI_Init(SAI_HandleTypeDef *hsai)
   {
     return HAL_ERROR;
   }
-  
+
   /* check the instance */
   assert_param(IS_SAI_ALL_INSTANCE(hsai->Instance));
-  
+
   /* Check the SAI Block parameters */
   assert_param(IS_SAI_AUDIO_FREQUENCY(hsai->Init.AudioFrequency));
   assert_param(IS_SAI_BLOCK_PROTOCOL(hsai->Init.Protocol));
@@ -347,34 +347,34 @@ HAL_StatusTypeDef HAL_SAI_Init(SAI_HandleTypeDef *hsai)
   assert_param(IS_SAI_BLOCK_COMPANDING_MODE(hsai->Init.CompandingMode));
   assert_param(IS_SAI_BLOCK_TRISTATE_MANAGEMENT(hsai->Init.TriState));
   assert_param(IS_SAI_BLOCK_SYNCEXT(hsai->Init.SynchroExt));
-  
+
   /* Check the SAI Block Frame parameters */
   assert_param(IS_SAI_BLOCK_FRAME_LENGTH(hsai->FrameInit.FrameLength));
   assert_param(IS_SAI_BLOCK_ACTIVE_FRAME(hsai->FrameInit.ActiveFrameLength));
   assert_param(IS_SAI_BLOCK_FS_DEFINITION(hsai->FrameInit.FSDefinition));
   assert_param(IS_SAI_BLOCK_FS_POLARITY(hsai->FrameInit.FSPolarity));
   assert_param(IS_SAI_BLOCK_FS_OFFSET(hsai->FrameInit.FSOffset));
-  
+
   /* Check the SAI Block Slot parameters */
   assert_param(IS_SAI_BLOCK_FIRSTBIT_OFFSET(hsai->SlotInit.FirstBitOffset));
   assert_param(IS_SAI_BLOCK_SLOT_SIZE(hsai->SlotInit.SlotSize));
   assert_param(IS_SAI_BLOCK_SLOT_NUMBER(hsai->SlotInit.SlotNumber));
   assert_param(IS_SAI_SLOT_ACTIVE(hsai->SlotInit.SlotActive));
-  
+
   if(hsai->State == HAL_SAI_STATE_RESET)
   {
     /* Allocate lock resource and initialize it */
     hsai->Lock = HAL_UNLOCKED;
-    
+
     /* Init the low level hardware : GPIO, CLOCK, NVIC and DMA */
     HAL_SAI_MspInit(hsai);
   }
-  
+
   hsai->State = HAL_SAI_STATE_BUSY;
-  
+
   /* Disable the selected SAI peripheral */
   SAI_Disable(hsai);
-  
+
   /* SAI Block Synchro Configuration -----------------------------------------*/
   /* This setting must be done with both audio block (A & B) disabled         */
   switch(hsai->Init.SynchroExt)
@@ -391,7 +391,7 @@ HAL_StatusTypeDef HAL_SAI_Init(SAI_HandleTypeDef *hsai)
   default:
     break;
   }
-  
+
   switch(hsai->Init.Synchro)
   {
     case SAI_ASYNCHRONOUS :
@@ -416,14 +416,14 @@ HAL_StatusTypeDef HAL_SAI_Init(SAI_HandleTypeDef *hsai)
       }
       break;
   default:
-    break;      
+    break;
   }
 
   if((hsai->Instance == SAI1_Block_A) || (hsai->Instance == SAI1_Block_B))
   {
     SAI1->GCR = tmpregisterGCR;
   }
-  else 
+  else
   {
     SAI2->GCR = tmpregisterGCR;
   }
@@ -441,7 +441,7 @@ HAL_StatusTypeDef HAL_SAI_Init(SAI_HandleTypeDef *hsai)
     {
       freq = HAL_RCCEx_GetPeriphCLKFreq(RCC_PERIPHCLK_SAI2);
     }
-    
+
     /* Configure Master Clock using the following formula :
        MCLK_x = SAI_CK_x / (MCKDIV[3:0] * 2) with MCLK_x = 256 * FS
        FS = SAI_CK_x / (MCKDIV[3:0] * 2) * 256
@@ -449,14 +449,14 @@ HAL_StatusTypeDef HAL_SAI_Init(SAI_HandleTypeDef *hsai)
     /* (freq x 10) to keep Significant digits */
     tmpval = (freq * 10) / (hsai->Init.AudioFrequency * 2 * 256);
     hsai->Init.Mckdiv = tmpval / 10;
-    
+
     /* Round result to the nearest integer */
     if((tmpval % 10) > 8)
     {
       hsai->Init.Mckdiv+= 1;
     }
   }
-  
+
   /* Compute CKSTR bits of SAI CR1 according ClockStrobing and AudioMode */
   if((hsai->Init.AudioMode == SAI_MODEMASTER_TX) || (hsai->Init.AudioMode == SAI_MODESLAVE_TX))
   { /* Transmit */
@@ -466,24 +466,24 @@ HAL_StatusTypeDef HAL_SAI_Init(SAI_HandleTypeDef *hsai)
   { /* Receive */
     ckstr_bits = (hsai->Init.ClockStrobing == SAI_CLOCKSTROBING_RISINGEDGE) ? SAI_xCR1_CKSTR : 0;
   }
-  
+
   /* SAI Block Configuration -------------------------------------------------*/
   /* SAI CR1 Configuration */
   hsai->Instance->CR1&=~(SAI_xCR1_MODE | SAI_xCR1_PRTCFG |  SAI_xCR1_DS |      \
                          SAI_xCR1_LSBFIRST | SAI_xCR1_CKSTR | SAI_xCR1_SYNCEN |\
                          SAI_xCR1_MONO | SAI_xCR1_OUTDRIV  | SAI_xCR1_DMAEN |  \
                          SAI_xCR1_NODIV | SAI_xCR1_MCKDIV);
-  
+
   hsai->Instance->CR1|=(hsai->Init.AudioMode | hsai->Init.Protocol |           \
                         hsai->Init.DataSize | hsai->Init.FirstBit  |           \
                         ckstr_bits | syncen_bits |                               \
                         hsai->Init.MonoStereoMode | hsai->Init.OutputDrive |   \
                         hsai->Init.NoDivider | (hsai->Init.Mckdiv << 20));
-  
+
   /* SAI CR2 Configuration */
   hsai->Instance->CR2&= ~(SAI_xCR2_FTH | SAI_xCR2_FFLUSH | SAI_xCR2_COMP | SAI_xCR2_CPL);
   hsai->Instance->CR2|=  (hsai->Init.FIFOThreshold | hsai->Init.CompandingMode | hsai->Init.TriState);
-  
+
   /* SAI Frame Configuration -----------------------------------------*/
   hsai->Instance->FRCR&=(~(SAI_xFRCR_FRL | SAI_xFRCR_FSALL | SAI_xFRCR_FSDEF | \
                            SAI_xFRCR_FSPOL | SAI_xFRCR_FSOFF));
@@ -492,30 +492,30 @@ HAL_StatusTypeDef HAL_SAI_Init(SAI_HandleTypeDef *hsai)
                           hsai->FrameInit.FSDefinition |
                           hsai->FrameInit.FSPolarity   |
                           ((hsai->FrameInit.ActiveFrameLength - 1) << 8));
-  
+
   /* SAI Block_x SLOT Configuration ------------------------------------------*/
   /* This register has no meaning in AC 97 and SPDIF audio protocol */
   hsai->Instance->SLOTR&= (~(SAI_xSLOTR_FBOFF | SAI_xSLOTR_SLOTSZ |            \
                              SAI_xSLOTR_NBSLOT | SAI_xSLOTR_SLOTEN ));
-  
+
   hsai->Instance->SLOTR|=  hsai->SlotInit.FirstBitOffset |  hsai->SlotInit.SlotSize
                           | (hsai->SlotInit.SlotActive << 16) | ((hsai->SlotInit.SlotNumber - 1) <<  8);
-  
+
   /* Initialize the error code */
   hsai->ErrorCode = HAL_SAI_ERROR_NONE;
-  
+
   /* Initialize the SAI state */
   hsai->State= HAL_SAI_STATE_READY;
-  
+
   /* Release Lock */
   __HAL_UNLOCK(hsai);
-  
+
   return HAL_OK;
 }
 
 /**
   * @brief  DeInitialize the SAI peripheral.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval HAL status
   */
@@ -532,13 +532,13 @@ HAL_StatusTypeDef HAL_SAI_DeInit(SAI_HandleTypeDef *hsai)
   /* Disabled All interrupt and clear all the flag */
   hsai->Instance->IMR = 0;
   hsai->Instance->CLRFR = 0xFFFFFFFFU;
-  
+
   /* Disable the SAI */
   SAI_Disable(hsai);
 
   /* Flush the fifo */
   SET_BIT(hsai->Instance->CR2, SAI_xCR2_FFLUSH);
-  
+
   /* DeInit the low level hardware: GPIO, CLOCK, NVIC and DMA */
   HAL_SAI_MspDeInit(hsai);
 
@@ -556,7 +556,7 @@ HAL_StatusTypeDef HAL_SAI_DeInit(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief Initialize the SAI MSP.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -572,7 +572,7 @@ __weak void HAL_SAI_MspInit(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief DeInitialize the SAI MSP.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -634,11 +634,11 @@ __weak void HAL_SAI_MspDeInit(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Transmit an amount of data in blocking mode.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  pData: Pointer to data buffer
-  * @param  Size: Amount of data to be sent
-  * @param  Timeout: Timeout duration
+  * @param  pData Pointer to data buffer
+  * @param  Size Amount of data to be sent
+  * @param  Timeout Timeout duration
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_Transmit(SAI_HandleTypeDef *hsai, uint8_t* pData, uint16_t Size, uint32_t Timeout)
@@ -734,11 +734,11 @@ HAL_StatusTypeDef HAL_SAI_Transmit(SAI_HandleTypeDef *hsai, uint8_t* pData, uint
 
 /**
   * @brief  Receive an amount of data in blocking mode.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  pData: Pointer to data buffer
-  * @param  Size: Amount of data to be received
-  * @param  Timeout: Timeout duration
+  * @param  pData Pointer to data buffer
+  * @param  Size Amount of data to be received
+  * @param  Timeout Timeout duration
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_Receive(SAI_HandleTypeDef *hsai, uint8_t *pData, uint16_t Size, uint32_t Timeout)
@@ -832,10 +832,10 @@ HAL_StatusTypeDef HAL_SAI_Receive(SAI_HandleTypeDef *hsai, uint8_t *pData, uint1
 
 /**
   * @brief  Transmit an amount of data in non-blocking mode with Interrupt.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  pData: Pointer to data buffer
-  * @param  Size: Amount of data to be sent
+  * @param  pData Pointer to data buffer
+  * @param  Size Amount of data to be sent
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_Transmit_IT(SAI_HandleTypeDef *hsai, uint8_t *pData, uint16_t Size)
@@ -894,10 +894,10 @@ HAL_StatusTypeDef HAL_SAI_Transmit_IT(SAI_HandleTypeDef *hsai, uint8_t *pData, u
 
 /**
   * @brief  Receive an amount of data in non-blocking mode with Interrupt.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  pData: Pointer to data buffer
-  * @param  Size: Amount of data to be received
+  * @param  pData Pointer to data buffer
+  * @param  Size Amount of data to be received
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_Receive_IT(SAI_HandleTypeDef *hsai, uint8_t *pData, uint16_t Size)
@@ -943,7 +943,7 @@ HAL_StatusTypeDef HAL_SAI_Receive_IT(SAI_HandleTypeDef *hsai, uint8_t *pData, ui
 
     /* Process Unlocked */
     __HAL_UNLOCK(hsai);
-    
+
     return HAL_OK;
   }
   else
@@ -954,7 +954,7 @@ HAL_StatusTypeDef HAL_SAI_Receive_IT(SAI_HandleTypeDef *hsai, uint8_t *pData, ui
 
 /**
   * @brief Pause the audio stream playing from the Media.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval HAL status
   */
@@ -974,7 +974,7 @@ HAL_StatusTypeDef HAL_SAI_DMAPause(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief Resume the audio stream playing from the Media.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval HAL status
   */
@@ -1001,57 +1001,73 @@ HAL_StatusTypeDef HAL_SAI_DMAResume(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief Stop the audio stream playing from the Media.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_DMAStop(SAI_HandleTypeDef *hsai)
 {
+  HAL_StatusTypeDef status = HAL_OK;
+
   /* Process Locked */
   __HAL_LOCK(hsai);
 
   /* Disable the SAI DMA request */
   hsai->Instance->CR1 &= ~SAI_xCR1_DMAEN;
 
-  /* Abort the SAI DMA Streams */
-  if(hsai->hdmatx != NULL)
+  /* Abort the SAI Tx DMA Stream */
+  if((hsai->hdmatx != NULL) && (hsai->State == HAL_SAI_STATE_BUSY_TX))
   {
     if(HAL_DMA_Abort(hsai->hdmatx) != HAL_OK)
     {
-      return HAL_ERROR;
+      /* If the DMA Tx errorCode is different from DMA No Transfer then return Error */
+      if(hsai->hdmatx->ErrorCode != HAL_DMA_ERROR_NO_XFER)
+      {
+        status = HAL_ERROR;
+        hsai->ErrorCode |= HAL_SAI_ERROR_DMA;
+      }
     }
   }
 
-  if(hsai->hdmarx != NULL)
+  /* Abort the SAI Rx DMA Stream */
+  if((hsai->hdmarx != NULL) && (hsai->State == HAL_SAI_STATE_BUSY_RX))
   {
     if(HAL_DMA_Abort(hsai->hdmarx) != HAL_OK)
     {
-      return HAL_ERROR;
+      /* If the DMA Rx errorCode is different from DMA No Transfer then return Error */
+      if(hsai->hdmarx->ErrorCode != HAL_DMA_ERROR_NO_XFER)
+      {
+        status = HAL_ERROR;
+        hsai->ErrorCode |= HAL_SAI_ERROR_DMA;
+      }
     }
   }
-  
+
   /* Disable SAI peripheral */
   SAI_Disable(hsai);
 
   /* Flush the fifo */
   SET_BIT(hsai->Instance->CR2, SAI_xCR2_FFLUSH);
 
+  /* Set hsai state to ready */
   hsai->State = HAL_SAI_STATE_READY;
 
   /* Process Unlocked */
   __HAL_UNLOCK(hsai);
 
-  return HAL_OK;
+  return status;
 }
 
 /**
   * @brief Abort the current transfer and disable the SAI.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_Abort(SAI_HandleTypeDef *hsai)
 {
+  HAL_StatusTypeDef status = HAL_OK;
+
   /* Process Locked */
   __HAL_LOCK(hsai);
 
@@ -1060,21 +1076,32 @@ HAL_StatusTypeDef HAL_SAI_Abort(SAI_HandleTypeDef *hsai)
   {
     /* Disable the SAI DMA request */
     hsai->Instance->CR1 &= ~SAI_xCR1_DMAEN;
-    
-    /* Abort the SAI DMA Streams */
-    if(hsai->hdmatx != NULL)
+
+    /* Abort the SAI Tx DMA Stream */
+    if((hsai->hdmatx != NULL) && (hsai->State == HAL_SAI_STATE_BUSY_TX))
     {
       if(HAL_DMA_Abort(hsai->hdmatx) != HAL_OK)
       {
-        return HAL_ERROR;
+        /* If the DMA Tx errorCode is different from DMA No Transfer then return Error */
+        if(hsai->hdmatx->ErrorCode != HAL_DMA_ERROR_NO_XFER)
+        {
+          status = HAL_ERROR;
+          hsai->ErrorCode |= HAL_SAI_ERROR_DMA;
+        }
       }
     }
 
-    if(hsai->hdmarx != NULL)
+    /* Abort the SAI Rx DMA Stream */
+    if((hsai->hdmarx != NULL) && (hsai->State == HAL_SAI_STATE_BUSY_RX))
     {
       if(HAL_DMA_Abort(hsai->hdmarx) != HAL_OK)
       {
-        return HAL_ERROR;
+        /* If the DMA Rx errorCode is different from DMA No Transfer then return Error */
+        if(hsai->hdmarx->ErrorCode != HAL_DMA_ERROR_NO_XFER)
+        {
+          status = HAL_ERROR;
+          hsai->ErrorCode |= HAL_SAI_ERROR_DMA;
+        }
       }
     }
   }
@@ -1088,20 +1115,21 @@ HAL_StatusTypeDef HAL_SAI_Abort(SAI_HandleTypeDef *hsai)
   /* Flush the fifo */
   SET_BIT(hsai->Instance->CR2, SAI_xCR2_FFLUSH);
 
+  /* Set hsai state to ready */
   hsai->State = HAL_SAI_STATE_READY;
 
   /* Process Unlocked */
   __HAL_UNLOCK(hsai);
 
-  return HAL_OK;
+  return status;
 }
 
 /**
   * @brief  Transmit an amount of data in non-blocking mode with DMA.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  pData: Pointer to data buffer
-  * @param  Size: Amount of data to be sent
+  * @param  pData Pointer to data buffer
+  * @param  Size Amount of data to be sent
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_Transmit_DMA(SAI_HandleTypeDef *hsai, uint8_t *pData, uint16_t Size)
@@ -1167,10 +1195,10 @@ HAL_StatusTypeDef HAL_SAI_Transmit_DMA(SAI_HandleTypeDef *hsai, uint8_t *pData, 
 
 /**
   * @brief  Receive an amount of data in non-blocking mode with DMA.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  pData: Pointer to data buffer
-  * @param  Size: Amount of data to be received
+  * @param  pData Pointer to data buffer
+  * @param  Size Amount of data to be received
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_Receive_DMA(SAI_HandleTypeDef *hsai, uint8_t *pData, uint16_t Size)
@@ -1237,9 +1265,9 @@ HAL_StatusTypeDef HAL_SAI_Receive_DMA(SAI_HandleTypeDef *hsai, uint8_t *pData, u
 
 /**
   * @brief  Enable the Tx mute mode.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  val:  value sent during the mute @ref SAI_Block_Mute_Value
+  * @param  val  value sent during the mute @ref SAI_Block_Mute_Value
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_EnableTxMuteMode(SAI_HandleTypeDef *hsai, uint16_t val)
@@ -1257,7 +1285,7 @@ HAL_StatusTypeDef HAL_SAI_EnableTxMuteMode(SAI_HandleTypeDef *hsai, uint16_t val
 
 /**
   * @brief  Disable the Tx mute mode.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval HAL status
   */
@@ -1273,10 +1301,10 @@ HAL_StatusTypeDef HAL_SAI_DisableTxMuteMode(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Enable the Rx mute detection.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  callback: function called when the mute is detected.
-  * @param  counter: number a data before mute detection max 63.
+  * @param  callback function called when the mute is detected.
+  * @param  counter number a data before mute detection max 63.
   * @retval HAL status
   */
 HAL_StatusTypeDef HAL_SAI_EnableRxMuteMode(SAI_HandleTypeDef *hsai, SAIcallback callback, uint16_t counter)
@@ -1298,7 +1326,7 @@ HAL_StatusTypeDef HAL_SAI_EnableRxMuteMode(SAI_HandleTypeDef *hsai, SAIcallback 
 
 /**
   * @brief  Disable the Rx mute detection.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval HAL status
   */
@@ -1317,7 +1345,7 @@ HAL_StatusTypeDef HAL_SAI_DisableRxMuteMode(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Handle SAI interrupt request.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1327,7 +1355,7 @@ void HAL_SAI_IRQHandler(SAI_HandleTypeDef *hsai)
   {
     uint32_t itflags = hsai->Instance->SR;
     uint32_t itsources = hsai->Instance->IMR;
-    uint32_t cr1config = hsai->Instance->CR1;    
+    uint32_t cr1config = hsai->Instance->CR1;
     uint32_t tmperror;
 
     /* SAI Fifo request interrupt occured ------------------------------------*/
@@ -1341,7 +1369,7 @@ void HAL_SAI_IRQHandler(SAI_HandleTypeDef *hsai)
       /* Clear the SAI Overrun flag */
       __HAL_SAI_CLEAR_FLAG(hsai, SAI_FLAG_OVRUDR);
       /* Get the SAI error code */
-      tmperror = ((hsai->State == HAL_SAI_STATE_BUSY_RX) ? HAL_SAI_ERROR_OVR : HAL_SAI_ERROR_UDR);      
+      tmperror = ((hsai->State == HAL_SAI_STATE_BUSY_RX) ? HAL_SAI_ERROR_OVR : HAL_SAI_ERROR_UDR);
       /* Change the SAI error code */
       hsai->ErrorCode |= tmperror;
       /* the transfer is not stopped, we will forward the information to the user and we let the user decide what needs to be done */
@@ -1386,11 +1414,11 @@ void HAL_SAI_IRQHandler(SAI_HandleTypeDef *hsai)
       }
       else
       {
-        /* Abort SAI */ 
+        /* Abort SAI */
         HAL_SAI_Abort(hsai);
-        
+
         /* Set error callback */
-        HAL_SAI_ErrorCallback(hsai);          
+        HAL_SAI_ErrorCallback(hsai);
       }
     }
     /* SAI LFSDET interrupt occurred ----------------------------------*/
@@ -1406,23 +1434,23 @@ void HAL_SAI_IRQHandler(SAI_HandleTypeDef *hsai)
         if(hsai->hdmatx != NULL)
         {
           /* Set the DMA Tx abort callback */
-          hsai->hdmatx->XferAbortCallback = SAI_DMAAbort; 
+          hsai->hdmatx->XferAbortCallback = SAI_DMAAbort;
           /* Abort DMA in IT mode */
           HAL_DMA_Abort_IT(hsai->hdmatx);
         }
         else if(hsai->hdmarx != NULL)
         {
           /* Set the DMA Rx abort callback */
-          hsai->hdmarx->XferAbortCallback = SAI_DMAAbort; 
-          /* Abort DMA in IT mode */          
+          hsai->hdmarx->XferAbortCallback = SAI_DMAAbort;
+          /* Abort DMA in IT mode */
           HAL_DMA_Abort_IT(hsai->hdmarx);
         }
       }
       else
       {
-        /* Abort SAI */ 
+        /* Abort SAI */
         HAL_SAI_Abort(hsai);
-        
+
         /* Set error callback */
         HAL_SAI_ErrorCallback(hsai);
       }
@@ -1437,15 +1465,15 @@ void HAL_SAI_IRQHandler(SAI_HandleTypeDef *hsai)
       if(hsai->hdmatx != NULL)
       {
         /* Set the DMA Tx abort callback */
-        hsai->hdmatx->XferAbortCallback = SAI_DMAAbort; 
+        hsai->hdmatx->XferAbortCallback = SAI_DMAAbort;
         /* Abort DMA in IT mode */
         HAL_DMA_Abort_IT(hsai->hdmatx);
       }
       else if(hsai->hdmarx != NULL)
       {
         /* Set the DMA Rx abort callback */
-        hsai->hdmarx->XferAbortCallback = SAI_DMAAbort; 
-        /* Abort DMA in IT mode */          
+        hsai->hdmarx->XferAbortCallback = SAI_DMAAbort;
+        /* Abort DMA in IT mode */
         HAL_DMA_Abort_IT(hsai->hdmarx);
       }
       else
@@ -1461,7 +1489,7 @@ void HAL_SAI_IRQHandler(SAI_HandleTypeDef *hsai)
         hsai->XferCount = 0U;
 
         /* SAI error Callback */
-        HAL_SAI_ErrorCallback(hsai);        
+        HAL_SAI_ErrorCallback(hsai);
       }
     }
     /* SAI CNRDY interrupt occurred ----------------------------------*/
@@ -1483,7 +1511,7 @@ void HAL_SAI_IRQHandler(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief Tx Transfer completed callback.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1499,7 +1527,7 @@ __weak void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief Tx Transfer Half completed callback.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1515,7 +1543,7 @@ __weak void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief Rx Transfer completed callback.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1531,7 +1559,7 @@ __weak void HAL_SAI_RxCpltCallback(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief Rx Transfer half completed callback.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1547,7 +1575,7 @@ __weak void HAL_SAI_RxHalfCpltCallback(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief SAI error callback.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1583,7 +1611,7 @@ __weak void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Return the SAI handle state.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval HAL state
   */
@@ -1594,7 +1622,7 @@ HAL_SAI_StateTypeDef HAL_SAI_GetState(SAI_HandleTypeDef *hsai)
 
 /**
 * @brief  Return the SAI error code.
-* @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+* @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *              the configuration information for the specified SAI Block.
 * @retval SAI Error Code
 */
@@ -1618,12 +1646,12 @@ uint32_t HAL_SAI_GetError(SAI_HandleTypeDef *hsai)
 /**
   * @brief  Initialize the SAI I2S protocol according to the specified parameters
   *         in the SAI_InitTypeDef and create the associated handle.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  protocol: one of the supported protocol.
-  * @param  datasize: one of the supported datasize @ref SAI_Protocol_DataSize
+  * @param  protocol one of the supported protocol.
+  * @param  datasize one of the supported datasize @ref SAI_Protocol_DataSize
   *                the configuration information for SAI module.
-  * @param  nbslot: number of slot minimum value is 2 and max is 16. 
+  * @param  nbslot number of slot minimum value is 2 and max is 16.
   *                    the value must be a multiple of 2.
   * @retval HAL status
   */
@@ -1713,11 +1741,11 @@ static HAL_StatusTypeDef SAI_InitI2S(SAI_HandleTypeDef *hsai, uint32_t protocol,
 /**
   * @brief  Initialize the SAI PCM protocol according to the specified parameters
   *         in the SAI_InitTypeDef and create the associated handle.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  protocol: one of the supported protocol
-  * @param  datasize: one of the supported datasize @ref SAI_Protocol_DataSize
-  * @param  nbslot: number of slot minimum value is 1 and the max is 16.
+  * @param  protocol one of the supported protocol
+  * @param  datasize one of the supported datasize @ref SAI_Protocol_DataSize
+  * @param  nbslot number of slot minimum value is 1 and the max is 16.
   * @retval HAL status
   */
 static HAL_StatusTypeDef SAI_InitPCM(SAI_HandleTypeDef *hsai, uint32_t protocol, uint32_t datasize, uint32_t nbslot)
@@ -1783,7 +1811,7 @@ static HAL_StatusTypeDef SAI_InitPCM(SAI_HandleTypeDef *hsai, uint32_t protocol,
 
 /**
   * @brief  Fill the fifo.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1812,15 +1840,15 @@ static void SAI_FillFifo(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Return the interrupt flag to set according the SAI setup.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
-  * @param  mode: SAI_MODE_DMA or SAI_MODE_IT
+  * @param  mode SAI_MODE_DMA or SAI_MODE_IT
   * @retval the list of the IT flag to enable
  */
 static uint32_t SAI_InterruptFlag(SAI_HandleTypeDef *hsai, uint32_t mode)
 {
   uint32_t tmpIT = SAI_IT_OVRUDR;
-  
+
   if(mode == SAI_MODE_IT)
   {
     tmpIT|= SAI_IT_FREQ;
@@ -1846,7 +1874,7 @@ static uint32_t SAI_InterruptFlag(SAI_HandleTypeDef *hsai, uint32_t mode)
 
 /**
   * @brief  Disable the SAI and wait for the disabling.
-  * @param  hsai : pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai  pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1858,11 +1886,11 @@ static HAL_StatusTypeDef SAI_Disable(SAI_HandleTypeDef *hsai)
   /* Disable the SAI instance */
   __HAL_SAI_DISABLE(hsai);
 
-  do 
+  do
   {
     /* Check for the Timeout */
     if (count-- == 0)
-    {         
+    {
       /* Update error code */
       hsai->ErrorCode |= HAL_SAI_ERROR_TIMEOUT;
       status = HAL_TIMEOUT;
@@ -1875,7 +1903,7 @@ static HAL_StatusTypeDef SAI_Disable(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Tx Handler for Transmit in Interrupt mode 8-Bit transfer.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1899,7 +1927,7 @@ static void SAI_Transmit_IT8Bit(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Tx Handler for Transmit in Interrupt mode for 16-Bit transfer.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1924,7 +1952,7 @@ static void SAI_Transmit_IT16Bit(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Tx Handler for Transmit in Interrupt mode for 32-Bit transfer.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1949,7 +1977,7 @@ static void SAI_Transmit_IT32Bit(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Rx Handler for Receive in Interrupt mode 8-Bit transfer.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -1967,7 +1995,7 @@ static void SAI_Receive_IT8Bit(SAI_HandleTypeDef *hsai)
 
     /* Clear the SAI Overrun flag */
     __HAL_SAI_CLEAR_FLAG(hsai, SAI_FLAG_OVRUDR);
-    
+
     hsai->State = HAL_SAI_STATE_READY;
     HAL_SAI_RxCpltCallback(hsai);
   }
@@ -1975,7 +2003,7 @@ static void SAI_Receive_IT8Bit(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief  Rx Handler for Receive in Interrupt mode for 16-Bit transfer.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -2001,7 +2029,7 @@ static void SAI_Receive_IT16Bit(SAI_HandleTypeDef *hsai)
 }
 /**
   * @brief  Rx Handler for Receive in Interrupt mode for 32-Bit transfer.
-  * @param  hsai: pointer to a SAI_HandleTypeDef structure that contains
+  * @param  hsai pointer to a SAI_HandleTypeDef structure that contains
   *                the configuration information for SAI module.
   * @retval None
   */
@@ -2017,7 +2045,7 @@ static void SAI_Receive_IT32Bit(SAI_HandleTypeDef *hsai)
   {
     /* Disable TXE and OVRUDR interrupts */
     __HAL_SAI_DISABLE_IT(hsai, SAI_InterruptFlag(hsai, SAI_MODE_IT));
-    
+
     /* Clear the SAI Overrun flag */
     __HAL_SAI_CLEAR_FLAG(hsai, SAI_FLAG_OVRUDR);
 
@@ -2028,7 +2056,7 @@ static void SAI_Receive_IT32Bit(SAI_HandleTypeDef *hsai)
 
 /**
   * @brief DMA SAI transmit process complete callback.
-  * @param  hdma: pointer to a DMA_HandleTypeDef structure that contains
+  * @param  hdma pointer to a DMA_HandleTypeDef structure that contains
   *                the configuration information for the specified DMA module.
   * @retval None
   */
@@ -2039,13 +2067,13 @@ static void SAI_DMATxCplt(DMA_HandleTypeDef *hdma)
   if((hdma->Instance->CR & DMA_SxCR_CIRC) == 0)
   {
     hsai->XferCount = 0;
-    
+
     /* Disable SAI Tx DMA Request */
     hsai->Instance->CR1 &= (uint32_t)(~SAI_xCR1_DMAEN);
 
     /* Stop the interrupts error handling */
     __HAL_SAI_DISABLE_IT(hsai, SAI_InterruptFlag(hsai, SAI_MODE_DMA));
-    
+
     hsai->State= HAL_SAI_STATE_READY;
   }
   HAL_SAI_TxCpltCallback(hsai);
@@ -2053,7 +2081,7 @@ static void SAI_DMATxCplt(DMA_HandleTypeDef *hdma)
 
 /**
   * @brief DMA SAI transmit process half complete callback.
-  * @param  hdma: pointer to a DMA_HandleTypeDef structure that contains
+  * @param  hdma pointer to a DMA_HandleTypeDef structure that contains
   *                the configuration information for the specified DMA module.
   * @retval None
   */
@@ -2066,7 +2094,7 @@ static void SAI_DMATxHalfCplt(DMA_HandleTypeDef *hdma)
 
 /**
   * @brief DMA SAI receive process complete callback.
-  * @param  hdma: pointer to a DMA_HandleTypeDef structure that contains
+  * @param  hdma pointer to a DMA_HandleTypeDef structure that contains
   *                the configuration information for the specified DMA module.
   * @retval None
   */
@@ -2081,15 +2109,15 @@ static void SAI_DMARxCplt(DMA_HandleTypeDef *hdma)
 
     /* Stop the interrupts error handling */
     __HAL_SAI_DISABLE_IT(hsai, SAI_InterruptFlag(hsai, SAI_MODE_DMA));
-    
+
     hsai->State = HAL_SAI_STATE_READY;
   }
   HAL_SAI_RxCpltCallback(hsai);
 }
 
 /**
-  * @brief DMA SAI receive process half complete callback 
-  * @param  hdma: pointer to a DMA_HandleTypeDef structure that contains
+  * @brief DMA SAI receive process half complete callback
+  * @param  hdma pointer to a DMA_HandleTypeDef structure that contains
   *                the configuration information for the specified DMA module.
   * @retval None
   */
@@ -2101,7 +2129,7 @@ static void SAI_DMARxHalfCplt(DMA_HandleTypeDef *hdma)
 }
 /**
   * @brief DMA SAI communication error callback.
-  * @param  hdma: pointer to a DMA_HandleTypeDef structure that contains
+  * @param  hdma pointer to a DMA_HandleTypeDef structure that contains
   *                the configuration information for the specified DMA module.
   * @retval None
   */
@@ -2119,34 +2147,34 @@ static void SAI_DMAError(DMA_HandleTypeDef *hdma)
 
     /* Disable SAI peripheral */
     SAI_Disable(hsai);
-    
+
     /* Set the SAI state ready to be able to start again the process */
     hsai->State = HAL_SAI_STATE_READY;
 
     /* Initialize XferCount */
     hsai->XferCount = 0U;
   }
-  /* SAI error Callback */ 
+  /* SAI error Callback */
   HAL_SAI_ErrorCallback(hsai);
 }
 
 /**
-  * @brief DMA SAI Abort callback. 
-  * @param  hdma: pointer to a DMA_HandleTypeDef structure that contains
+  * @brief DMA SAI Abort callback.
+  * @param  hdma pointer to a DMA_HandleTypeDef structure that contains
   *                the configuration information for the specified DMA module.
   * @retval None
   */
-static void SAI_DMAAbort(DMA_HandleTypeDef *hdma)   
+static void SAI_DMAAbort(DMA_HandleTypeDef *hdma)
 {
   SAI_HandleTypeDef* hsai = ( SAI_HandleTypeDef* )((DMA_HandleTypeDef* )hdma)->Parent;
-  
+
   /* Disable DMA request */
   hsai->Instance->CR1 &= ~SAI_xCR1_DMAEN;
 
   /* Disable all interrupts and clear all flags */
   hsai->Instance->IMR = 0U;
   hsai->Instance->CLRFR = 0xFFFFFFFFU;
-  
+
   if(hsai->ErrorCode != HAL_SAI_ERROR_WCKCFG)
   {
     /* Disable SAI peripheral */
@@ -2157,11 +2185,11 @@ static void SAI_DMAAbort(DMA_HandleTypeDef *hdma)
   }
   /* Set the SAI state to ready to be able to start again the process */
   hsai->State = HAL_SAI_STATE_READY;
-  
-  /* Initialize XferCount */
-  hsai->XferCount = 0U;  
 
-  /* SAI error Callback */ 
+  /* Initialize XferCount */
+  hsai->XferCount = 0U;
+
+  /* SAI error Callback */
   HAL_SAI_ErrorCallback(hsai);
 }
 

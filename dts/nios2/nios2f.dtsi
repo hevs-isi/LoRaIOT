@@ -1,6 +1,5 @@
 #include "skeleton.dtsi"
-
-#define __SIZE_K(x) (x * 1024)
+#include <dt-bindings/i2c/i2c.h>
 
 / {
 	cpus {
@@ -16,6 +15,7 @@
 	};
 
 	flash0: flash@0 {
+		compatible = "soc-nv-flash";
 		reg = <0x00 0xb8000>;
 	};
 
@@ -39,5 +39,14 @@
 			status = "disabled";
 		};
 
+		i2c0: i2c@100200 {
+			compatible = "nios2,i2c";
+			clock-frequency = <I2C_BITRATE_ULTRA>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x100200 0x400>;
+			label = "I2C_0";
+
+		};
 	};
 };

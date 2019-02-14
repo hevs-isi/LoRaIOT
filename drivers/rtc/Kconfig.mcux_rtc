@@ -6,9 +6,7 @@
 #
 
 menuconfig RTC_MCUX
-	bool
-	prompt "MCUX RTC driver"
-	depends on RTC && HAS_MCUX
-	default n
+	bool "MCUX RTC driver"
+	depends on RTC && HAS_MCUX_RTC
 	help
 	  Enable support for mcux rtc driver.

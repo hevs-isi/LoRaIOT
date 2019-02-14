@@ -5,7 +5,7 @@
  */
 
 /dts-v1/;
-#include <st/stm32l432.dtsi>
+#include <st/l4/stm32l432Xc.dtsi>
 
 / {
 	model = "STMicroelectronics STM32L432KC-NUCLEO board";
@@ -13,29 +13,21 @@
 
 	chosen {
 		zephyr,console = &usart2;
+		zephyr,shell-uart = &usart2;
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
 	};
 
 	leds {
 		compatible = "gpio-leds";
-		green_led_2: led@0 {
-			gpios = <&gpioa 5 GPIO_INT_ACTIVE_HIGH>;
-			label = "User LD2";
-		};
-	};
-
-	gpio_keys {
-		compatible = "gpio-keys";
-		user_button: button@0 {
-			label = "User";
-			gpios = <&gpioc 13 GPIO_INT_ACTIVE_LOW>;
+		green_led: led_0 {
+			gpios = <&gpiob 3 GPIO_INT_ACTIVE_HIGH>;
+			label = "User LD3";
 		};
 	};
 
 	aliases {
-		led0 = &green_led_2;
-		sw0 = &user_button;
+		led0 = &green_led;
 	};
 };
 
@@ -54,4 +46,39 @@
 
 &spi1 {
 	status = "ok";
+};
+
+&timers2 {
+	status = "ok";
+
+	pwm {
+		status = "ok";
+	};
+};
+
+&can1 {
+	pinctrl-0 = <&can_pins_a>;
+	pinctrl-names = "default";
+	bus-speed = <125000>;
+	status = "ok";
+};
+
+&rtc {
+	status = "ok";
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/*
+		 * Reserve the final 16 KiB for the application.
+		 */
+		storage_partition: partition@3c000 {
+			label = "storage";
+			reg = <0x0003c000 0x00004000>;
+		};
+	};
 };

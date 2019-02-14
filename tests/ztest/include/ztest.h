@@ -39,6 +39,8 @@ extern "C" {
 #define CONFIG_NUM_COOP_PRIORITIES 16
 #define CONFIG_COOP_ENABLED 1
 #define CONFIG_PREEMPT_ENABLED 1
+#define CONFIG_SYS_CLOCK_TICKS_PER_SEC 100
+#define CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC 10000000
 /* FIXME: Properly integrate with Zephyr's arch specific code */
 #define CONFIG_X86 1
 #define PRINT printf
@@ -58,7 +60,6 @@ extern "C" {
 #include <ztest_mock.h>
 #include <ztest_test.h>
 #include <tc_util.h>
-#include <logging/sys_log.h>
 
 void test_main(void);
 

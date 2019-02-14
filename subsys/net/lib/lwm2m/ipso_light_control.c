@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017 Linaro Limited
+ * Copyright (c) 2019 Foundries.io
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -10,12 +11,14 @@
  * Section: "16. IPSO Object: Light Control"
  */
 
-#define SYS_LOG_DOMAIN "ipso_light_control"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_LWM2M_LEVEL
-#include <logging/sys_log.h>
+#define LOG_MODULE_NAME net_ipso_light_control
+#define LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+
 #include <stdint.h>
 #include <init.h>
-#include <net/lwm2m.h>
 
 #include "lwm2m_object.h"
 #include "lwm2m_engine.h"
@@ -34,6 +37,7 @@
 #define MAX_INSTANCE_COUNT	CONFIG_LWM2M_IPSO_LIGHT_CONTROL_INSTANCE_COUNT
 
 #define LIGHT_STRING_SHORT	8
+#define LIGHT_STRING_LONG       64
 
 /* resource state variables */
 static bool on_off_value[MAX_INSTANCE_COUNT];
@@ -42,7 +46,7 @@ static s32_t on_time_value[MAX_INSTANCE_COUNT];
 static u32_t on_time_offset[MAX_INSTANCE_COUNT];
 static float32_value_t cumulative_active_value[MAX_INSTANCE_COUNT];
 static float32_value_t power_factor_value[MAX_INSTANCE_COUNT];
-static char colour[MAX_INSTANCE_COUNT][LIGHT_STRING_SHORT];
+static char colour[MAX_INSTANCE_COUNT][LIGHT_STRING_LONG];
 static char units[MAX_INSTANCE_COUNT][LIGHT_STRING_SHORT];
 
 static struct lwm2m_engine_obj light_control;
@@ -87,7 +91,7 @@ static int on_time_post_write_cb(u16_t obj_inst_id,
 	int i;
 
 	if (data_len != 4) {
-		SYS_LOG_ERR("unknown size %u", data_len);
+		LOG_ERR("unknown size %u", data_len);
 		return -EINVAL;
 	}
 
@@ -116,8 +120,8 @@ static struct lwm2m_engine_obj_inst *light_control_create(u16_t obj_inst_id)
 	/* Check that there is no other instance with this ID */
 	for (index = 0; index < MAX_INSTANCE_COUNT; index++) {
 		if (inst[index].obj && inst[index].obj_inst_id == obj_inst_id) {
-			SYS_LOG_ERR("Can not create instance - "
-				    "already existing: %u", obj_inst_id);
+			LOG_ERR("Can not create instance - "
+				"already existing: %u", obj_inst_id);
 			return NULL;
 		}
 
@@ -128,16 +132,16 @@ static struct lwm2m_engine_obj_inst *light_control_create(u16_t obj_inst_id)
 	}
 
 	if (avail < 0) {
-		SYS_LOG_ERR("Can not create instance - "
-			    "no more room: %u", obj_inst_id);
+		LOG_ERR("Can not create instance - no more room: %u",
+			obj_inst_id);
 		return NULL;
 	}
 
 	/* Set default values */
 	on_off_value[avail] = false;
-	dimmer_value[avail] = 0;
+	dimmer_value[avail] = 0U;
 	on_time_value[avail] = 0;
-	on_time_offset[avail] = 0;
+	on_time_offset[avail] = 0U;
 	cumulative_active_value[avail].val1 = 0;
 	cumulative_active_value[avail].val2 = 0;
 	power_factor_value[avail].val1 = 0;
@@ -159,35 +163,33 @@ static struct lwm2m_engine_obj_inst *light_control_create(u16_t obj_inst_id)
 	INIT_OBJ_RES_DATA(res[avail], i, LIGHT_POWER_FACTOR_ID,
 		&power_factor_value[avail], sizeof(*power_factor_value));
 	INIT_OBJ_RES_DATA(res[avail], i, LIGHT_COLOUR_ID,
-		colour[avail], LIGHT_STRING_SHORT);
+		colour[avail], LIGHT_STRING_LONG);
 	INIT_OBJ_RES_DATA(res[avail], i, LIGHT_SENSOR_UNITS_ID,
 		units[avail], LIGHT_STRING_SHORT);
 
 	inst[avail].resources = res[avail];
 	inst[avail].resource_count = i;
 
-	SYS_LOG_DBG("Create IPSO Light Control instance: %d", obj_inst_id);
+	LOG_DBG("Create IPSO Light Control instance: %d", obj_inst_id);
 
 	return &inst[avail];
 }
 
 static int ipso_light_control_init(struct device *dev)
 {
-	int ret = 0;
-
 	/* Set default values */
-	memset(inst, 0, sizeof(*inst) * MAX_INSTANCE_COUNT);
-	memset(res, 0, sizeof(struct lwm2m_engine_res_inst) *
-		       MAX_INSTANCE_COUNT * LIGHT_MAX_ID);
+	(void)memset(inst, 0, sizeof(*inst) * MAX_INSTANCE_COUNT);
+	(void)memset(res, 0, sizeof(struct lwm2m_engine_res_inst) *
+			MAX_INSTANCE_COUNT * LIGHT_MAX_ID);
 
 	light_control.obj_id = IPSO_OBJECT_LIGHT_CONTROL_ID;
 	light_control.fields = fields;
-	light_control.field_count = sizeof(fields) / sizeof(*fields);
+	light_control.field_count = ARRAY_SIZE(fields);
 	light_control.max_instance_count = MAX_INSTANCE_COUNT;
 	light_control.create_cb = light_control_create;
 	lwm2m_register_obj(&light_control);
 
-	return ret;
+	return 0;
 }
 
 SYS_INIT(ipso_light_control_init, APPLICATION,

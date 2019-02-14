@@ -10,7 +10,6 @@
 #include <errno.h>
 #include <i2c.h>
 #include <soc.h>
-#include "i2c-priv.h"
 
 /* Driverlib includes */
 #include <inc/hw_memmap.h>
@@ -18,6 +17,12 @@
 #include <driverlib/rom.h>
 #include <driverlib/rom_map.h>
 #include <driverlib/i2c.h>
+
+#define LOG_LEVEL CONFIG_I2C_LOG_LEVEL
+#include <logging/log.h>
+LOG_MODULE_REGISTER(i2c_cc32xx);
+
+#include "i2c-priv.h"
 
 #define I2C_MASTER_CMD_BURST_RECEIVE_START_NACK	 I2C_MASTER_CMD_BURST_SEND_START
 #define I2C_MASTER_CMD_BURST_RECEIVE_STOP \
@@ -89,10 +94,10 @@ static int i2c_cc32xx_configure(struct device *dev, u32_t dev_config_raw)
 
 	switch (I2C_SPEED_GET(dev_config_raw)) {
 	case I2C_SPEED_STANDARD:
-		bitrate_id = 0;
+		bitrate_id = 0U;
 		break;
 	case I2C_SPEED_FAST:
-		bitrate_id = 1;
+		bitrate_id = 1U;
 		break;
 	default:
 		return -EINVAL;
@@ -269,7 +274,7 @@ static void i2c_cc32xx_isr(void *arg)
 	/* Clear interrupt source to avoid additional interrupts */
 	MAP_I2CMasterIntClearEx(base, int_status);
 
-	SYS_LOG_DBG("primed state: %d; err_status: 0x%x; int_status: 0x%x",
+	LOG_DBG("primed state: %d; err_status: 0x%x; int_status: 0x%x",
 		    data->state, err_status, int_status);
 
 	/* Handle errors: */
@@ -367,22 +372,22 @@ static const struct i2c_driver_api i2c_cc32xx_driver_api = {
 
 
 static const struct i2c_cc32xx_config i2c_cc32xx_config = {
-	.base = CONFIG_I2C_0_BASE_ADDRESS,
-	.bitrate = CONFIG_I2C_0_BITRATE,
-	.irq_no = CONFIG_I2C_0_IRQ,
+	.base = DT_I2C_0_BASE_ADDRESS,
+	.bitrate = DT_I2C_0_BITRATE,
+	.irq_no = DT_I2C_0_IRQ,
 };
 
 static struct i2c_cc32xx_data i2c_cc32xx_data;
 
-DEVICE_AND_API_INIT(i2c_cc32xx, CONFIG_I2C_0_LABEL, &i2c_cc32xx_init,
+DEVICE_AND_API_INIT(i2c_cc32xx, DT_I2C_0_LABEL, &i2c_cc32xx_init,
 		    &i2c_cc32xx_data, &i2c_cc32xx_config,
 		    POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,
 		    &i2c_cc32xx_driver_api);
 
 static void configure_i2c_irq(const struct i2c_cc32xx_config *config)
 {
-	IRQ_CONNECT(CONFIG_I2C_0_IRQ,
-		    CONFIG_I2C_0_IRQ_PRIORITY,
+	IRQ_CONNECT(DT_I2C_0_IRQ,
+		    DT_I2C_0_IRQ_PRIORITY,
 		    i2c_cc32xx_isr, DEVICE_GET(i2c_cc32xx), 0);
 
 	irq_enable(config->irq_no);

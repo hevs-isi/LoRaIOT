@@ -8,11 +8,11 @@
 if BOARD_NUCLEO_F091RC
 
 config BOARD
-	default nucleo_f091rc
+	default "nucleo_f091rc"
 
 if UART_CONSOLE
 
-config UART_STM32_PORT_2
+config UART_2
 	default y
 
 endif # UART_CONSOLE

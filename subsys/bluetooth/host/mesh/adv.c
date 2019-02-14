@@ -18,6 +18,7 @@
 #include <bluetooth/mesh.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_ADV)
+#define LOG_MODULE_NAME bt_mesh_adv
 #include "common/log.h"
 
 #include "../hci_core.h"
@@ -33,8 +34,8 @@
 #define ADV_SCAN_UNIT(_ms) ((_ms) * 8 / 5)
 
 /* Window and Interval are equal for continuous scanning */
-#define MESH_SCAN_INTERVAL_MS 10
-#define MESH_SCAN_WINDOW_MS   10
+#define MESH_SCAN_INTERVAL_MS 30
+#define MESH_SCAN_WINDOW_MS   30
 #define MESH_SCAN_INTERVAL    ADV_SCAN_UNIT(MESH_SCAN_INTERVAL_MS)
 #define MESH_SCAN_WINDOW      ADV_SCAN_UNIT(MESH_SCAN_WINDOW_MS)
 
@@ -55,7 +56,7 @@
 
 static K_FIFO_DEFINE(adv_queue);
 static struct k_thread adv_thread_data;
-static BT_STACK_NOINIT(adv_thread_stack, ADV_STACK_SIZE);
+static K_THREAD_STACK_DEFINE(adv_thread_stack, ADV_STACK_SIZE);
 
 static const u8_t adv_type[] = {
 	[BT_MESH_ADV_PROV]   = BT_DATA_MESH_PROV,
@@ -102,14 +103,17 @@ static inline void adv_send(struct net_buf *buf)
 	struct bt_data ad;
 	int err;
 
-	adv_int = max(adv_int_min, BT_MESH_ADV(buf)->adv_int);
-	duration = MESH_SCAN_WINDOW_MS +
-		   ((BT_MESH_ADV(buf)->count + 1) * (adv_int + 10));
+	adv_int = max(adv_int_min,
+		      BT_MESH_TRANSMIT_INT(BT_MESH_ADV(buf)->xmit));
+	duration = (MESH_SCAN_WINDOW_MS +
+		    ((BT_MESH_TRANSMIT_COUNT(BT_MESH_ADV(buf)->xmit) + 1) *
+		     (adv_int + 10)));
 
 	BT_DBG("type %u len %u: %s", BT_MESH_ADV(buf)->type,
 	       buf->len, bt_hex(buf->data, buf->len));
 	BT_DBG("count %u interval %ums duration %ums",
-	       BT_MESH_ADV(buf)->count + 1, adv_int, duration);
+	       BT_MESH_TRANSMIT_COUNT(BT_MESH_ADV(buf)->xmit) + 1, adv_int,
+	       duration);
 
 	ad.type = adv_type[BT_MESH_ADV(buf)->type];
 	ad.data_len = buf->len;
@@ -121,6 +125,7 @@ static inline void adv_send(struct net_buf *buf)
 		param.options = 0;
 	}
 
+	param.id = BT_ID_DEFAULT;
 	param.interval_min = ADV_SCAN_UNIT(adv_int);
 	param.interval_max = param.interval_min;
 
@@ -182,7 +187,7 @@ static void adv_thread(void *p1, void *p2, void *p3)
 
 		/* busy == 0 means this was canceled */
 		if (BT_MESH_ADV(buf)->busy) {
-			BT_MESH_ADV(buf)->busy = 0;
+			BT_MESH_ADV(buf)->busy = 0U;
 			adv_send(buf);
 		}
 
@@ -204,11 +209,15 @@ void bt_mesh_adv_update(void)
 struct net_buf *bt_mesh_adv_create_from_pool(struct net_buf_pool *pool,
 					     bt_mesh_adv_alloc_t get_id,
 					     enum bt_mesh_adv_type type,
-					     u8_t xmit_count, u8_t xmit_int,
-					     s32_t timeout)
+					     u8_t xmit, s32_t timeout)
 {
 	struct bt_mesh_adv *adv;
 	struct net_buf *buf;
+
+	if (atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
+		BT_WARN("Refusing to allocate buffer while suspended");
+		return NULL;
+	}
 
 	buf = net_buf_alloc(pool, timeout);
 	if (!buf) {
@@ -218,20 +227,19 @@ struct net_buf *bt_mesh_adv_create_from_pool(struct net_buf_pool *pool,
 	adv = get_id(net_buf_id(buf));
 	BT_MESH_ADV(buf) = adv;
 
-	memset(adv, 0, sizeof(*adv));
+	(void)memset(adv, 0, sizeof(*adv));
 
 	adv->type         = type;
-	adv->count        = xmit_count;
-	adv->adv_int      = xmit_int;
+	adv->xmit         = xmit;
 
 	return buf;
 }
 
-struct net_buf *bt_mesh_adv_create(enum bt_mesh_adv_type type, u8_t xmit_count,
-				   u8_t xmit_int, s32_t timeout)
+struct net_buf *bt_mesh_adv_create(enum bt_mesh_adv_type type, u8_t xmit,
+				   s32_t timeout)
 {
 	return bt_mesh_adv_create_from_pool(&adv_buf_pool, adv_alloc, type,
-					    xmit_count, xmit_int, timeout);
+					    xmit, timeout);
 }
 
 void bt_mesh_adv_send(struct net_buf *buf, const struct bt_mesh_send_cb *cb,
@@ -242,7 +250,7 @@ void bt_mesh_adv_send(struct net_buf *buf, const struct bt_mesh_send_cb *cb,
 
 	BT_MESH_ADV(buf)->cb = cb;
 	BT_MESH_ADV(buf)->cb_data = cb_data;
-	BT_MESH_ADV(buf)->busy = 1;
+	BT_MESH_ADV(buf)->busy = 1U;
 
 	net_buf_put(&adv_queue, net_buf_ref(buf));
 }
@@ -303,6 +311,7 @@ void bt_mesh_adv_init(void)
 	k_thread_create(&adv_thread_data, adv_thread_stack,
 			K_THREAD_STACK_SIZEOF(adv_thread_stack), adv_thread,
 			NULL, NULL, NULL, K_PRIO_COOP(7), 0, K_NO_WAIT);
+	k_thread_name_set(&adv_thread_data, "BT Mesh adv");
 }
 
 int bt_mesh_scan_enable(void)

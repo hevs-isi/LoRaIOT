@@ -114,7 +114,7 @@ typedef struct
 
 /** @defgroup RCC_LL_EC_OSC_VALUES Oscillator Values adaptation
   * @brief    Defines used to adapt values of different oscillators
-  * @note     These values could be modified in the user environment according to 
+  * @note     These values could be modified in the user environment according to
   *           HW set-up.
   * @{
   */
@@ -3449,6 +3449,31 @@ __STATIC_INLINE void LL_RCC_PLL_ConfigDomain_DSI(uint32_t Source, uint32_t PLLM,
 #endif /* DSI */
 
 /**
+  * @brief  Configure PLL clock source
+  * @rmtoll PLLCFGR      PLLSRC        LL_RCC_PLL_SetMainSource
+  * @param PLLSource This parameter can be one of the following values:
+  *         @arg @ref LL_RCC_PLLSOURCE_HSI
+  *         @arg @ref LL_RCC_PLLSOURCE_HSE
+  * @retval None
+  */
+__STATIC_INLINE void LL_RCC_PLL_SetMainSource(uint32_t PLLSource)
+{
+  MODIFY_REG(RCC->PLLCFGR, RCC_PLLCFGR_PLLSRC, PLLSource);
+}
+
+/**
+  * @brief  Get the oscillator used as PLL clock source.
+  * @rmtoll PLLCFGR      PLLSRC        LL_RCC_PLL_GetMainSource
+  * @retval Returned value can be one of the following values:
+  *         @arg @ref LL_RCC_PLLSOURCE_HSI
+  *         @arg @ref LL_RCC_PLLSOURCE_HSE
+  */
+__STATIC_INLINE uint32_t LL_RCC_PLL_GetMainSource(void)
+{
+  return (uint32_t)(READ_BIT(RCC->PLLCFGR, RCC_PLLCFGR_PLLSRC));
+}
+
+/**
   * @brief  Get Main PLL multiplication factor for VCO
   * @rmtoll PLLCFGR      PLLN          LL_RCC_PLL_GetN
   * @retval Between 50 and 432
@@ -3459,7 +3484,7 @@ __STATIC_INLINE uint32_t LL_RCC_PLL_GetN(void)
 }
 
 /**
-  * @brief  Get Main PLL division factor for PLLP 
+  * @brief  Get Main PLL division factor for PLLP
   * @rmtoll PLLCFGR      PLLP       LL_RCC_PLL_GetP
   * @retval Returned value can be one of the following values:
   *         @arg @ref LL_RCC_PLLP_DIV_2
@@ -3515,18 +3540,6 @@ __STATIC_INLINE uint32_t LL_RCC_PLL_GetR(void)
   return (uint32_t)(READ_BIT(RCC->PLLCFGR, RCC_PLLCFGR_PLLR));
 }
 #endif /* RCC_PLLCFGR_PLLR */
-
-/**
-  * @brief  Get the oscillator used as PLL clock source.
-  * @rmtoll PLLCFGR      PLLSRC        LL_RCC_PLL_GetMainSource
-  * @retval Returned value can be one of the following values:
-  *         @arg @ref LL_RCC_PLLSOURCE_HSI
-  *         @arg @ref LL_RCC_PLLSOURCE_HSE
-  */
-__STATIC_INLINE uint32_t LL_RCC_PLL_GetMainSource(void)
-{
-  return (uint32_t)(READ_BIT(RCC->PLLCFGR, RCC_PLLCFGR_PLLSRC));
-}
 
 /**
   * @brief  Get Division factor for the main PLL and other PLL

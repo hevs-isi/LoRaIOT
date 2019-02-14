@@ -4,11 +4,13 @@ type: mcu
 arch: arm
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
 ram: 16
 testing:
-  default: true
   ignore_tags:
     - net
 supported:
   - ble
+  - i2c
+  - gpio

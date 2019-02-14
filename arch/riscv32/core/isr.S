@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016 Jean-Paul Etienne <fractalclone@gmail.com>
+ * Copyright (c) 2018 Foundries.io Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,34 +12,25 @@
 
 /* imports */
 GDATA(_sw_isr_table)
-GTEXT(__soc_save_context)
-GTEXT(__soc_restore_context)
 GTEXT(__soc_is_irq)
 GTEXT(__soc_handle_irq)
 GTEXT(_Fault)
+#ifdef CONFIG_RISCV_SOC_CONTEXT_SAVE
+GTEXT(__soc_save_context)
+GTEXT(__soc_restore_context)
+#endif /* CONFIG_RISCV_SOC_CONTEXT_SAVE */
 
 GTEXT(_k_neg_eagain)
 GTEXT(_is_next_thread_current)
 GTEXT(_get_next_ready_thread)
 
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_CONTEXT_SWITCH
-GTEXT(_sys_k_event_logger_context_switch)
-#endif
-
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_SLEEP
-GTEXT(_sys_k_event_logger_exit_sleep)
-#endif
-
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_INTERRUPT
-GTEXT(_sys_k_event_logger_interrupt)
+#ifdef CONFIG_TRACING
+GTEXT(z_sys_trace_thread_switched_in)
+GTEXT(z_sys_trace_isr_enter)
 #endif
 
 #ifdef CONFIG_IRQ_OFFLOAD
 GTEXT(_offload_routine)
-#endif
-
-#ifdef CONFIG_TIMESLICING
-GTEXT(_update_time_slice_before_swap)
 #endif
 
 /* exports */
@@ -47,23 +39,24 @@ GTEXT(__irq_wrapper)
 /* use ABI name of registers for the sake of simplicity */
 
 /*
- * ISR is handled at both ARCH and SOC levels.
- * At the ARCH level, ISR handles basic context saving/restore of registers
- * onto/from the thread stack and calls corresponding IRQ function registered
- * at driver level.
-
- * At SOC level, ISR handles saving/restoring of SOC-specific registers
- * onto/from the thread stack (handled via __soc_save_context and
- * __soc_restore_context functions). SOC level save/restore context
- * is accounted for only if CONFIG_RISCV_SOC_CONTEXT_SAVE variable is set
+ * Generic architecture-level IRQ handling, along with callouts to
+ * SoC-specific routines.
  *
- * Moreover, given that RISC-V architecture does not provide a clear ISA
- * specification about interrupt handling, each RISC-V SOC handles it in
- * its own way. Hence, the generic RISC-V ISR handler expects the following
- * functions to be provided at the SOC level:
- * __soc_is_irq: to check if the exception is the result of an interrupt or not.
- * __soc_handle_irq: handle pending IRQ at SOC level (ex: clear pending IRQ in
- * SOC-specific IRQ register)
+ * Architecture level IRQ handling includes basic context save/restore
+ * of standard registers and calling ISRs registered at Zephyr's driver
+ * level.
+ *
+ * Since RISC-V does not completely prescribe IRQ handling behavior,
+ * implementations vary (some implementations also deviate from
+ * what standard behavior is defined). Hence, the arch level code expects
+ * the following functions to be provided at the SOC level:
+ *
+ *     - __soc_is_irq: decide if we're handling an interrupt or an exception
+ *     - __soc_handle_irq: handle SoC-specific details for a pending IRQ
+ *       (e.g. clear a pending bit in a SoC-specific register)
+ *
+ * If CONFIG_RISCV_SOC_CONTEXT_SAVE=y, calls to SoC-level context save/restore
+ * routines are also made here. For details, see the Kconfig help text.
  */
 
 /*
@@ -110,8 +103,13 @@ SECTION_FUNC(exception.entry, __irq_wrapper)
 
 #ifdef CONFIG_RISCV_SOC_CONTEXT_SAVE
 	/* Handle context saving at SOC level. */
+	addi a0, sp, __NANO_ESF_soc_context_OFFSET
 	jal ra, __soc_save_context
 #endif /* CONFIG_RISCV_SOC_CONTEXT_SAVE */
+
+#ifdef CONFIG_EXECUTION_BENCHMARKING
+	call read_timer_start_of_isr
+#endif
 
 	/*
 	 * Check if exception is the result of an interrupt or not.
@@ -130,16 +128,6 @@ SECTION_FUNC(exception.entry, __irq_wrapper)
 	bnez a0, is_interrupt
 
 	/*
-	 * If exception is not an interrupt, MEPC will contain
-	 * the instruction address, which has caused the exception.
-	 * Increment saved MEPC by 4 to prevent running into the
-	 * exception again, upon exiting the ISR.
-	 */
-	lw t0, __NANO_ESF_mepc_OFFSET(sp)
-	addi t0, t0, 4
-	sw t0, __NANO_ESF_mepc_OFFSET(sp)
-
-	/*
 	 * If the exception is the result of an ECALL, check whether to
 	 * perform a context-switch or an IRQ offload. Otherwise call _Fault
 	 * to report the exception.
@@ -153,29 +141,7 @@ SECTION_FUNC(exception.entry, __irq_wrapper)
 	 * If mcause == SOC_MCAUSE_ECALL_EXP, handle system call,
 	 * otherwise handle fault
 	 */
-#ifdef CONFIG_IRQ_OFFLOAD
-	/* If not system call, jump to is_fault */
-	bne t0, t1, is_fault
-
-	/*
-	 * Determine if the system call is the result of an IRQ offloading.
-	 * Done by checking if _offload_routine is not pointing to NULL.
-	 * If NULL, jump to reschedule to perform a context-switch, otherwise,
-	 * jump to is_interrupt to handle the IRQ offload.
-	 */
-	la t0, _offload_routine
-	lw t1, 0x00(t0)
-	beqz t1, reschedule
-	bnez t1, is_interrupt
-
-is_fault:
-#else
-	/*
-	 * Go to reschedule to handle context-switch if system call,
-	 * otherwise call _Fault to handle exception
-	 */
-	beq t0, t1, reschedule
-#endif
+	beq t0, t1, is_syscall
 
 	/*
 	 * Call _Fault to handle exception.
@@ -187,6 +153,37 @@ is_fault:
 	addi a0, sp, 0
 	la ra, no_reschedule
 	tail _Fault
+
+is_syscall:
+	/*
+	 * A syscall is the result of an ecall instruction, in which case the
+	 * MEPC will contain the address of the ecall instruction.
+	 * Increment saved MEPC by 4 to prevent triggering the same ecall
+	 * again upon exiting the ISR.
+	 *
+	 * It's safe to always increment by 4, even with compressed
+	 * instructions, because the ecall instruction is always 4 bytes.
+	 */
+	lw t0, __NANO_ESF_mepc_OFFSET(sp)
+	addi t0, t0, 4
+	sw t0, __NANO_ESF_mepc_OFFSET(sp)
+
+#ifdef CONFIG_IRQ_OFFLOAD
+	/*
+	 * Determine if the system call is the result of an IRQ offloading.
+	 * Done by checking if _offload_routine is not pointing to NULL.
+	 * If NULL, jump to reschedule to perform a context-switch, otherwise,
+	 * jump to is_interrupt to handle the IRQ offload.
+	 */
+	la t0, _offload_routine
+	lw t1, 0x00(t0)
+	bnez t1, is_interrupt
+#endif
+
+	/*
+	 * Go to reschedule to handle context-switch
+	 */
+	j reschedule
 
 is_interrupt:
 	/*
@@ -229,12 +226,8 @@ on_irq_stack:
 	tail _irq_do_offload
 
 call_irq:
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_SLEEP
-	call _sys_k_event_logger_exit_sleep
-#endif
-
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_INTERRUPT
-	call _sys_k_event_logger_interrupt
+#ifdef CONFIG_TRACING
+	call z_sys_trace_isr_enter
 #endif
 
 	/* Get IRQ causing interrupt */
@@ -262,6 +255,15 @@ call_irq:
 	/* Load ISR function address in register t1 */
 	lw t1, 0x04(t0)
 
+#ifdef CONFIG_EXECUTION_BENCHMARKING
+	addi sp, sp, -16
+	sw a0, 0x00(sp)
+	sw t1, 0x04(sp)
+	call read_timer_end_of_isr
+	lw t1, 0x04(sp)
+	lw a0, 0x00(sp)
+	addi sp, sp, 16
+#endif
 	/* Call ISR function */
 	jalr ra, t1
 
@@ -292,14 +294,6 @@ on_thread_stack:
 	lw t2, _kernel_offset_to_current(t1)
 
 	/*
-	 * If non-preemptible thread, do not schedule
-	 * (see explanation of preempt field in kernel_structs.h
-	 */
-	lhu t3, _thread_offset_to_preempt(t2)
-	li t4, _NON_PREEMPT_THRESHOLD
-	bgeu t3, t4, no_reschedule
-
-	/*
 	 * Check if next thread to schedule is current thread.
 	 * If yes do not perform a reschedule
 	 */
@@ -310,12 +304,9 @@ on_thread_stack:
 #endif /* CONFIG_PREEMPT_ENABLED */
 
 reschedule:
-#if CONFIG_TIMESLICING
-	call _update_time_slice_before_swap
+#if CONFIG_TRACING
+	call z_sys_trace_thread_switched_in
 #endif
-#if CONFIG_KERNEL_EVENT_LOGGER_CONTEXT_SWITCH
-	call _sys_k_event_logger_context_switch
-#endif /* CONFIG_KERNEL_EVENT_LOGGER_CONTEXT_SWITCH */
 	/* Get reference to _kernel */
 	la t0, _kernel
 
@@ -373,9 +364,57 @@ reschedule:
 	lw s10, _thread_offset_to_s10(t1)
 	lw s11, _thread_offset_to_s11(t1)
 
+#ifdef CONFIG_EXECUTION_BENCHMARKING
+	addi sp, sp, -__NANO_ESF_SIZEOF
+
+	sw ra, __NANO_ESF_ra_OFFSET(sp)
+	sw gp, __NANO_ESF_gp_OFFSET(sp)
+	sw tp, __NANO_ESF_tp_OFFSET(sp)
+	sw t0, __NANO_ESF_t0_OFFSET(sp)
+	sw t1, __NANO_ESF_t1_OFFSET(sp)
+	sw t2, __NANO_ESF_t2_OFFSET(sp)
+	sw t3, __NANO_ESF_t3_OFFSET(sp)
+	sw t4, __NANO_ESF_t4_OFFSET(sp)
+	sw t5, __NANO_ESF_t5_OFFSET(sp)
+	sw t6, __NANO_ESF_t6_OFFSET(sp)
+	sw a0, __NANO_ESF_a0_OFFSET(sp)
+	sw a1, __NANO_ESF_a1_OFFSET(sp)
+	sw a2, __NANO_ESF_a2_OFFSET(sp)
+	sw a3, __NANO_ESF_a3_OFFSET(sp)
+	sw a4, __NANO_ESF_a4_OFFSET(sp)
+	sw a5, __NANO_ESF_a5_OFFSET(sp)
+	sw a6, __NANO_ESF_a6_OFFSET(sp)
+	sw a7, __NANO_ESF_a7_OFFSET(sp)
+
+	call read_timer_end_of_swap
+
+	lw ra, __NANO_ESF_ra_OFFSET(sp)
+	lw gp, __NANO_ESF_gp_OFFSET(sp)
+	lw tp, __NANO_ESF_tp_OFFSET(sp)
+	lw t0, __NANO_ESF_t0_OFFSET(sp)
+	lw t1, __NANO_ESF_t1_OFFSET(sp)
+	lw t2, __NANO_ESF_t2_OFFSET(sp)
+	lw t3, __NANO_ESF_t3_OFFSET(sp)
+	lw t4, __NANO_ESF_t4_OFFSET(sp)
+	lw t5, __NANO_ESF_t5_OFFSET(sp)
+	lw t6, __NANO_ESF_t6_OFFSET(sp)
+	lw a0, __NANO_ESF_a0_OFFSET(sp)
+	lw a1, __NANO_ESF_a1_OFFSET(sp)
+	lw a2, __NANO_ESF_a2_OFFSET(sp)
+	lw a3, __NANO_ESF_a3_OFFSET(sp)
+	lw a4, __NANO_ESF_a4_OFFSET(sp)
+	lw a5, __NANO_ESF_a5_OFFSET(sp)
+	lw a6, __NANO_ESF_a6_OFFSET(sp)
+	lw a7, __NANO_ESF_a7_OFFSET(sp)
+
+	/* Release stack space */
+	addi sp, sp, __NANO_ESF_SIZEOF
+#endif
+
 no_reschedule:
 #ifdef CONFIG_RISCV_SOC_CONTEXT_SAVE
 	/* Restore context at SOC level */
+	addi a0, sp, __NANO_ESF_soc_context_OFFSET
 	jal ra, __soc_restore_context
 #endif /* CONFIG_RISCV_SOC_CONTEXT_SAVE */
 

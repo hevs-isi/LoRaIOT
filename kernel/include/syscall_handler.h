@@ -5,8 +5,8 @@
  */
 
 
-#ifndef _ZEPHYR_SYSCALL_HANDLER_H_
-#define _ZEPHYR_SYSCALL_HANDLER_H_
+#ifndef ZEPHYR_KERNEL_INCLUDE_SYSCALL_HANDLER_H_
+#define ZEPHYR_KERNEL_INCLUDE_SYSCALL_HANDLER_H_
 
 #ifdef CONFIG_USERSPACE
 
@@ -14,6 +14,7 @@
 #include <kernel.h>
 #include <misc/printk.h>
 #include <kernel_internal.h>
+#include <stdbool.h>
 
 extern const _k_syscall_handler_t _k_syscall_table[K_SYSCALL_LIMIT];
 
@@ -125,12 +126,141 @@ extern void _thread_perms_all_clear(struct k_thread *thread);
  */
 void _k_object_uninit(void *obj);
 
+/**
+ * Initialize and reset permissions to only access by the caller
+ *
+ * Intended for scenarios where objects are fetched from slab pools
+ * and may have had different permissions set during prior usage.
+ *
+ * This is only intended for pools of objects, where such objects are
+ * acquired and released to the pool. If an object has already been used,
+ * we do not want stale permission information hanging around, the object
+ * should only have permissions on the caller. Objects which are not
+ * managed by a pool-like mechanism should not use this API.
+ *
+ * The object will be marked as initialized and the calling thread
+ * granted access to it.
+ *
+ * @param object Address of the kernel object
+ */
+void _k_object_recycle(void *obj);
+
+/**
+ * @brief Obtain the size of a C string passed from user mode
+ *
+ * Given a C string pointer and a maximum size, obtain the true
+ * size of the string (not including the trailing NULL byte) just as
+ * if calling strnlen() on it, with the same semantics of strnlen() with
+ * respect to the return value and the maxlen parameter.
+ *
+ * Any memory protection faults triggered by the examination of the string
+ * will be safely handled and an error code returned.
+ *
+ * NOTE: Doesn't guarantee that user mode has actual access to this
+ * string, you will need to still do a Z_SYSCALL_MEMORY_READ()
+ * with the obtained size value to guarantee this.
+ *
+ * @param src String to measure size of
+ * @param maxlen Maximum number of characters to examine
+ * @param err Pointer to int, filled in with -1 on memory error, 0 on
+ *	success
+ * @return undefined on error, or strlen(src) if that is less than maxlen, or
+ *	maxlen if there were no NULL terminating characters within the
+ *	first maxlen bytes.
+ */
+static inline size_t z_user_string_nlen(const char *src, size_t maxlen,
+					int *err)
+{
+	return z_arch_user_string_nlen(src, maxlen, err);
+}
+
+/**
+ * @brief Copy data from userspace into a resource pool allocation
+ *
+ * Given a pointer and a size, allocate a similarly sized buffer in the
+ * caller's resource pool and copy all the data within it to the newly
+ * allocated buffer. This will need to be freed later with k_free().
+ *
+ * Checks are done to ensure that the current thread would have read
+ * access to the provided buffer.
+ *
+ * @param src Source memory address
+ * @param size Size of the memory buffer
+ * @return An allocated buffer with the data copied within it, or NULL
+ *	if some error condition occurred
+ */
+extern void *z_user_alloc_from_copy(void *src, size_t size);
+
+/**
+ * @brief Copy data from user mode
+ *
+ * Given a userspace pointer and a size, copies data from it into a provided
+ * destination buffer, performing checks to ensure that the caller would have
+ * appropriate access when in user mode.
+ *
+ * @param dst Destination memory buffer
+ * @param src Source memory buffer, in userspace
+ * @param size Number of bytes to copy
+ * @retval 0 On success
+ * @retval EFAULT On memory access error
+ */
+extern int z_user_from_copy(void *dst, void *src, size_t size);
+
+/**
+ * @brief Copy data to user mode
+ *
+ * Given a userspace pointer and a size, copies data to it from a provided
+ * source buffer, performing checks to ensure that the caller would have
+ * appropriate access when in user mode.
+ *
+ * @param dst Destination memory buffer, in userspace
+ * @param src Source memory buffer
+ * @param size Number of bytes to copy
+ * @retval 0 On success
+ * @retval EFAULT On memory access error
+ */
+extern int z_user_to_copy(void *dst, void *src, size_t size);
+
+/**
+ * @brief Copy a C string from userspace into a resource pool allocation
+ *
+ * Given a C string and maximum length, duplicate the string using an
+ * allocation from the calling thread's resource pool. This will need to be
+ * freed later with k_free().
+ *
+ * Checks are performed to ensure that the string is valid memory and that
+ * the caller has access to it in user mode.
+ *
+ * @param src Source string pointer, in userspace
+ * @param maxlen Maximum size of the string including trailing NULL
+ * @return The duplicated string, or NULL if an error occurred.
+ */
+extern char *z_user_string_alloc_copy(char *src, size_t maxlen);
+
+/**
+ * @brief Copy a C string from userspace into a provided buffer
+ *
+ * Given a C string and maximum length, copy the string into a buffer.
+ *
+ * Checks are performed to ensure that the string is valid memory and that
+ * the caller has access to it in user mode.
+ *
+ * @param dst Destination buffer
+ * @param src Source string pointer, in userspace
+ * @param maxlen Maximum size of the string including trailing NULL
+ * @retval 0 on success
+ * @retval EINVAL if the source string is too long with respect
+ *	to maxlen
+ * @retval EFAULT On memory access error
+ */
+extern int z_user_string_copy(char *dst, char *src, size_t maxlen);
+
 #define Z_OOPS(expr) \
 	do { \
 		if (expr) { \
 			_arch_syscall_oops(ssf); \
 		} \
-	} while (0)
+	} while (false)
 
 static inline __attribute__((warn_unused_result)) __printf_like(2, 3)
 bool z_syscall_verify_msg(bool expr, const char *fmt, ...)
@@ -176,7 +306,8 @@ bool z_syscall_verify_msg(bool expr, const char *fmt, ...)
 #define Z_SYSCALL_VERIFY(expr) Z_SYSCALL_VERIFY_MSG(expr, #expr)
 
 #define Z_SYSCALL_MEMORY(ptr, size, write) \
-	Z_SYSCALL_VERIFY_MSG(!_arch_buffer_validate((void *)ptr, size, write), \
+	Z_SYSCALL_VERIFY_MSG(_arch_buffer_validate((void *)ptr, size, write) \
+			     == 0, \
 			     "Memory region %p (size %u) %s access denied", \
 			     (void *)(ptr), (u32_t)(size), \
 			     write ? "write" : "read")
@@ -268,7 +399,7 @@ static inline int _obj_validation_check(struct _k_object *ko,
 	ret = _k_object_validate(ko, otype, init);
 
 #ifdef CONFIG_PRINTK
-	if (ret) {
+	if (ret != 0) {
 		_dump_object_error(ret, obj, ko, otype);
 	}
 #else
@@ -280,8 +411,8 @@ static inline int _obj_validation_check(struct _k_object *ko,
 
 #define Z_SYSCALL_IS_OBJ(ptr, type, init) \
 	Z_SYSCALL_VERIFY_MSG( \
-	    !_obj_validation_check(_k_object_find((void *)ptr), (void *)ptr, \
-				   type, init), "access denied")
+	    _obj_validation_check(_k_object_find((void *)ptr), (void *)ptr, \
+				   type, init) == 0, "access denied")
 
 /**
  * @brief Runtime check driver object pointer for presence of operation
@@ -304,9 +435,36 @@ static inline int _obj_validation_check(struct _k_object *ko,
 	})
 
 /**
+ * @brief Runtime check that device object is of a specific driver type
+ *
+ * Checks that the driver object passed in is initialized, the caller has
+ * correct permissions, and that it belongs to the specified driver
+ * subsystems. Additionally, all devices store a function pointer to the
+ * driver's init function. If this doesn't match the value provided, the
+ * check will fail.
+ *
+ * This provides an easy way to determine if a device object not only
+ * belongs to a particular subsystem, but is of a specific device driver
+ * implementation. Useful for defining out-of-subsystem system calls
+ * which are implemented for only one driver.
+ *
+ * @param _device Untrusted device pointer
+ * @param _dtype Expected kernel object type for the provided device pointer
+ * @param _init_fn Expected init function memory address
+ * @return 0 on success, nonzero on failure
+ */
+#define Z_SYSCALL_SPECIFIC_DRIVER(_device, _dtype, _init_fn) \
+	({ \
+		struct device *_dev = (struct device *)_device; \
+		Z_SYSCALL_OBJ(_dev, _dtype) || \
+			Z_SYSCALL_VERIFY_MSG(_dev->config->init == _init_fn, \
+					     "init function mismatch"); \
+	})
+
+/**
  * @brief Runtime check kernel object pointer for non-init functions
  *
- * Calls _k_object_validate and triggers a kernel oops if the check files.
+ * Calls _k_object_validate and triggers a kernel oops if the check fails.
  * For use in system call handlers which are not init functions; a fatal
  * error will occur if the object is not initialized.
  *
@@ -365,7 +523,7 @@ static inline int _obj_validation_check(struct _k_object *ko,
  */
 
 #define __SYSCALL_HANDLER0(name_) \
-	u32_t _handler_ ## name_(u32_t arg1 __unused, \
+	u32_t hdlr_ ## name_(u32_t arg1 __unused, \
 				 u32_t arg2 __unused, \
 				 u32_t arg3 __unused, \
 				 u32_t arg4 __unused, \
@@ -374,7 +532,7 @@ static inline int _obj_validation_check(struct _k_object *ko,
 				 void *ssf)
 
 #define __SYSCALL_HANDLER1(name_, arg1_) \
-	u32_t _handler_ ## name_(u32_t arg1_, \
+	u32_t hdlr_ ## name_(u32_t arg1_, \
 				 u32_t arg2 __unused, \
 				 u32_t arg3 __unused, \
 				 u32_t arg4 __unused, \
@@ -383,7 +541,7 @@ static inline int _obj_validation_check(struct _k_object *ko,
 				 void *ssf)
 
 #define __SYSCALL_HANDLER2(name_, arg1_, arg2_) \
-	u32_t _handler_ ## name_(u32_t arg1_, \
+	u32_t hdlr_ ## name_(u32_t arg1_, \
 				 u32_t arg2_, \
 				 u32_t arg3 __unused, \
 				 u32_t arg4 __unused, \
@@ -392,7 +550,7 @@ static inline int _obj_validation_check(struct _k_object *ko,
 				 void *ssf)
 
 #define __SYSCALL_HANDLER3(name_, arg1_, arg2_, arg3_) \
-	u32_t _handler_ ## name_(u32_t arg1_, \
+	u32_t hdlr_ ## name_(u32_t arg1_, \
 				 u32_t arg2_, \
 				 u32_t arg3_, \
 				 u32_t arg4 __unused, \
@@ -401,7 +559,7 @@ static inline int _obj_validation_check(struct _k_object *ko,
 				 void *ssf)
 
 #define __SYSCALL_HANDLER4(name_, arg1_, arg2_, arg3_, arg4_) \
-	u32_t _handler_ ## name_(u32_t arg1_, \
+	u32_t hdlr_ ## name_(u32_t arg1_, \
 				 u32_t arg2_, \
 				 u32_t arg3_, \
 				 u32_t arg4_, \
@@ -410,7 +568,7 @@ static inline int _obj_validation_check(struct _k_object *ko,
 				 void *ssf)
 
 #define __SYSCALL_HANDLER5(name_, arg1_, arg2_, arg3_, arg4_, arg5_) \
-	u32_t _handler_ ## name_(u32_t arg1_, \
+	u32_t hdlr_ ## name_(u32_t arg1_, \
 				 u32_t arg2_, \
 				 u32_t arg3_, \
 				 u32_t arg4_, \
@@ -419,7 +577,7 @@ static inline int _obj_validation_check(struct _k_object *ko,
 				 void *ssf)
 
 #define __SYSCALL_HANDLER6(name_, arg1_, arg2_, arg3_, arg4_, arg5_, arg6_) \
-	u32_t _handler_ ## name_(u32_t arg1_, \
+	u32_t hdlr_ ## name_(u32_t arg1_, \
 				 u32_t arg2_, \
 				 u32_t arg3_, \
 				 u32_t arg4_, \
@@ -476,4 +634,4 @@ static inline int _obj_validation_check(struct _k_object *ko,
 
 #endif /* CONFIG_USERSPACE */
 
-#endif /* _ZEPHYR_SYSCALL_H_ */
+#endif /* ZEPHYR_KERNEL_INCLUDE_SYSCALL_HANDLER_H_ */

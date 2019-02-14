@@ -11,14 +11,16 @@
  *
  */
 
+#define LOG_LEVEL CONFIG_OPENTHREAD_LOG_LEVEL
+#define LOG_MODULE_NAME net_otPlat_radio
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-
-#define SYS_LOG_LEVEL CONFIG_OPENTHREAD_LOG_LEVEL
-#define SYS_LOG_DOMAIN "otPlat/radio"
-#include <logging/sys_log.h>
 
 #include <kernel.h>
 #include <device.h>
@@ -26,11 +28,10 @@
 #include <net/net_pkt.h>
 #include <misc/__assert.h>
 
+#include <openthread-system.h>
+#include <openthread/instance.h>
 #include <openthread/platform/radio.h>
 #include <openthread/platform/diag.h>
-#include <platform.h>
-
-#include <openthread/types.h>
 
 #include "platform-zephyr.h"
 
@@ -51,10 +52,10 @@ static u16_t channel;
 
 static void dataInit(void)
 {
-	tx_pkt = net_pkt_get_reserve_tx(0, K_NO_WAIT);
+	tx_pkt = net_pkt_get_reserve_tx(K_NO_WAIT);
 	__ASSERT_NO_MSG(tx_pkt != NULL);
 
-	tx_payload = net_pkt_get_reserve_tx_data(0, K_NO_WAIT);
+	tx_payload = net_pkt_get_reserve_tx_data(K_NO_WAIT);
 	__ASSERT_NO_MSG(tx_payload != NULL);
 
 	net_pkt_frag_insert(tx_pkt, tx_payload);
@@ -66,7 +67,7 @@ void platformRadioInit(void)
 {
 	dataInit();
 
-	radio_dev = device_get_binding(CONFIG_NET_APP_IEEE802154_DEV_NAME);
+	radio_dev = device_get_binding(CONFIG_NET_CONFIG_IEEE802154_DEV_NAME);
 	__ASSERT_NO_MSG(radio_dev != NULL);
 
 	radio_api = (struct ieee802154_radio_api *)radio_dev->driver_api;
@@ -96,7 +97,7 @@ void platformRadioProcess(otInstance *aInstance)
 		radio_api->set_channel(radio_dev, sTransmitFrame.mChannel);
 		radio_api->set_txpower(radio_dev, tx_power);
 
-		if (sTransmitFrame.mIsCcaEnabled) {
+		if (sTransmitFrame.mInfo.mTxInfo.mCsmaCaEnabled) {
 			if (radio_api->cca(radio_dev) ||
 			    radio_api->tx(radio_dev, tx_pkt, tx_payload)) {
 				result = OT_ERROR_CHANNEL_ACCESS_FAILURE;
@@ -127,8 +128,8 @@ void platformRadioProcess(otInstance *aInstance)
 
 				ackPsdu[2] = sTransmitFrame.mPsdu[2];
 				ackFrame.mPsdu = ackPsdu;
-				ackFrame.mLqi = 80;
-				ackFrame.mRssi = -40;
+				ackFrame.mInfo.mRxInfo.mLqi = 80;
+				ackFrame.mInfo.mRxInfo.mRssi = -40;
 				ackFrame.mLength = 5;
 
 				otPlatRadioTxDone(aInstance, &sTransmitFrame,
@@ -241,7 +242,7 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aPacket)
 	if (sState == OT_RADIO_STATE_RECEIVE) {
 		error = OT_ERROR_NONE;
 		sState = OT_RADIO_STATE_TRANSMIT;
-		PlatformEventSignalPending();
+		otSysEventSignalPending();
 	}
 
 	return error;
@@ -276,7 +277,7 @@ bool otPlatRadioGetPromiscuous(otInstance *aInstance)
 	/* TODO: No API in Zephyr to get promiscuous mode. */
 	bool result = false;
 
-	SYS_LOG_DBG("PromiscuousMode=%d", result ? 1 : 0);
+	LOG_DBG("PromiscuousMode=%d", result ? 1 : 0);
 	return result;
 }
 
@@ -285,7 +286,7 @@ void otPlatRadioSetPromiscuous(otInstance *aInstance, bool aEnable)
 	ARG_UNUSED(aInstance);
 	ARG_UNUSED(aEnable);
 
-	SYS_LOG_DBG("PromiscuousMode=%d", aEnable ? 1 : 0);
+	LOG_DBG("PromiscuousMode=%d", aEnable ? 1 : 0);
 	/* TODO: No API in Zephyr to set promiscuous mode. */
 }
 
@@ -379,4 +380,3 @@ otError otPlatRadioSetTransmitPower(otInstance *aInstance, int8_t aPower)
 
 	return OT_ERROR_NONE;
 }
-

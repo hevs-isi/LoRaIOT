@@ -3,6 +3,8 @@ sample:
   name: socket_http_get
 tests:
   test:
+    filter: TOOLCHAIN_HAS_NEWLIB == 1
     harness: net
     min_ram: 32
-    tags: net
+    min_flash: 80
+    tags: net socket

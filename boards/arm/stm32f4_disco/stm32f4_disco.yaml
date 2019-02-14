@@ -4,6 +4,10 @@ type: mcu
 arch: arm
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
 supported:
   - pwm
+  - rtc
+  - counter
+  - usb

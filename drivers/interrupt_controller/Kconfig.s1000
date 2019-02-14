@@ -7,7 +7,6 @@
 
 config CAVS_ICTL
 	bool "CAVS Interrupt Logic"
-	default n
 	depends on MULTI_LEVEL_INTERRUPTS
 	help
 	  These are 4 in number supporting a max of 32 interrupts each.
@@ -26,8 +25,8 @@ config CAVS_ICTL_0_NAME
 	default "CAVS_0"
 
 config CAVS_ICTL_0_OFFSET
-	hex "Parent interrupt number to which CAVS_0 maps"
-	default 0x00
+	int "Parent interrupt number to which CAVS_0 maps"
+	default 0
 	depends on CAVS_ICTL
 
 config CAVS_ICTL_1_NAME
@@ -36,8 +35,8 @@ config CAVS_ICTL_1_NAME
 	default "CAVS_1"
 
 config CAVS_ICTL_1_OFFSET
-	hex "Parent interrupt number to which CAVS_1 maps"
-	default 0x00
+	int "Parent interrupt number to which CAVS_1 maps"
+	default 0
 	depends on CAVS_ICTL
 
 config CAVS_ICTL_2_NAME
@@ -46,8 +45,8 @@ config CAVS_ICTL_2_NAME
 	default "CAVS_2"
 
 config CAVS_ICTL_2_OFFSET
-	hex "Parent interrupt number to which CAVS_2 maps"
-	default 0x00
+	int "Parent interrupt number to which CAVS_2 maps"
+	default 0
 	depends on CAVS_ICTL
 
 config CAVS_ICTL_3_NAME
@@ -56,8 +55,8 @@ config CAVS_ICTL_3_NAME
 	default "CAVS_3"
 
 config CAVS_ICTL_3_OFFSET
-	hex "Parent interrupt number to which CAVS_3 maps"
-	default 0x00
+	int "Parent interrupt number to which CAVS_3 maps"
+	default 0
 	depends on CAVS_ICTL
 
 config CAVS_ICTL_INIT_PRIORITY

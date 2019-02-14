@@ -17,6 +17,24 @@ static struct k_spinlock bounce_lock;
 
 volatile int bounce_owner, bounce_done;
 
+/**
+ * @brief Tests for spinlock
+ *
+ * @defgroup kernel_spinlock_tests Spinlock Tests
+ *
+ * @ingroup all_tests
+ *
+ * @{
+ * @}
+ */
+
+/**
+ * @brief Test basic spinlock
+ *
+ * @ingroup kernel_spinlock_tests
+ *
+ * @see k_spin_lock(), k_spin_unlock()
+ */
 void test_spinlock_basic(void)
 {
 	k_spinlock_key_t key;
@@ -58,7 +76,7 @@ void bounce_once(int id)
 		return;
 	}
 
-	zassert_true(locked, "Other cpu did not get lock in 10000 tries\n");
+	zassert_true(locked, "Other cpu did not get lock in 10000 tries");
 
 	/* Mark us as the owner, spin for a while validating that we
 	 * never see another owner write to the protected data.
@@ -83,6 +101,13 @@ void cpu1_fn(int key, void *arg)
 	}
 }
 
+/**
+ * @brief Test spinlock with bounce
+ *
+ * @ingroup kernel_spinlock_tests
+ *
+ * @see _arch_start_cpu()
+ */
 void test_spinlock_bounce(void)
 {
 	int i;

@@ -8,13 +8,21 @@
 #include "settings_test.h"
 #include "settings/settings_file.h"
 
+#ifdef CONFIG_SETTINGS_USE_BASE64
+#define CF_MFG_TEST_STR "\x10\x00myfoo/mybar=AQ=="
+#define CF_RUNNING_TEST_STR "\x10\x00myfoo/mybar=CA=="
+#else
+#define CF_MFG_TEST_STR "\x0D\x00myfoo/mybar=\x01"
+#define CF_RUNNING_TEST_STR "\x0D\x00myfoo/mybar=\x08"
+#endif
+
 void test_config_small_file(void)
 {
 	int rc;
 	struct settings_file cf_mfg;
 	struct settings_file cf_running;
-	const char cf_mfg_test[] = "myfoo/mybar=1";
-	const char cf_running_test[] = " myfoo/mybar = 8 ";
+	const char cf_mfg_test[] = CF_MFG_TEST_STR;
+	const char cf_running_test[] = CF_RUNNING_TEST_STR;
 
 	config_wipe_srcs();
 
@@ -22,29 +30,29 @@ void test_config_small_file(void)
 	cf_running.cf_name = TEST_CONFIG_DIR "/running";
 
 	rc = settings_file_src(&cf_mfg);
-	zassert_true(rc == 0, "can't register FS as configuration source\n");
+	zassert_true(rc == 0, "can't register FS as configuration source");
 	rc = settings_file_src(&cf_running);
-	zassert_true(rc == 0, "can't register FS as configuration source\n");
+	zassert_true(rc == 0, "can't register FS as configuration source");
 
 	rc = fsutil_write_file(TEST_CONFIG_DIR "/mfg", cf_mfg_test,
 			       sizeof(cf_mfg_test));
-	zassert_true(rc == 0, "can't write to file\n");
+	zassert_true(rc == 0, "can't write to file");
 
 	settings_load();
-	zassert_true(test_set_called, "the SET handler wasn't called\n");
+	zassert_true(test_set_called, "the SET handler wasn't called");
 	zassert_true(val8 == 1,
-		     "SET handler: was called with wrong parameters\n");
+		     "SET handler: was called with wrong parameters");
 
 	ctest_clear_call_state();
 
 	rc = fsutil_write_file(TEST_CONFIG_DIR "/running", cf_running_test,
 			       sizeof(cf_running_test));
-	zassert_true(rc == 0, "can't write to file\n");
+	zassert_true(rc == 0, "can't write to file");
 
 	settings_load();
-	zassert_true(test_set_called, "the SET handler wasn't called\n");
+	zassert_true(test_set_called, "the SET handler wasn't called");
 	zassert_true(val8 == 8,
-		     "SET handler: was called with wrong parameters\n");
+		     "SET handler: was called with wrong parameters");
 
 	ctest_clear_call_state();
 }

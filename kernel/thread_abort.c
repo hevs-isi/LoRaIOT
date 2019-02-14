@@ -27,27 +27,23 @@ extern void _k_thread_single_abort(struct k_thread *thread);
 #if !defined(CONFIG_ARCH_HAS_THREAD_ABORT)
 void _impl_k_thread_abort(k_tid_t thread)
 {
-	unsigned int key;
+	/* We aren't trying to synchronize data access here (these
+	 * APIs are internally synchronized).  The original lock seems
+	 * to have been in place to prevent the thread from waking up
+	 * due to a delivered interrupt.  Leave a dummy spinlock in
+	 * place to do that.  This API should be revisted though, it
+	 * doesn't look SMP-safe as it stands.
+	 */
+	struct k_spinlock lock = {};
+	k_spinlock_key_t key = k_spin_lock(&lock);
 
-	key = irq_lock();
-
-	__ASSERT(!(thread->base.user_options & K_ESSENTIAL),
+	__ASSERT((thread->base.user_options & K_ESSENTIAL) == 0,
 		 "essential thread aborted");
 
 	_k_thread_single_abort(thread);
 	_thread_monitor_exit(thread);
 
-	if (_is_in_isr()) {
-		irq_unlock(key);
-	} else {
-		if (_current == thread) {
-			_Swap(key);
-			CODE_UNREACHABLE;
-		}
-
-		/* The abort handler might have altered the ready queue. */
-		_reschedule(key);
-	}
+	_reschedule(&lock, key);
 }
 #endif
 

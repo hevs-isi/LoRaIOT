@@ -21,11 +21,8 @@
 #include <bluetooth/uuid.h>
 #include <bluetooth/gatt.h>
 
-#include <gatt/dis.h>
 #include <gatt/bas.h>
 
-#define DEVICE_NAME			CONFIG_BT_DEVICE_NAME
-#define DEVICE_NAME_LEN			(sizeof(DEVICE_NAME) - 1)
 #define CSC_SUPPORTED_LOCATIONS		{ CSC_LOC_OTHER, \
 					  CSC_LOC_FRONT_WHEEL, \
 					  CSC_LOC_REAR_WHEEL, \
@@ -246,7 +243,7 @@ static void ctrl_point_ind(struct bt_conn *conn, u8_t req_op, u8_t status,
 		memcpy(ind->data, data, data_len);
 	}
 
-	bt_gatt_notify(conn, &csc_attrs[9], buf, sizeof(buf));
+	bt_gatt_notify(conn, &csc_attrs[8], buf, sizeof(buf));
 }
 
 struct csc_measurement_nfy {
@@ -271,10 +268,10 @@ static void measurement_nfy(struct bt_conn *conn, u32_t cwr, u16_t lwet,
 	u8_t buf[sizeof(*nfy) +
 		    (cwr ? sizeof(struct wheel_rev_data_nfy) : 0) +
 		    (ccr ? sizeof(struct crank_rev_data_nfy) : 0)];
-	u16_t len = 0;
+	u16_t len = 0U;
 
 	nfy = (void *) buf;
-	nfy->flags = 0;
+	nfy->flags = 0U;
 
 	/* Send Wheel Revolution data is present */
 	if (cwr) {
@@ -299,7 +296,7 @@ static void measurement_nfy(struct bt_conn *conn, u32_t cwr, u16_t lwet,
 		memcpy(nfy->data + len, &data, sizeof(data));
 	}
 
-	bt_gatt_notify(NULL, &csc_attrs[2], buf, sizeof(buf));
+	bt_gatt_notify(NULL, &csc_attrs[1], buf, sizeof(buf));
 }
 
 static u16_t lwet; /* Last Wheel Event Time */
@@ -339,9 +336,9 @@ static void csc_simulation(void)
 	 * every 64 seconds.
 	 */
 	if (!(i % 64)) {
-		lcet = 0;
-		lwet = 0;
-		i = 0;
+		lcet = 0U;
+		lwet = 0U;
+		i = 0U;
 	}
 
 	i++;
@@ -371,10 +368,6 @@ static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_UUID16_ALL, 0x16, 0x18, 0x0f, 0x18),
 };
 
-static const struct bt_data sd[] = {
-	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
-};
-
 static void bt_ready(int err)
 {
 	if (err) {
@@ -385,11 +378,9 @@ static void bt_ready(int err)
 	printk("Bluetooth initialized\n");
 
 	bas_init();
-	dis_init(CONFIG_SOC, "ACME");
 	bt_gatt_service_register(&csc_svc);
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN, ad, ARRAY_SIZE(ad),
-			      sd, ARRAY_SIZE(sd));
+	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
 		printk("Advertising failed to start (err %d)\n", err);
 		return;

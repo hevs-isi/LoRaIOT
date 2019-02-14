@@ -31,7 +31,7 @@
   * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   *
   ******************************************************************************
-  */ 
+  */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __STM32F7xx_HAL_USART_H
@@ -83,7 +83,7 @@ typedef struct
                                            This parameter can be a value of @ref USART_Mode */
 
   uint32_t OverSampling;              /*!< Specifies whether the Over sampling 8 is enabled or disabled, to achieve higher speed (up to fPCLK/8).
-                                           This parameter can be a value of @ref USART_Over_Sampling */                                                                                        
+                                           This parameter can be a value of @ref USART_Over_Sampling */
 
   uint32_t CLKPolarity;               /*!< Specifies the steady state of the serial clock.
                                            This parameter can be a value of @ref USART_Clock_Polarity */
@@ -170,9 +170,9 @@ typedef struct
   */
 
 /** @defgroup USART_Error_Code USART Error Code
-  * @brief    USART Error Code 
+  * @brief    USART Error Code
   * @{
-  */ 
+  */
 #define HAL_USART_ERROR_NONE         ((uint32_t)0x00000000U)   /*!< No error            */
 #define HAL_USART_ERROR_PE           ((uint32_t)0x00000001U)   /*!< Parity error        */
 #define HAL_USART_ERROR_NE           ((uint32_t)0x00000002U)   /*!< Noise error         */
@@ -260,7 +260,7 @@ typedef struct
 /** @defgroup USART_Request_Parameters  USART Request Parameters
   * @{
   */
-#define USART_RXDATA_FLUSH_REQUEST        ((uint32_t)USART_RQR_RXFRQ)        /*!< Receive Data flush Request */ 
+#define USART_RXDATA_FLUSH_REQUEST        ((uint32_t)USART_RQR_RXFRQ)        /*!< Receive Data flush Request */
 #define USART_TXDATA_FLUSH_REQUEST        ((uint32_t)USART_RQR_TXFRQ)        /*!< Transmit data flush Request */
 /**
   * @}
@@ -272,7 +272,7 @@ typedef struct
   * @{
   */
 #define USART_FLAG_REACK                     ((uint32_t)0x00400000U)
-#define USART_FLAG_TEACK                     ((uint32_t)0x00200000U)  
+#define USART_FLAG_TEACK                     ((uint32_t)0x00200000U)
 #define USART_FLAG_BUSY                      ((uint32_t)0x00010000U)
 #define USART_FLAG_CTS                       ((uint32_t)0x00000400U)
 #define USART_FLAG_CTSIF                     ((uint32_t)0x00000200U)
@@ -338,14 +338,14 @@ typedef struct
   */
 
 /** @brief Reset USART handle state
-  * @param  __HANDLE__: USART handle.
+  * @param  __HANDLE__ USART handle.
   * @retval None
   */
 #define __HAL_USART_RESET_HANDLE_STATE(__HANDLE__)  ((__HANDLE__)->State = HAL_USART_STATE_RESET)
 
 /** @brief  Checks whether the specified USART flag is set or not.
-  * @param  __HANDLE__: specifies the USART Handle
-  * @param  __FLAG__: specifies the flag to check.
+  * @param  __HANDLE__ specifies the USART Handle
+  * @param  __FLAG__ specifies the flag to check.
   *        This parameter can be one of the following values:
   *            @arg USART_FLAG_REACK: Receive enable acknowledge flag
   *            @arg USART_FLAG_TEACK: Transmit enable acknowledge flag
@@ -365,8 +365,8 @@ typedef struct
 
 
 /** @brief  Enables the specified USART interrupt.
-  * @param  __HANDLE__: specifies the USART Handle
-  * @param  __INTERRUPT__: specifies the USART interrupt source to enable.
+  * @param  __HANDLE__ specifies the USART Handle
+  * @param  __INTERRUPT__ specifies the USART interrupt source to enable.
   *          This parameter can be one of the following values:
   *            @arg USART_IT_TXE:  Transmit Data Register empty interrupt
   *            @arg USART_IT_TC:   Transmission complete interrupt
@@ -381,8 +381,8 @@ typedef struct
                                                             ((__HANDLE__)->Instance->CR3 |= (1U << ((__INTERRUPT__) & USART_IT_MASK))))
 
 /** @brief  Disables the specified USART interrupt.
-  * @param  __HANDLE__: specifies the USART Handle.
-  * @param  __INTERRUPT__: specifies the USART interrupt source to disable.
+  * @param  __HANDLE__ specifies the USART Handle.
+  * @param  __INTERRUPT__ specifies the USART interrupt source to disable.
   *          This parameter can be one of the following values:
   *            @arg USART_IT_TXE:  Transmit Data Register empty interrupt
   *            @arg USART_IT_TC:   Transmission complete interrupt
@@ -398,8 +398,8 @@ typedef struct
 
 
 /** @brief  Checks whether the specified USART interrupt has occurred or not.
-  * @param  __HANDLE__: specifies the USART Handle
-  * @param  __IT__: specifies the USART interrupt source to check.
+  * @param  __HANDLE__ specifies the USART Handle
+  * @param  __IT__ specifies the USART interrupt source to check.
   *          This parameter can be one of the following values:
   *            @arg USART_IT_TXE: Transmit Data Register empty interrupt
   *            @arg USART_IT_TC:  Transmission complete interrupt
@@ -414,8 +414,8 @@ typedef struct
 #define __HAL_USART_GET_IT(__HANDLE__, __IT__) ((__HANDLE__)->Instance->ISR & ((uint32_t)1 << ((__IT__)>> 0x08)))
 
 /** @brief  Checks whether the specified USART interrupt source is enabled.
-  * @param  __HANDLE__: specifies the USART Handle.
-  * @param  __IT__: specifies the USART interrupt source to check.
+  * @param  __HANDLE__ specifies the USART Handle.
+  * @param  __IT__ specifies the USART interrupt source to check.
   *          This parameter can be one of the following values:
   *            @arg USART_IT_TXE: Transmit Data Register empty interrupt
   *            @arg USART_IT_TC:  Transmission complete interrupt
@@ -433,8 +433,8 @@ typedef struct
 
 
 /** @brief  Clears the specified USART ISR flag, in setting the proper ICR register flag.
-  * @param  __HANDLE__: specifies the USART Handle.
-  * @param  __IT_CLEAR__: specifies the interrupt clear register flag that needs to be set
+  * @param  __HANDLE__ specifies the USART Handle.
+  * @param  __IT_CLEAR__ specifies the interrupt clear register flag that needs to be set
   *                       to clear the corresponding interrupt
   *          This parameter can be one of the following values:
   *            @arg USART_CLEAR_PEF: Parity Error Clear Flag
@@ -449,24 +449,24 @@ typedef struct
 #define __HAL_USART_CLEAR_IT(__HANDLE__, __IT_CLEAR__) ((__HANDLE__)->Instance->ICR = (uint32_t)(__IT_CLEAR__))
 
 /** @brief  Set a specific USART request flag.
-  * @param  __HANDLE__: specifies the USART Handle.
-  * @param  __REQ__: specifies the request flag to set
+  * @param  __HANDLE__ specifies the USART Handle.
+  * @param  __REQ__ specifies the request flag to set
   *          This parameter can be one of the following values:
   *            @arg USART_RXDATA_FLUSH_REQUEST: Receive Data flush Request
   *            @arg USART_TXDATA_FLUSH_REQUEST: Transmit data flush Request
   *
   * @retval None
   */
-#define __HAL_USART_SEND_REQ(__HANDLE__, __REQ__) ((__HANDLE__)->Instance->RQR |= (uint16_t)(__REQ__)) 
+#define __HAL_USART_SEND_REQ(__HANDLE__, __REQ__) ((__HANDLE__)->Instance->RQR |= (uint16_t)(__REQ__))
 
 /** @brief  Enable USART
-  * @param  __HANDLE__: specifies the USART Handle.
+  * @param  __HANDLE__ specifies the USART Handle.
   * @retval None
   */
 #define __HAL_USART_ENABLE(__HANDLE__)                 ((__HANDLE__)->Instance->CR1 |=  USART_CR1_UE)
 
 /** @brief  Disable USART
-  * @param  __HANDLE__: specifies the USART Handle.
+  * @param  __HANDLE__ specifies the USART Handle.
   * @retval None
   */
 #define __HAL_USART_DISABLE(__HANDLE__)                ((__HANDLE__)->Instance->CR1 &=  ~USART_CR1_UE)
@@ -521,7 +521,7 @@ void HAL_USART_ErrorCallback(USART_HandleTypeDef *husart);
 
 /**
   * @}
-  */ 
+  */
 
 /** @addtogroup USART_Exported_Functions_Group3
   * @{
@@ -544,8 +544,8 @@ uint32_t               HAL_USART_GetError(USART_HandleTypeDef *husart);
   * @{
   */
 /** @brief USART interruptions flag mask
-  * 
-  */ 
+  *
+  */
 #define USART_IT_MASK                             ((uint16_t)0x001FU)
 
 /**
@@ -556,8 +556,8 @@ uint32_t               HAL_USART_GetError(USART_HandleTypeDef *husart);
   * @{
   */
 /** @brief  Reports the USART clock source.
-  * @param  __HANDLE__: specifies the USART Handle
-  * @param  __CLOCKSOURCE__ : output variable
+  * @param  __HANDLE__ specifies the USART Handle
+  * @param  __CLOCKSOURCE__  output variable
   * @retval the USART clocking source, written in __CLOCKSOURCE__.
   */
 #define USART_GETCLOCKSOURCE(__HANDLE__, __CLOCKSOURCE__)\
@@ -643,7 +643,7 @@ uint32_t               HAL_USART_GetError(USART_HandleTypeDef *husart);
        }                                                       \
     }                                                          \
  } while(0)
-  
+
 
 #define IS_USART_STOPBITS(__STOPBITS__) (((__STOPBITS__) == USART_STOPBITS_1) || \
                                          ((__STOPBITS__) == USART_STOPBITS_1_5) || \
@@ -661,7 +661,7 @@ uint32_t               HAL_USART_GetError(USART_HandleTypeDef *husart);
 #define IS_USART_LASTBIT(__LASTBIT__) (((__LASTBIT__) == USART_LASTBIT_DISABLE) || \
                                        ((__LASTBIT__) == USART_LASTBIT_ENABLE))
 #define IS_USART_REQUEST_PARAMETER(__PARAM__) (((__PARAM__) == USART_RXDATA_FLUSH_REQUEST) || \
-                                               ((__PARAM__) == USART_TXDATA_FLUSH_REQUEST))   
+                                               ((__PARAM__) == USART_TXDATA_FLUSH_REQUEST))
 #define IS_USART_BAUDRATE(__BAUDRATE__) ((__BAUDRATE__) < 9000001)
 
 /**
@@ -679,12 +679,12 @@ uint32_t               HAL_USART_GetError(USART_HandleTypeDef *husart);
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
   */
-  
+
 #ifdef __cplusplus
 }
 #endif

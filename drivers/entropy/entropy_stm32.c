@@ -17,8 +17,8 @@
 #include <clock_control.h>
 #include <clock_control/stm32_clock_control.h>
 
-#if !defined(CONFIG_SOC_SERIES_STM32L4X) && !defined(CONFIG_SOC_SERIES_STM32F4X)
-#error RNG only available on STM32F4 and STM32L4 series
+#if !defined(CONFIG_SOC_SERIES_STM32L4X) && !defined(CONFIG_SOC_SERIES_STM32F4X) && !defined(CONFIG_SOC_SERIES_STM32F7X)
+#error RNG only available on STM32F4, STM32F7 and STM32L4 series
 #elif defined(CONFIG_SOC_STM32F401XE)
 #error RNG not available on STM32F401 based SoCs
 #elif defined(CONFIG_SOC_STM32F411XE)
@@ -151,6 +151,7 @@ static int entropy_stm32_rng_init(struct device *dev)
 {
 	struct entropy_stm32_rng_dev_data *dev_data;
 	struct entropy_stm32_rng_dev_cfg *dev_cfg;
+	int res;
 
 	__ASSERT_NO_MSG(dev != NULL);
 
@@ -186,8 +187,9 @@ static int entropy_stm32_rng_init(struct device *dev)
 	dev_data->clock = device_get_binding(STM32_CLOCK_CONTROL_NAME);
 	__ASSERT_NO_MSG(dev_data->clock != NULL);
 
-	clock_control_on(dev_data->clock,
+	res = clock_control_on(dev_data->clock,
 		(clock_control_subsys_t *)&dev_cfg->pclken);
+	__ASSERT_NO_MSG(res);
 
 	LL_RNG_Enable(dev_data->rng);
 
@@ -210,7 +212,7 @@ static struct entropy_stm32_rng_dev_data entropy_stm32_rng_data = {
 DEVICE_AND_API_INIT(entropy_stm32_rng, CONFIG_ENTROPY_NAME,
 		    entropy_stm32_rng_init,
 		    &entropy_stm32_rng_data, &entropy_stm32_rng_config,
-		    PRE_KERNEL_2, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,
+		    PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,
 		    &entropy_stm32_rng_api);
 
 #endif

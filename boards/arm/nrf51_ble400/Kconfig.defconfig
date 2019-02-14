@@ -7,29 +7,23 @@
 if BOARD_NRF51_BLE400
 
 config BOARD
-	default nrf51_ble400
+	default "nrf51_ble400"
 
-if GPIO_NRF5
+if I2C
 
-config GPIO_NRF5_P0
+config I2C_0
 	default y
 
-endif # GPIO_NRF5
+endif # I2C
 
-if UART_NRF5
+if SPI
 
-config UART_NRF5_GPIO_TX_PIN
-	default 9
+config SPI_1
+	default y
 
-config UART_NRF5_GPIO_RX_PIN
-	default 11
+endif # SPI
 
-config UART_NRF5_GPIO_RTS_PIN
-	default 8
-
-config UART_NRF5_GPIO_CTS_PIN
-	default 10
-
-endif # UART_NRF5
+config BT_CTLR
+	default BT
 
 endif # BOARD_NRF51_BLE400

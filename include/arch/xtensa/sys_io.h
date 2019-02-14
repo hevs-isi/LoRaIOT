@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XTENSA_SYS_IO_H
-#define XTENSA_SYS_IO_H
+#ifndef ZEPHYR_INCLUDE_ARCH_XTENSA_SYS_IO_H_
+#define ZEPHYR_INCLUDE_ARCH_XTENSA_SYS_IO_H_
 
 #if !defined(_ASMLANGUAGE)
 
@@ -17,11 +17,21 @@ static ALWAYS_INLINE u32_t sys_read32(mem_addr_t addr)
 	return *(volatile u32_t *)addr;
 }
 
-
 static ALWAYS_INLINE void sys_write32(u32_t data, mem_addr_t addr)
 {
 	*(volatile u32_t *)addr = data;
 }
+
+static ALWAYS_INLINE u16_t sys_read16(mem_addr_t addr)
+{
+	return *(volatile u16_t *)addr;
+}
+
+static ALWAYS_INLINE void sys_write16(u16_t data, mem_addr_t addr)
+{
+	*(volatile u16_t *)addr = data;
+}
+
 
 static ALWAYS_INLINE u8_t sys_read8(mem_addr_t addr)
 {
@@ -114,9 +124,7 @@ static ALWAYS_INLINE
 
 	return ret;
 }
-
-
 #endif /* !_ASMLANGUAGE */
 
 
-#endif /* XTENSA_SYS_IO_H */
+#endif /* ZEPHYR_INCLUDE_ARCH_XTENSA_SYS_IO_H_ */

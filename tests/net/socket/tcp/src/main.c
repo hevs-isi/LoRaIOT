@@ -4,8 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(net_test, CONFIG_NET_SOCKETS_LOG_LEVEL);
+
 #include <ztest_assert.h>
 #include <net/socket.h>
+
+#include "../../socket_helpers.h"
 
 #define TEST_STR_SMALL "test"
 
@@ -15,46 +20,6 @@
 #define MAX_CONNS 5
 
 #define TCP_TEARDOWN_TIMEOUT K_SECONDS(1)
-
-static void prepare_sock_v4(const char *addr,
-			    u16_t port,
-			    int *sock,
-			    struct sockaddr_in *sockaddr)
-{
-	int rv;
-
-	zassert_not_null(addr, "null addr");
-	zassert_not_null(sock, "null sock");
-	zassert_not_null(sockaddr, "null sockaddr");
-
-	*sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	zassert_true(*sock >= 0, "socket open failed");
-
-	sockaddr->sin_family = AF_INET;
-	sockaddr->sin_port = htons(port);
-	rv = inet_pton(AF_INET, addr, &sockaddr->sin_addr);
-	zassert_equal(rv, 1, "inet_pton failed");
-}
-
-static void prepare_sock_v6(const char *addr,
-			    u16_t port,
-			    int *sock,
-			    struct sockaddr_in6 *sockaddr)
-{
-	int rv;
-
-	zassert_not_null(addr, "null addr");
-	zassert_not_null(sock, "null sock");
-	zassert_not_null(sockaddr, "null sockaddr");
-
-	*sock = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
-	zassert_true(*sock >= 0, "socket open failed");
-
-	sockaddr->sin6_family = AF_INET6;
-	sockaddr->sin6_port = htons(port);
-	rv = inet_pton(AF_INET6, addr, &sockaddr->sin6_addr);
-	zassert_equal(rv, 1, "inet_pton failed");
-}
 
 static void test_bind(int sock, struct sockaddr *addr, socklen_t addrlen)
 {
@@ -155,15 +120,10 @@ void test_v4_send_recv(void)
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
 
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
-			ANY_PORT,
-			&c_sock,
-			&c_saddr);
-
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
-			SERVER_PORT,
-			&s_sock,
-			&s_saddr);
+	prepare_sock_tcp_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR, ANY_PORT,
+			    &c_sock, &c_saddr);
+	prepare_sock_tcp_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR, SERVER_PORT,
+			    &s_sock, &s_saddr);
 
 	test_bind(s_sock, (struct sockaddr *)&s_saddr, sizeof(s_saddr));
 	test_listen(s_sock);
@@ -195,15 +155,10 @@ void test_v6_send_recv(void)
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
 
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
-			ANY_PORT,
-			&c_sock,
-			&c_saddr);
-
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
-			SERVER_PORT,
-			&s_sock,
-			&s_saddr);
+	prepare_sock_tcp_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR, ANY_PORT,
+			    &c_sock, &c_saddr);
+	prepare_sock_tcp_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR, SERVER_PORT,
+			    &s_sock, &s_saddr);
 
 	test_bind(s_sock, (struct sockaddr *)&s_saddr, sizeof(s_saddr));
 	test_listen(s_sock);
@@ -234,15 +189,10 @@ void test_v4_sendto_recvfrom(void)
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
 
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
-			ANY_PORT,
-			&c_sock,
-			&c_saddr);
-
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
-			SERVER_PORT,
-			&s_sock,
-			&s_saddr);
+	prepare_sock_tcp_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR, ANY_PORT,
+			    &c_sock, &c_saddr);
+	prepare_sock_tcp_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR, SERVER_PORT,
+			    &s_sock, &s_saddr);
 
 	test_bind(s_sock, (struct sockaddr *)&s_saddr, sizeof(s_saddr));
 	test_listen(s_sock);
@@ -277,15 +227,11 @@ void test_v6_sendto_recvfrom(void)
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
 
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
-			ANY_PORT,
-			&c_sock,
-			&c_saddr);
+	prepare_sock_tcp_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR, ANY_PORT,
+			    &c_sock, &c_saddr);
 
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
-			SERVER_PORT,
-			&s_sock,
-			&s_saddr);
+	prepare_sock_tcp_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR, SERVER_PORT,
+			    &s_sock, &s_saddr);
 
 	test_bind(s_sock, (struct sockaddr *)&s_saddr, sizeof(s_saddr));
 	test_listen(s_sock);
@@ -321,15 +267,10 @@ void test_v4_sendto_recvfrom_null_dest(void)
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
 
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
-			ANY_PORT,
-			&c_sock,
-			&c_saddr);
-
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
-			SERVER_PORT,
-			&s_sock,
-			&s_saddr);
+	prepare_sock_tcp_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR, ANY_PORT,
+			    &c_sock, &c_saddr);
+	prepare_sock_tcp_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR, SERVER_PORT,
+			    &s_sock, &s_saddr);
 
 	test_bind(s_sock, (struct sockaddr *)&s_saddr, sizeof(s_saddr));
 	test_listen(s_sock);
@@ -361,15 +302,10 @@ void test_v6_sendto_recvfrom_null_dest(void)
 	struct sockaddr addr;
 	socklen_t addrlen = sizeof(addr);
 
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
-			ANY_PORT,
-			&c_sock,
-			&c_saddr);
-
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
-			SERVER_PORT,
-			&s_sock,
-			&s_saddr);
+	prepare_sock_tcp_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR, ANY_PORT,
+			    &c_sock, &c_saddr);
+	prepare_sock_tcp_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR, SERVER_PORT,
+			    &s_sock, &s_saddr);
 
 	test_bind(s_sock, (struct sockaddr *)&s_saddr, sizeof(s_saddr));
 	test_listen(s_sock);
@@ -393,12 +329,12 @@ void test_v6_sendto_recvfrom_null_dest(void)
 void test_main(void)
 {
 	ztest_test_suite(socket_tcp,
-			 ztest_unit_test(test_v4_send_recv),
-			 ztest_unit_test(test_v6_send_recv),
-			 ztest_unit_test(test_v4_sendto_recvfrom),
-			 ztest_unit_test(test_v6_sendto_recvfrom),
-			 ztest_unit_test(test_v4_sendto_recvfrom_null_dest),
-			 ztest_unit_test(test_v6_sendto_recvfrom_null_dest));
+			 ztest_user_unit_test(test_v4_send_recv),
+			 ztest_user_unit_test(test_v6_send_recv),
+			 ztest_user_unit_test(test_v4_sendto_recvfrom),
+			 ztest_user_unit_test(test_v6_sendto_recvfrom),
+			 ztest_user_unit_test(test_v4_sendto_recvfrom_null_dest),
+			 ztest_user_unit_test(test_v6_sendto_recvfrom_null_dest));
 
 	ztest_run_test_suite(socket_tcp);
 }

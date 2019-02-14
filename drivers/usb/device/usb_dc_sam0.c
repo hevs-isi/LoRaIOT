@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define SYS_LOG_DOMAIN "usb/dc"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_USB_DRIVER_LEVEL
-#include <logging/sys_log.h>
+#define LOG_LEVEL CONFIG_USB_DRIVER_LOG_LEVEL
+#include <logging/log.h>
+LOG_MODULE_REGISTER(usb_dc_sam0);
 
-#include <drivers/usb/usb_dc.h>
+#include <usb/usb_device.h>
 #include <soc.h>
 #include <string.h>
 
@@ -21,8 +21,8 @@
 
 #define USB_SAM0_IN_EP 0x80
 
-#define REGS ((Usb *)CONFIG_USB_DC_SAM0_BASE_ADDRESS)
-#define USB_NUM_ENDPOINTS CONFIG_USB_DC_SAM0_NUM_BIDIR_ENDPOINTS
+#define REGS ((Usb *)DT_USB_DC_SAM0_BASE_ADDRESS)
+#define USB_NUM_ENDPOINTS DT_USB_DC_SAM0_NUM_BIDIR_ENDPOINTS
 
 struct usb_sam0_data {
 	UsbDeviceDescriptor descriptors[USB_NUM_ENDPOINTS];
@@ -75,7 +75,7 @@ static void usb_sam0_ep_isr(u8_t ep)
 			 * completes else the ack will get dropped.
 			 */
 			regs->DADD.reg = data->addr;
-			data->addr = 0;
+			data->addr = 0U;
 		}
 	}
 }
@@ -106,7 +106,7 @@ static void usb_sam0_isr(void)
 	}
 
 	/* Dispatch the endpoint interrupts */
-	for (ep = 0; epint != 0; epint >>= 1) {
+	for (ep = 0U; epint != 0; epint >>= 1) {
 		/* Scan bit-by-bit as the Cortex-M0 doesn't have ffs */
 		if ((epint & 1) != 0) {
 			usb_sam0_ep_isr(ep);
@@ -138,7 +138,7 @@ static void usb_sam0_load_padcal(void)
 		     ((1 << NVM_USB_PAD_TRANSN_SIZE) - 1);
 
 	if (pad_transn == 0x1F) {
-		pad_transn = 5;
+		pad_transn = 5U;
 	}
 
 	regs->PADCAL.bit.TRANSN = pad_transn;
@@ -149,7 +149,7 @@ static void usb_sam0_load_padcal(void)
 		     ((1 << NVM_USB_PAD_TRANSP_SIZE) - 1);
 
 	if (pad_transp == 0x1F) {
-		pad_transp = 29;
+		pad_transp = 29U;
 	}
 
 	regs->PADCAL.bit.TRANSP = pad_transp;
@@ -160,7 +160,7 @@ static void usb_sam0_load_padcal(void)
 		   ((1 << NVM_USB_PAD_TRIM_SIZE) - 1);
 
 	if (pad_trim == 0x7) {
-		pad_trim = 3;
+		pad_trim = 3U;
 	}
 
 	regs->PADCAL.bit.TRIM = pad_trim;
@@ -197,15 +197,15 @@ int usb_dc_attach(void)
 	regs->CTRLA.reg = USB_CTRLA_MODE_DEVICE | USB_CTRLA_RUNSTDBY;
 	regs->CTRLB.reg = USB_DEVICE_CTRLB_SPDCONF_HS;
 
-	memset(data->descriptors, 0, sizeof(data->descriptors));
+	(void)memset(data->descriptors, 0, sizeof(data->descriptors));
 	regs->DESCADD.reg = (uintptr_t)&data->descriptors[0];
 
 	regs->INTENSET.reg = USB_DEVICE_INTENSET_EORST;
 
 	/* Connect and enable the interrupt */
-	IRQ_CONNECT(CONFIG_USB_DC_SAM0_IRQ, CONFIG_USB_DC_SAM0_IRQ_PRIORITY,
+	IRQ_CONNECT(DT_USB_DC_SAM0_IRQ, DT_USB_DC_SAM0_IRQ_PRIORITY,
 		    usb_sam0_isr, 0, 0);
-	irq_enable(CONFIG_USB_DC_SAM0_IRQ);
+	irq_enable(DT_USB_DC_SAM0_IRQ);
 
 	/* Enable and attach */
 	regs->CTRLA.bit.ENABLE = 1;
@@ -231,7 +231,7 @@ int usb_dc_reset(void)
 {
 	UsbDevice *regs = &REGS->DEVICE;
 
-	irq_disable(CONFIG_USB_DC_SAM0_IRQ);
+	irq_disable(DT_USB_DC_SAM0_IRQ);
 
 	regs->CTRLA.bit.SWRST = 1;
 	usb_sam0_wait_syncbusy();
@@ -256,6 +256,23 @@ int usb_dc_set_status_callback(const usb_dc_status_callback cb)
 	struct usb_sam0_data *data = usb_sam0_get_data();
 
 	data->cb = cb;
+
+	return 0;
+}
+
+int usb_dc_ep_check_cap(const struct usb_dc_ep_cfg_data * const cfg)
+{
+	u8_t ep_idx = cfg->ep_addr & ~USB_EP_DIR_MASK;
+
+	if ((cfg->ep_type == USB_DC_EP_CONTROL) && ep_idx) {
+		LOG_ERR("invalid endpoint configuration");
+		return -1;
+	}
+
+	if (ep_idx > DT_USB_DC_SAM0_NUM_BIDIR_ENDPOINTS) {
+		LOG_ERR("endpoint index/address too high");
+		return -1;
+	}
 
 	return 0;
 }
@@ -463,7 +480,7 @@ int usb_dc_ep_read_ex(u8_t ep, u8_t *buf, u32_t max_data_len,
 	 * also marks the OUT buffer as freed.
 	 */
 	if (buf == NULL) {
-		data->out_at = 0;
+		data->out_at = 0U;
 
 		if (read_bytes != NULL) {
 			*read_bytes = bytes;
@@ -483,7 +500,7 @@ int usb_dc_ep_read_ex(u8_t ep, u8_t *buf, u32_t max_data_len,
 	if (take == remain) {
 		if (!wait) {
 			endpoint->EPSTATUSCLR.bit.BK0RDY = 1;
-			data->out_at = 0;
+			data->out_at = 0U;
 		}
 	} else {
 		data->out_at += take;
@@ -511,7 +528,7 @@ int usb_dc_ep_read_continue(u8_t ep)
 	UsbDeviceEndpoint *endpoint = &regs->DeviceEndpoint[ep_num];
 
 	endpoint->EPSTATUSCLR.bit.BK0RDY = 1;
-	data->out_at = 0;
+	data->out_at = 0U;
 
 	return 0;
 }

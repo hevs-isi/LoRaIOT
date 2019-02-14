@@ -6,6 +6,11 @@ description: >
     Describe in free form text w/ spanning lines what you
     are describing
 
+inherits:
+  - !include other.yaml # or [other1.yaml, other2.yaml]
+# other.yaml contains bindings that also apply to this node.
+# In case there are duplicate definitions in the different
+# bindings the one that is defined first prevails.
 
 < parent | child >:
 # parent/child is used to document implicit relation between nodes.
@@ -23,7 +28,7 @@ properties:
 # A typical property entry will look like the following
 #   <name of property as it is in device tree>
 #     category: <required | optional>
-#     type: <string | int | array>
+#     type: <string | int | array | compound>
 #     description: <description of property>
 #     generation: <define | structure>
 
@@ -32,6 +37,7 @@ properties:
       category: required
       type: string
       description: compatible of node
+      generation: define
 
 # reg is used to denote mmio registers
     reg:
@@ -56,4 +62,12 @@ properties:
   - cell1    # name of second cell
   - cell2    # name of third cell
   - and so on and so forth
+
+# When the "generation" attribute is set to "define", value "use-prop-name"
+# could be added to indicate that generated #define should use property
+# name instead of controller generic name, for instance _CS_GPIO_ instead
+# of _GPIOS_
+
+# "type" attribute is currently not used.
+
 ...

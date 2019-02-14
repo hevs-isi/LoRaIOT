@@ -43,7 +43,7 @@ void fcb_test_wipe(void)
 	int rc;
 	const struct flash_area *fap;
 
-	rc = flash_area_open(2, &fap);
+	rc = flash_area_open(TEST_FCB_FLASH_AREA_ID, &fap);
 	zassert_true(rc == 0, "flash area open call failure");
 
 	for (i = 0; i < ARRAY_SIZE(test_fcb_sector); i++) {
@@ -106,7 +106,7 @@ void fcb_tc_pretest(int sectors)
 
 	fcb_test_wipe();
 	fcb = &test_fcb;
-	memset(fcb, 0, sizeof(*fcb));
+	(void)memset(fcb, 0, sizeof(*fcb));
 	fcb->f_sector_cnt = sectors;
 	fcb->f_sectors = test_fcb_sector; /* XXX */
 

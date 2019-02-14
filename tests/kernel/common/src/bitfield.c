@@ -14,16 +14,29 @@
 #define BIT_VAL(bit)    (1 << (bit & 0x7))
 #define BITFIELD_SIZE   512
 
+/**
+ * @addtogroup kernel_common_tests
+ * @{
+ */
+
+/**
+ * @brief Test bitfield operations
+ *
+ * @see sys_test_bit(), sys_set_bit(), sys_clear_bit(),
+ * sys_bitfield_set_bit(), sys_bitfield_clear_bit(),
+ * sys_bitfield_test_bit(), sys_bitfield_test_and_set_bit(),
+ * sys_bitfield_test_and_clear_bit()
+ */
 void test_bitfield(void)
 {
-	u32_t b1 = 0;
+	u32_t b1 = 0U;
 	unsigned char b2[BITFIELD_SIZE >> 3] = { 0 };
 	unsigned int bit;
 	int ret;
 
 	TC_PRINT("twiddling bits....\n");
 
-	for (bit = 0; bit < 32; ++bit) {
+	for (bit = 0U; bit < 32; ++bit) {
 		sys_set_bit((mem_addr_t)&b1, bit);
 
 		zassert_equal(b1, (1 << bit),
@@ -63,7 +76,7 @@ void test_bitfield(void)
 			      bit);
 	}
 
-	for (bit = 0; bit < BITFIELD_SIZE; ++bit) {
+	for (bit = 0U; bit < BITFIELD_SIZE; ++bit) {
 		sys_bitfield_set_bit((mem_addr_t)b2, bit);
 		zassert_equal(b2[BIT_INDEX(bit)], BIT_VAL(bit),
 			      "sys_bitfield_set_bit failed for bit %d\n",
@@ -108,3 +121,7 @@ void test_bitfield(void)
 			      bit);
 	}
 }
+
+/**
+ * @}
+ */

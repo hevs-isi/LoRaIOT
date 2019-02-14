@@ -10,12 +10,13 @@
 #include <init.h>
 #include <string.h>
 #include <misc/__assert.h>
+#include <stdbool.h>
 
 /* Linker-defined symbols bound the static pool structs */
 extern struct k_mem_pool _k_mem_pool_list_start[];
 extern struct k_mem_pool _k_mem_pool_list_end[];
 
-s64_t _tick_get(void);
+static struct k_spinlock lock;
 
 static struct k_mem_pool *get_pool(int id)
 {
@@ -56,27 +57,45 @@ int k_mem_pool_alloc(struct k_mem_pool *p, struct k_mem_block *block,
 	__ASSERT(!(_is_in_isr() && timeout != K_NO_WAIT), "");
 
 	if (timeout > 0) {
-		end = _tick_get() + _ms_to_ticks(timeout);
+		end = z_tick_get() + _ms_to_ticks(timeout);
 	}
 
-	while (1) {
+	while (true) {
 		u32_t level_num, block_num;
 
-		ret = _sys_mem_pool_block_alloc(&p->base, size, &level_num,
-						&block_num, &block->data);
+		/* There is a "managed race" in alloc that can fail
+		 * (albeit in a well-defined way, see comments there)
+		 * with -EAGAIN when simultaneous allocations happen.
+		 * Retry exactly once before sleeping to resolve it.
+		 * If we're so contended that it fails twice, then we
+		 * clearly want to block.
+		 */
+		for (int i = 0; i < 2; i++) {
+			ret = _sys_mem_pool_block_alloc(&p->base, size,
+							&level_num, &block_num,
+							&block->data);
+			if (ret != -EAGAIN) {
+				break;
+			}
+		}
+
+		if (ret == -EAGAIN) {
+			ret = -ENOMEM;
+		}
+
 		block->id.pool = pool_id(p);
 		block->id.level = level_num;
 		block->id.block = block_num;
 
 		if (ret == 0 || timeout == K_NO_WAIT ||
-		    ret == -EAGAIN || (ret && ret != -ENOMEM)) {
+		    ret != -ENOMEM) {
 			return ret;
 		}
 
-		_pend_current_thread(irq_lock(), &p->wait_q, timeout);
+		_pend_curr_unlocked(&p->wait_q, timeout);
 
 		if (timeout != K_FOREVER) {
-			timeout = end - _tick_get();
+			timeout = end - z_tick_get();
 
 			if (timeout < 0) {
 				break;
@@ -89,22 +108,26 @@ int k_mem_pool_alloc(struct k_mem_pool *p, struct k_mem_block *block,
 
 void k_mem_pool_free_id(struct k_mem_block_id *id)
 {
-	int key, need_sched = 0;
+	int need_sched = 0;
 	struct k_mem_pool *p = get_pool(id->pool);
 
 	_sys_mem_pool_block_free(&p->base, id->level, id->block);
 
 	/* Wake up anyone blocked on this pool and let them repeat
 	 * their allocation attempts
+	 *
+	 * (Note that this spinlock only exists because _unpend_all()
+	 * is unsynchronized.  Maybe we want to put the lock into the
+	 * wait_q instead and make the API safe?)
 	 */
-	key = irq_lock();
+	k_spinlock_key_t key = k_spin_lock(&lock);
 
 	need_sched = _unpend_all(&p->wait_q);
 
-	if (need_sched && !_is_in_isr()) {
-		_reschedule(key);
+	if (need_sched) {
+		_reschedule(&lock, key);
 	} else {
-		irq_unlock(key);
+		k_spin_unlock(&lock, key);
 	}
 }
 
@@ -130,7 +153,7 @@ void *k_mem_pool_malloc(struct k_mem_pool *pool, size_t size)
 	}
 
 	/* save the block descriptor info at the start of the actual block */
-	memcpy(block.data, &block.id, sizeof(struct k_mem_block_id));
+	(void)memcpy(block.data, &block.id, sizeof(struct k_mem_block_id));
 
 	/* return address of the user area part of the block to the caller */
 	return (char *)block.data + sizeof(struct k_mem_block_id);
@@ -174,8 +197,8 @@ void *k_calloc(size_t nmemb, size_t size)
 	}
 
 	ret = k_malloc(bounds);
-	if (ret) {
-		memset(ret, 0, bounds);
+	if (ret != NULL) {
+		(void)memset(ret, 0, bounds);
 	}
 	return ret;
 }
@@ -190,7 +213,7 @@ void *z_thread_malloc(size_t size)
 {
 	void *ret;
 
-	if (_current->resource_pool) {
+	if (_current->resource_pool != NULL) {
 		ret = k_mem_pool_malloc(_current->resource_pool, size);
 	} else {
 		ret = NULL;

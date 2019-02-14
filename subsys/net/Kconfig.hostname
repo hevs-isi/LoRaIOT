@@ -8,7 +8,6 @@
 
 config NET_HOSTNAME_ENABLE
 	bool "Add hostname to the device"
-	default n
 	help
 	  This is used for example in mDNS to respond to <hostname>.local
 	  mDNS queries.
@@ -23,17 +22,15 @@ config NET_HOSTNAME
 
 config NET_HOSTNAME_UNIQUE
 	bool "Make hostname unique"
-	default n
 	help
 	  This will append link address to hostname to create a unique
 	  hostname. For example, zephyr00005e005357 could be the hostname
 	  if this	setting is enabled.
 
-config  NET_DEBUG_HOSTNAME
-	bool "Debug hostname configuration"
-	default n
-	depends on NET_LOG
-	help
-	  Enables hostname configuration functions to output debug messages
+module = NET_HOSTNAME
+module-dep = NET_LOG
+module-str = Log level for hostname configuration
+module-help = Enables hostname configuration code to output debug messages.
+source "subsys/net/Kconfig.template.log_config.net"
 
 endif

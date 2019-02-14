@@ -8,11 +8,11 @@
 if BOARD_OLIMEXINO_STM32
 
 config BOARD
-	default olimexino_stm32
+	default "olimexino_stm32"
 
 if UART_CONSOLE
 
-config UART_STM32_PORT_1
+config UART_1
 	default y
 
 endif # UART_CONSOLE

@@ -11,8 +11,8 @@
  * Exception/interrupt context helpers.
  */
 
-#ifndef _ARM_CORTEXM_ISR__H_
-#define _ARM_CORTEXM_ISR__H_
+#ifndef ZEPHYR_ARCH_ARM_INCLUDE_CORTEX_M_EXC_H_
+#define ZEPHYR_ARCH_ARM_INCLUDE_CORTEX_M_EXC_H_
 
 #include <arch/cpu.h>
 
@@ -27,12 +27,17 @@ extern "C" {
 #else
 
 #include <arch/arm/cortex_m/cmsis.h>
+#include <arch/arm/cortex_m/exc.h>
 #include <irq_offload.h>
 
 #ifdef CONFIG_IRQ_OFFLOAD
 extern volatile irq_offload_routine_t offload_routine;
 #endif
 
+/* Writes to the AIRCR must be accompanied by a write of the value 0x05FA
+ * to the Vector Key field, otherwise the writes are ignored.
+ */
+#define AIRCR_VECT_KEY_PERMIT_WRITE 0x05FAUL
 /**
  *
  * @brief Find out if running in an ISR context
@@ -44,7 +49,7 @@ extern volatile irq_offload_routine_t offload_routine;
  *
  * @return 1 if in ISR, 0 if not.
  */
-static ALWAYS_INLINE int _IsInIsr(void)
+static ALWAYS_INLINE bool _IsInIsr(void)
 {
 	u32_t vector = __get_IPSR();
 
@@ -78,8 +83,6 @@ static ALWAYS_INLINE int _IsInIsr(void)
 		;
 }
 
-#define _EXC_SVC_PRIO 0
-#define _EXC_FAULT_PRIO 0
 /**
  * @brief Setup system exceptions
  *
@@ -125,7 +128,8 @@ static ALWAYS_INLINE void _ExcSetup(void)
 	SCB->AIRCR =
 		(SCB->AIRCR & (~(SCB_AIRCR_VECTKEY_Msk)))
 		| SCB_AIRCR_BFHFNMINS_Msk
-		| ((0x5FAUL << SCB_AIRCR_VECTKEY_Pos) & SCB_AIRCR_VECTKEY_Msk);
+		| ((AIRCR_VECT_KEY_PERMIT_WRITE << SCB_AIRCR_VECTKEY_Pos) &
+			SCB_AIRCR_VECTKEY_Msk);
 	/* Note: Fault conditions that would generate a SecureFault
 	 * in a PE with the Main Extension instead generate a
 	 * SecureHardFault in a PE without the Main Extension.
@@ -163,4 +167,4 @@ static ALWAYS_INLINE void _ClearFaults(void)
 #endif
 
 
-#endif /* _ARM_CORTEXM_ISR__H_ */
+#endif /* ZEPHYR_ARCH_ARM_INCLUDE_CORTEX_M_EXC_H_ */

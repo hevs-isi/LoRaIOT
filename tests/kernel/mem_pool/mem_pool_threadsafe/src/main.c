@@ -31,7 +31,7 @@ static void tmpool_api(void *p1, void *p2, void *p3)
 	int ret[BLK_NUM_MIN];
 	struct k_mem_pool *pool = pools[atomic_inc(&pool_id) % POOL_NUM];
 
-	memset(block, 0, sizeof(block));
+	(void)memset(block, 0, sizeof(block));
 
 	for (int i = 0; i < 4; i++) {
 		ret[i] = k_mem_pool_alloc(pool, &block[i], BLK_SIZE_MIN,
@@ -48,6 +48,18 @@ static void tmpool_api(void *p1, void *p2, void *p3)
 }
 
 /* test cases*/
+/**
+ * @brief Test alloc and free on different priority threads
+ *
+ * @ingroup kernel_memory_pool_tests
+ *
+ * @details The test creates 4 threads of equal priority and
+ * invokes memory pool APIs on same memory domain. Checks for
+ * the synchronization of threads on the resource memory pool.
+ * Each thread allocates 4 blocks of size 4 bytes (all blocks
+ * in memory pool) with timeout of 200 ms and frees up all the
+ * blocks
+ */
 void test_mpool_threadsafe(void)
 {
 	k_tid_t tid[THREAD_NUM];

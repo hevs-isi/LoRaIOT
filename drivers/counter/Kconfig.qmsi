@@ -7,10 +7,8 @@
 #
 
 config AON_COUNTER_QMSI
-	bool
-	prompt "AON counter driver"
+	bool "AON counter driver"
 	depends on COUNTER && QMSI
-	default n
 	help
 	  Enable support for AON counter.
 
@@ -22,14 +20,12 @@ config AON_COUNTER_QMSI_DEV_NAME
 	  Specify the device name for AON counter driver.
 
 config AON_TIMER_QMSI
-	bool
-	prompt "AON periodic timer driver"
+	bool "AON periodic timer driver"
 	depends on COUNTER && QMSI
-	default n
 	help
 	  Enable support for AON periodic timer.
 
-config AON_TIMER_QMSI_DEV_NAME
+config COUNTER_0_NAME
 	string "QMSI AON Timer Device Name"
 	depends on AON_TIMER_QMSI
 	default "AON_TIMER"
@@ -43,9 +39,30 @@ config AON_TIMER_IRQ_PRI
 	  aon timer interrupt priority.
 
 config AON_API_REENTRANCY
-	bool
-	prompt "AON driver API reentrancy"
+	bool "AON driver API reentrancy"
 	depends on AON_TIMER_QMSI
-	default n
 	help
 	  Enable support for AON driver API reentrancy.
+
+config RTC_QMSI
+	bool "QMSI RTC Driver"
+	depends on QMSI
+	help
+	  Build QMSI RTC driver.
+
+if RTC_QMSI
+
+config RTC_QMSI_API_REENTRANCY
+	bool
+	prompt "RTC shim driver API reentrancy"
+	help
+	  Enable support for RTC shim driver API reentrancy.
+
+config RTC_PRESCALER
+	int
+	default 1
+	prompt "Prescaler size"
+	help
+	  RTC prescaler used to determine ticks per second
+
+endif

@@ -66,7 +66,7 @@ class SignedOffBy(CommitRule):
         flags |= re.IGNORECASE
         for line in commit.message.body:
             if line.lower().startswith("signed-off-by"):
-                if not re.search('(^)Signed-off-by: ([-\w.]+) ([-\w.]+) (.*)', line, flags=flags):
+                if not re.search('(^)Signed-off-by: ([-\'\w.]+) ([-\'\w.]+) (.*)', line, flags=flags):
                     return [RuleViolation(self.id, "Signed-off-by: must have a full name", line_nr=1)]
                 else:
                     return
@@ -93,7 +93,7 @@ class TitleStartsWithSubsystem(LineRule):
     def validate(self, title, _commit):
         regex = self.options['regex'].value
         pattern = re.compile(regex, re.UNICODE)
-        violation_message = "Title does not follow [subsystem]: [subject]"
+        violation_message = "Title does not follow [subsystem]: [subject] (and should not start with literal subsys:)"
         if not pattern.search(title):
             return [RuleViolation(self.id, violation_message, title)]
 

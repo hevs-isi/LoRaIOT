@@ -53,8 +53,6 @@
 #include <kernel.h>
 #include <arch/cpu.h>
 
-#include "board.h"
-
 #include <toolchain.h>
 #include <linker/sections.h>
 #include <init.h>
@@ -178,7 +176,7 @@ void store_flags(unsigned int irq, u32_t flags)
 
 u32_t restore_flags(unsigned int irq)
 {
-	u32_t flags = 0;
+	u32_t flags = 0U;
 
 	if (sys_bitfield_test_bit((mem_addr_t) ioapic_suspend_buf,
 		BIT_POS_FOR_IRQ_OPTION(irq, IOAPIC_BITFIELD_HI_LO))) {
@@ -205,7 +203,7 @@ int ioapic_suspend(struct device *port)
 	u32_t rte_lo;
 
 	ARG_UNUSED(port);
-	memset(ioapic_suspend_buf, 0, (SUSPEND_BITS_REQD >> 3));
+	(void)memset(ioapic_suspend_buf, 0, (SUSPEND_BITS_REQD >> 3));
 	for (irq = 0; irq < CONFIG_IOAPIC_NUM_RTES; irq++) {
 		/*
 		 * The following check is to figure out the registered
@@ -323,15 +321,15 @@ void _ioapic_int_vec_set(unsigned int irq, unsigned int vector)
 static u32_t __IoApicGet(s32_t offset)
 {
 	u32_t value; /* value */
-	int key;	/* interrupt lock level */
+	unsigned int key;	/* interrupt lock level */
 
 	/* lock interrupts to ensure indirect addressing works "atomically" */
 
 	key = irq_lock();
 
-	*((volatile char *)
-		(CONFIG_IOAPIC_BASE_ADDRESS + IOAPIC_IND)) = (char)offset;
-	value = *((volatile u32_t *)(CONFIG_IOAPIC_BASE_ADDRESS + IOAPIC_DATA));
+	*((volatile u32_t *)
+		(DT_IOAPIC_BASE_ADDRESS + IOAPIC_IND)) = (char)offset;
+	value = *((volatile u32_t *)(DT_IOAPIC_BASE_ADDRESS + IOAPIC_DATA));
 
 	irq_unlock(key);
 
@@ -350,14 +348,14 @@ static u32_t __IoApicGet(s32_t offset)
  */
 static void __IoApicSet(s32_t offset, u32_t value)
 {
-	int key; /* interrupt lock level */
+	unsigned int key; /* interrupt lock level */
 
 	/* lock interrupts to ensure indirect addressing works "atomically" */
 
 	key = irq_lock();
 
-	*(volatile char *)(CONFIG_IOAPIC_BASE_ADDRESS + IOAPIC_IND) = (char)offset;
-	*((volatile u32_t *)(CONFIG_IOAPIC_BASE_ADDRESS + IOAPIC_DATA)) = value;
+	*(volatile u32_t *)(DT_IOAPIC_BASE_ADDRESS + IOAPIC_IND) = (char)offset;
+	*((volatile u32_t *)(DT_IOAPIC_BASE_ADDRESS + IOAPIC_DATA)) = value;
 
 	irq_unlock(key);
 }

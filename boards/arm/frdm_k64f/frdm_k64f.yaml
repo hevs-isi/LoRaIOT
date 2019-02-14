@@ -4,14 +4,17 @@ type: mcu
 arch: arm
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
 supported:
   - netif:eth
   - adc
   - i2c
+  - nvs
   - spi
   - gpio
   - usb_device
   - watchdog
+  - hwinfo
 testing:
   default: true

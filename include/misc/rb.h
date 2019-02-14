@@ -40,8 +40,10 @@
  * just two pointers, identical with a doubly-linked list.
  */
 
-#ifndef _RB_H
-#define _RB_H
+#ifndef ZEPHYR_INCLUDE_MISC_RB_H_
+#define ZEPHYR_INCLUDE_MISC_RB_H_
+
+#include <stdbool.h>
 
 struct rbnode {
 	struct rbnode *children[2];
@@ -51,8 +53,8 @@ struct rbnode {
  * @typedef rb_lessthan_t
  * @brief Red/black tree comparison predicate
  *
- * Compares the two nodes and returns 1 if node A is strictly less
- * than B according to the tree's sorting criteria, 0 otherwise.
+ * Compares the two nodes and returns true if node A is strictly less
+ * than B according to the tree's sorting criteria, false otherwise.
  *
  * Note that during insert, the new node being inserted will always be
  * "A", where "B" is the existing node within the tree against which
@@ -60,7 +62,7 @@ struct rbnode {
  * implement "most/least recently added" semantics between nodes which
  * would otherwise compare as equal.
  */
-typedef int (*rb_lessthan_t)(struct rbnode *a, struct rbnode *b);
+typedef bool (*rb_lessthan_t)(struct rbnode *a, struct rbnode *b);
 
 struct rbtree {
 	struct rbnode *root;
@@ -110,7 +112,7 @@ static inline struct rbnode *rb_get_max(struct rbtree *tree)
  * implement a "set" construct by simply testing the pointer value
  * itself.
  */
-int rb_contains(struct rbtree *tree, struct rbnode *node);
+bool rb_contains(struct rbtree *tree, struct rbnode *node);
 
 /**
  * @brief Walk/enumerate a rbtree
@@ -169,7 +171,7 @@ struct rbnode *_rb_foreach_next(struct rbtree *tree, struct _rb_foreach *f);
 /**
  * @brief Loop over rbtree with implicit container field logic
  *
- * As for RB_FOR_EACH(), but "node" can have an aribtrary type
+ * As for RB_FOR_EACH(), but "node" can have an arbitrary type
  * containing a struct rbnode.
  *
  * @param tree A pointer to a struct rbtree to walk
@@ -179,7 +181,7 @@ struct rbnode *_rb_foreach_next(struct rbtree *tree, struct _rb_foreach *f);
 #define RB_FOR_EACH_CONTAINER(tree, node, field)			\
 	for (struct _rb_foreach __f = _RB_FOREACH_INIT(tree, node);	\
 	     (node = CONTAINER_OF(_rb_foreach_next(tree, &__f),		\
-				  __typeof__(*(node)), field));		\
+				  __typeof__(*(node)), field)) != NULL;	\
 	     /**/)
 
-#endif /* _RB_H */
+#endif /* ZEPHYR_INCLUDE_MISC_RB_H_ */

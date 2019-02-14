@@ -1,6 +1,5 @@
 ---
 title: NXP Kinetis Flash Memory Module (FTFE)
-id: nxp,kinetis-ftfe
 version: 0.1
 
 description: >
@@ -11,9 +10,6 @@ inherits:
 
 properties:
     compatible:
-      type: string
-      category: required
-      description: compatible strings
       constraint: "nxp,kinetis-ftfe"
 
 ...

@@ -1,6 +1,5 @@
 ---
 title: ARM CMSDK DUALTIMER
-id: arm,cmsdk-dtimer
 version: 0.1
 
 description: >
@@ -12,6 +11,7 @@ properties:
       category: required
       description: compatible strings
       constraint: "arm,cmsdk-dtimer"
+      generation: define
 
     reg:
       type: array
@@ -23,5 +23,11 @@ properties:
       type: array
       category: required
       description: required interrupts
+      generation: define
+
+    label:
+      type: string
+      category: required
+      description: Human readable string describing the device (used by Zephyr for API name)
       generation: define
 ...

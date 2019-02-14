@@ -7,8 +7,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef __BT_RFCOMM_H
-#define __BT_RFCOMM_H
+#ifndef ZEPHYR_INCLUDE_BLUETOOTH_RFCOMM_H_
+#define ZEPHYR_INCLUDE_BLUETOOTH_RFCOMM_H_
 
 /**
  * @brief RFCOMM
@@ -21,8 +21,6 @@
 extern "C" {
 #endif
 
-/* FIXME: temporary workaround until thread details are made internal */
-#include "../../subsys/bluetooth/common/log.h"
 #include <bluetooth/buf.h>
 #include <bluetooth/conn.h>
 
@@ -98,7 +96,7 @@ struct bt_rfcomm_dlc {
 
 	/* Stack & kernel data for TX thread */
 	struct k_thread            tx_thread;
-	BT_STACK(stack, 256);
+	K_THREAD_STACK_MEMBER(stack, 256);
 };
 
 struct bt_rfcomm_server {
@@ -187,4 +185,4 @@ struct net_buf *bt_rfcomm_create_pdu(struct net_buf_pool *pool);
  * @}
  */
 
-#endif /* __BT_RFCOMM_H */
+#endif /* ZEPHYR_INCLUDE_BLUETOOTH_RFCOMM_H_ */

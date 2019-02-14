@@ -15,9 +15,6 @@
 #include <toolchain.h>
 #include <kernel_structs.h>
 #include <wait_q.h>
-#ifdef CONFIG_INIT_STACKS
-#include <string.h>
-#endif /* CONFIG_INIT_STACKS */
 
 #ifdef CONFIG_USERSPACE
 extern u8_t *_k_priv_stack_find(void *obj);
@@ -77,7 +74,7 @@ void _new_thread(struct k_thread *thread, k_thread_stack_t *stack,
 						     sizeof(struct __esf)));
 
 #if CONFIG_USERSPACE
-	if (options & K_USER) {
+	if ((options & K_USER) != 0) {
 		pInitCtx->pc = (u32_t)_arch_user_mode_enter;
 	} else {
 		pInitCtx->pc = (u32_t)_thread_entry;
@@ -102,7 +99,6 @@ void _new_thread(struct k_thread *thread, k_thread_stack_t *stack,
 #if CONFIG_USERSPACE
 	thread->arch.mode = 0;
 	thread->arch.priv_stack_start = 0;
-	thread->arch.priv_stack_size = 0;
 #endif
 
 	/* swap_return_value can contain garbage */
@@ -111,15 +107,6 @@ void _new_thread(struct k_thread *thread, k_thread_stack_t *stack,
 	 * initial values in all other registers/thread entries are
 	 * irrelevant.
 	 */
-
-#ifdef CONFIG_THREAD_MONITOR
-	/*
-	 * In debug mode thread->entry give direct access to the thread entry
-	 * and the corresponding parameters.
-	 */
-	thread->entry = (struct __thread_entry *)(pInitCtx);
-	thread_monitor_init(thread);
-#endif
 }
 
 #ifdef CONFIG_USERSPACE
@@ -131,8 +118,10 @@ FUNC_NORETURN void _arch_user_mode_enter(k_thread_entry_t user_entry,
 	/* Set up privileged stack before entering user mode */
 	_current->arch.priv_stack_start =
 		(u32_t)_k_priv_stack_find(_current->stack_obj);
-	_current->arch.priv_stack_size =
-		(u32_t)CONFIG_PRIVILEGED_STACK_SIZE;
+
+	/* Truncate the stack size with the MPU region granularity. */
+	_current->stack_info.size &=
+		~(CONFIG_ARM_MPU_REGION_MIN_ALIGN_AND_SIZE - 1);
 
 	_arm_userspace_enter(user_entry, p1, p2, p3,
 			     (u32_t)_current->stack_info.start,
@@ -148,12 +137,21 @@ FUNC_NORETURN void _arch_user_mode_enter(k_thread_entry_t user_entry,
  *
  * This function configures per thread stack guards by reprogramming
  * the built-in Process Stack Pointer Limit Register (PSPLIM).
+ * The functionality is meant to be used during context switch.
  *
  * @param thread thread info data structure.
  */
 void configure_builtin_stack_guard(struct k_thread *thread)
 {
 #if defined(CONFIG_USERSPACE)
+	if ((thread->arch.mode & CONTROL_nPRIV_Msk) != 0) {
+		/* Only configure stack limit for threads in privileged mode
+		 * (i.e supervisor threads or user threads doing system call).
+		 * User threads executing in user mode do not require a stack
+		 * limit protection.
+		 */
+		return;
+	}
 	u32_t guard_start = thread->arch.priv_stack_start ?
 			    (u32_t)thread->arch.priv_stack_start :
 			    (u32_t)thread->stack_obj;
@@ -166,4 +164,4 @@ void configure_builtin_stack_guard(struct k_thread *thread)
 #error "Built-in PSP limit checks not supported by HW"
 #endif
 }
-#endif /* CONFIG_BUIILTIN_STACK_GUARD */
+#endif /* CONFIG_BUILTIN_STACK_GUARD */

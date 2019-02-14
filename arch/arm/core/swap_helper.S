@@ -16,6 +16,7 @@
 #include <offsets_short.h>
 #include <toolchain.h>
 #include <arch/cpu.h>
+#include <syscall.h>
 
 _ASM_FILE_PROLOGUE
 
@@ -42,17 +43,27 @@ GDATA(_kernel)
 
 SECTION_FUNC(TEXT, __pendsv)
 
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_CONTEXT_SWITCH
+#ifdef CONFIG_TRACING
     /* Register the context switch */
-    push {lr}
-    bl _sys_k_event_logger_context_switch
+    push {r0, lr}
+    bl z_sys_trace_thread_switched_out
 #if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE)
-    pop {r0}
-    mov lr, r0
+    pop {r0, r1}
+    mov lr, r1
 #else
-    pop {lr}
+    pop {r0, lr}
 #endif /* CONFIG_ARMV6_M_ARMV8_M_BASELINE */
-#endif /* CONFIG_KERNEL_EVENT_LOGGER_CONTEXT_SWITCH  */
+#endif /* CONFIG_TRACING */
+
+    /* protect the kernel state while we play with the thread lists */
+#if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE)
+    cpsid i
+#elif defined(CONFIG_ARMV7_M_ARMV8_M_MAINLINE)
+    movs.n r0, #_EXC_IRQ_DEFAULT_PRIO
+    msr BASEPRI, r0
+#else
+#error Unknown ARM architecture
+#endif /* CONFIG_ARMV6_M_ARMV8_M_BASELINE */
 
     /* load _kernel into r1 and current k_thread into r2 */
     ldr r1, =_kernel
@@ -96,16 +107,6 @@ SECTION_FUNC(TEXT, __pendsv)
     ldr v4, =_SCS_ICSR
     ldr v3, =_SCS_ICSR_UNPENDSV
 
-    /* protect the kernel state while we play with the thread lists */
-#if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE)
-    cpsid i
-#elif defined(CONFIG_ARMV7_M_ARMV8_M_MAINLINE)
-    movs.n r0, #_EXC_IRQ_DEFAULT_PRIO
-    msr BASEPRI, r0
-#else
-#error Unknown ARM architecture
-#endif /* CONFIG_ARMV6_M_ARMV8_M_BASELINE */
-
     /* _kernel is still in r1 */
 
     /* fetch the thread to run from the ready queue cache */
@@ -126,9 +127,23 @@ SECTION_FUNC(TEXT, __pendsv)
     str v3, [v4, #0]
 
     /* Restore previous interrupt disable state (irq_lock key) */
+#if (defined(CONFIG_CPU_CORTEX_M0PLUS) || defined(CONFIG_CPU_CORTEX_M0)) && \
+	    _thread_offset_to_basepri > 124
+    /* Doing it this way since the offset to thread->arch.basepri can in
+     * some configurations be larger than the maximum of 124 for ldr/str
+     * immediate offsets.
+     */
+    ldr r4, =_thread_offset_to_basepri
+    adds r4, r2, r4
+
+    ldr r0, [r4]
+    movs.n r3, #0
+    str r3, [r4]
+#else
     ldr r0, [r2, #_thread_offset_to_basepri]
     movs.n r3, #0
     str r3, [r2, #_thread_offset_to_basepri]
+#endif
 
 #if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE)
     /* BASEPRI not available, previous interrupt disable state
@@ -167,21 +182,14 @@ _thread_irq_disabled:
     vldmia r0, {s16-s31}
 #endif
 
-#ifdef CONFIG_MPU_STACK_GUARD
-    /* r2 contains k_thread */
-    add r0, r2, #0
-    push {r2, lr}
-    blx configure_mpu_stack_guard
-    pop {r2, lr}
-#endif /* CONFIG_MPU_STACK_GUARD */
-
-#ifdef CONFIG_BUILTIN_STACK_GUARD
-    /* r2 contains k_thread */
-    add r0, r2, #0
-    push {r2, lr}
-    blx configure_builtin_stack_guard
-    pop {r2, lr}
-#endif /* CONFIG_BUILTIN_STACK_GUARD */
+#if defined (CONFIG_ARM_MPU)
+    /* Re-program dynamic memory map */
+    push {r2,lr}
+    ldr r0, =_kernel
+    ldr r0, [r0, #_kernel_offset_to_current]
+    bl _arch_configure_dynamic_mpu_regions
+    pop {r2,lr}
+#endif
 
 #ifdef CONFIG_USERSPACE
     /* restore mode */
@@ -197,16 +205,6 @@ _thread_irq_disabled:
      */
     isb
 
-    /* r2 contains k_thread */
-    add r0, r2, #0
-    push {r2, lr}
-    blx configure_mpu_mem_domain
-    pop {r2, lr}
-
-    add r0, r2, #0
-    push {r2, lr}
-    blx configure_mpu_user_context
-    pop {r2, lr}
 #endif
 
     /* load callee-saved + psp from thread */
@@ -216,26 +214,61 @@ _thread_irq_disabled:
 #error Unknown ARM architecture
 #endif /* CONFIG_ARMV6_M_ARMV8_M_BASELINE */
 
+#ifdef CONFIG_BUILTIN_STACK_GUARD
+    /* clear stack pointer limit before setting the PSP */
+    mov r0, #0
+    msr PSPLIM, r0
+#endif /* CONFIG_BUILTIN_STACK_GUARD */
+
     msr PSP, ip
 
-#ifdef CONFIG_EXECUTION_BENCHMARKING
-    stm sp!,{r0-r3} /* Save regs r0 to r4 on stack */
-    push {lr}
-    bl read_timer_end_of_swap
+#ifdef CONFIG_BUILTIN_STACK_GUARD
+    /* r2 contains k_thread */
+    add r0, r2, #0
+    push {r2, lr}
+    blx configure_builtin_stack_guard
+    pop {r2, lr}
+#endif /* CONFIG_BUILTIN_STACK_GUARD */
 
+#ifdef CONFIG_EXECUTION_BENCHMARKING
+    push {r0, lr}
+    bl read_timer_end_of_swap
 #if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE)
-    pop {r3}
-    mov lr,r3
+    pop {r0, r1}
+    mov lr,r1
 #else
-    pop {lr}
+    pop {r0, lr}
 #endif /* CONFIG_ARMV6_M_ARMV8_M_BASELINE */
-    ldm sp!,{r0-r3} /* Load back regs ro to r4 */
+
 #endif /* CONFIG_EXECUTION_BENCHMARKING */
+
+#ifdef CONFIG_TRACING
+    /* Register the context switch */
+    push {r0, lr}
+    bl z_sys_trace_thread_switched_in
+#if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE)
+    pop {r0, r1}
+    mov lr, r1
+#else
+    pop {r0, lr}
+#endif
+#endif /* CONFIG_TRACING */
 
     /* exc return */
     bx lr
 
 #if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE)
+
+/**
+ *
+ * @brief Service call handler
+ *
+ * The service call (svc) is used in the following occasions:
+ * - IRQ offloading
+ * - Kernel run-time exceptions
+ *
+ * @return N/A
+ */
 SECTION_FUNC(TEXT, __svc)
     /* Use EXC_RETURN state to find out if stack frame is on the
      * MSP or PSP
@@ -268,31 +301,33 @@ _stack_frame_endif:
     beq _oops
 
 #if CONFIG_IRQ_OFFLOAD
-    push {lr}
+    push {r0, lr}
     blx _irq_do_offload  /* call C routine which executes the offload */
-    pop {r3}
-    mov lr, r3
-#endif
+    pop {r0, r1}
+    mov lr, r1
+#endif /* CONFIG_IRQ_OFFLOAD */
 
     /* exception return is done in _IntExit() */
     b _IntExit
 
 _oops:
-    push {lr}
+    push {r0, lr}
     blx _do_kernel_oops
-    pop {pc}
+    pop {r0, pc}
 
 #elif defined(CONFIG_ARMV7_M_ARMV8_M_MAINLINE)
+
 /**
  *
  * @brief Service call handler
  *
- * The service call (svc) is only used in __swap() to enter handler mode so we
- * can go through the PendSV exception to perform a context switch.
+ * The service call (svc) is used in the following occasions:
+ * - IRQ offloading
+ * - Kernel run-time exceptions
+ * - System Calls (User mode)
  *
  * @return N/A
  */
-
 SECTION_FUNC(TEXT, __svc)
     tst lr, #0x4    /* did we come from thread mode ? */
     ite eq  /* if zero (equal), came from handler mode */
@@ -305,7 +340,7 @@ SECTION_FUNC(TEXT, __svc)
 
    /*
     * grab service call number:
-    * 0: context switch
+    * 0: Unused
     * 1: irq_offload (if configured)
     * 2: kernel panic or oops (software generated fatal exception)
     * 3: System call
@@ -326,44 +361,24 @@ SECTION_FUNC(TEXT, __svc)
     tst r2, #0x1
     bne _oops
 
-    cmp r1, #0
 #endif
-    beq _context_switch
 
     cmp r1, #2
     beq _oops
 
 #if CONFIG_IRQ_OFFLOAD
-    push {lr}
+    push {r0, lr}
     blx _irq_do_offload  /* call C routine which executes the offload */
-    pop {lr}
+    pop {r0, lr}
 
     /* exception return is done in _IntExit() */
     b _IntExit
 #endif
 
-_context_switch:
-
-    /*
-     * Unlock interrupts:
-     * - in a SVC call, so protected against context switches
-     * - allow PendSV, since it's running at prio 0xff
-     */
-    eors.n r0, r0
-    msr BASEPRI, r0
-
-     /* set PENDSV bit, pending the PendSV exception */
-    ldr r1, =_SCS_ICSR
-    ldr r2, =_SCS_ICSR_PENDSV
-    str r2, [r1, #0]
-
-    /* handler mode exit, to PendSV */
-    bx lr
-
 _oops:
-    push {lr}
+    push {r0, lr}
     blx _do_kernel_oops
-    pop {pc}
+    pop {r0, pc}
 
 #if CONFIG_USERSPACE
     /*
@@ -385,21 +400,21 @@ _oops:
      * r4 - arg5
      * r5 - arg6
      * r6 - call_id
-     * r7 - saved link register
+     * r8 - saved link register
      */
 _do_syscall:
-    ldr r7, [r0, #24]   /* grab address of PC from stack frame */
+    ldr r8, [r0, #24]   /* grab address of PC from stack frame */
     ldr r1, =_arm_do_syscall
     str r1, [r0, #24]   /* overwrite the LR to point to _arm_do_syscall */
 
     /* validate syscall limit, only set priv mode if valid */
-    ldr ip, =_SYSCALL_LIMIT
+    ldr ip, =K_SYSCALL_LIMIT
     cmp r6, ip
     blt valid_syscall_id
 
     /* bad syscall id.  Set arg0 to bad id and set call_id to SYSCALL_BAD */
     str r6, [r0, #0]
-    ldr r6, =_SYSCALL_BAD
+    ldr r6, =K_SYSCALL_BAD
 
 valid_syscall_id:
     /* set mode to privileged, r2 still contains value from CONTROL */

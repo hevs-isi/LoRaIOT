@@ -4,4 +4,15 @@ type: mcu
 arch: arm
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
+ram: 320
+flash: 1024
+supported:
+  - arduino_i2c
+  - pwm
+  - i2c
+  - spi
+  - gpio
+  - rtc
+  - counter

@@ -7,10 +7,10 @@
 #include <device.h>
 #include <sensor.h>
 #include <clock_control.h>
+#include <logging/log.h>
 
-#define SYS_LOG_DOMAIN "TEMPNRF5"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
+#define LOG_LEVEL CONFIG_SENSOR_LOG_LEVEL
+LOG_MODULE_REGISTER(TEMPNRF5);
 
 #include "nrf.h"
 #include "nrf_common.h"
@@ -34,7 +34,7 @@ static int temp_nrf5_sample_fetch(struct device *dev, enum sensor_channel chan)
 	struct temp_nrf5_data *data = dev->driver_data;
 	int r;
 
-	SYS_LOG_DBG("");
+	LOG_DBG("");
 
 	if (chan != SENSOR_CHAN_ALL && chan != SENSOR_CHAN_DIE_TEMP) {
 		return -ENOTSUP;
@@ -51,7 +51,7 @@ static int temp_nrf5_sample_fetch(struct device *dev, enum sensor_channel chan)
 	k_sem_take(&data->device_sync_sem, K_FOREVER);
 
 	r = clock_control_off(data->clk_m16_dev, (void *)1);
-	__ASSERT_NO_MSG(!r);
+	__ASSERT_NO_MSG(!r || r == -EBUSY);
 
 	data->sample = temp->TEMP;
 
@@ -67,7 +67,7 @@ static int temp_nrf5_channel_get(struct device *dev,
 	struct temp_nrf5_data *data = dev->driver_data;
 	s32_t uval;
 
-	SYS_LOG_DBG("");
+	LOG_DBG("");
 
 	if (chan != SENSOR_CHAN_DIE_TEMP) {
 		return -ENOTSUP;
@@ -109,10 +109,10 @@ static int temp_nrf5_init(struct device *dev)
 	volatile NRF_TEMP_Type *temp = NRF_TEMP;
 	struct temp_nrf5_data *data = dev->driver_data;
 
-	SYS_LOG_DBG("");
+	LOG_DBG("");
 
 	data->clk_m16_dev =
-		device_get_binding(CONFIG_CLOCK_CONTROL_NRF5_M16SRC_DRV_NAME);
+		device_get_binding(CONFIG_CLOCK_CONTROL_NRF_M16SRC_DRV_NAME);
 	__ASSERT_NO_MSG(data->clk_m16_dev);
 
 	k_sem_init(&data->device_sync_sem, 0, UINT_MAX);

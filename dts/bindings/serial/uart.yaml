@@ -1,12 +1,19 @@
 ---
 title: Uart Base Structure
-id: uart
 version: 0.1
 
 description: >
     This binding gives the base structures for all UART devices
 
+child:
+    bus: uart
+
 properties:
+    compatible:
+      type: string
+      category: required
+      description: compatible strings
+      generation: define
     clock-frequency:
       type: int
       category: optional
@@ -19,7 +26,7 @@ properties:
       generation: define
     clocks:
       type: array
-      category: required
+      category: optional
       description: Clock gate information
       generation: define
     label:

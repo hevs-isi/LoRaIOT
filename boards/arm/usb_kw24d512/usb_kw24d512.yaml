@@ -6,7 +6,8 @@ ram: 32
 flash: 512
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
 supported:
   - ieee802154
   - usb_device

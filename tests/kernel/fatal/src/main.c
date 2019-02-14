@@ -21,12 +21,17 @@
 
 static K_THREAD_STACK_DEFINE(alt_stack, STACKSIZE);
 
-#ifdef CONFIG_STACK_SENTINEL
+#if defined(CONFIG_STACK_SENTINEL) && !defined(CONFIG_ARCH_POSIX)
 #define OVERFLOW_STACKSIZE (STACKSIZE / 2)
 static k_thread_stack_t *overflow_stack =
 		alt_stack + (STACKSIZE - OVERFLOW_STACKSIZE);
 #else
+#if defined(CONFIG_USERSPACE) && defined(CONFIG_ARC)
+/* for ARC, privilege stack is merged into defined stack */
+#define OVERFLOW_STACKSIZE (STACKSIZE + CONFIG_PRIVILEGED_STACK_SIZE)
+#else
 #define OVERFLOW_STACKSIZE STACKSIZE
+#endif
 #endif
 
 static struct k_thread alt_thread;
@@ -41,14 +46,15 @@ static volatile int crash_reason;
  * completing the exception path; the faulting thread is never run
  * again.
  *
- * On Xtensa/asm2 the handler is running in interrupt context and on
- * the interrupt stack and needs to return through the interrupt exit
- * code.
+ * On Xtensa/asm2 and x86_64 the handler is running in interrupt
+ * context and on the interrupt stack and needs to return through the
+ * interrupt exit code.
  *
  * In both cases the thread is guaranteed never to run again once we
  * return from the _SysFatalErrorHandler().
  */
-#if !(defined(CONFIG_ARM) || defined(CONFIG_XTENSA_ASM2) || defined(CONFIG_ARC))
+#if !(defined(CONFIG_ARM) || defined(CONFIG_XTENSA_ASM2) \
+	|| defined(CONFIG_ARC) || defined(CONFIG_X86_64))
 #define ERR_IS_NORETURN 1
 #endif
 
@@ -68,7 +74,7 @@ void _SysFatalErrorHandler(unsigned int reason, const NANO_ESF *pEsf)
 
 void alt_thread1(void)
 {
-#if defined(CONFIG_X86)
+#if defined(CONFIG_X86) || defined(CONFIG_X86_64)
 	__asm__ volatile ("ud2");
 #elif defined(CONFIG_NIOS2)
 	__asm__ volatile ("trap");
@@ -89,7 +95,7 @@ void alt_thread1(void)
 
 void alt_thread2(void)
 {
-	int key;
+	unsigned int key;
 
 	key = irq_lock();
 	k_oops();
@@ -100,7 +106,7 @@ void alt_thread2(void)
 
 void alt_thread3(void)
 {
-	int key;
+	unsigned int key;
 
 	key = irq_lock();
 	k_panic();
@@ -114,7 +120,7 @@ void blow_up_stack(void)
 	char buf[OVERFLOW_STACKSIZE];
 
 	TC_PRINT("posting %zu bytes of junk to stack...\n", sizeof(buf));
-	memset(buf, 0xbb, sizeof(buf));
+	(void)memset(buf, 0xbb, sizeof(buf));
 }
 
 void stack_thread1(void)
@@ -130,27 +136,28 @@ void stack_thread1(void)
 
 void stack_thread2(void)
 {
-	int key = irq_lock();
+	unsigned int key = irq_lock();
 
 	/* Test that stack overflow check due to swap works */
 	blow_up_stack();
 	TC_PRINT("swapping...\n");
-	_Swap(irq_lock());
+	_Swap_unlocked();
 	TC_ERROR("should never see this\n");
 	rv = TC_FAIL;
 	irq_unlock(key);
 }
 
-
+/**
+ * @brief Test the kernel fatal error handling works correctly
+ * @details Manually trigger the crash with various ways and check
+ * that the kernel is handling that properly or not. Also the crash reason
+ * should match. Check for stack sentinel feature by overflowing the
+ * thread's stack and check for the exception.
+ *
+ * @ingroup kernel_common_tests
+ */
 void test_fatal(void)
 {
-	int expected_reason;
-
-#if defined(CONFIG_ARCH_POSIX)
-	ARG_UNUSED(expected_reason);
-	ARG_UNUSED(overflow_stack);
-#endif
-
 	rv = TC_PASS;
 
 	/*
@@ -167,7 +174,7 @@ void test_fatal(void)
 			(k_thread_entry_t)alt_thread1,
 			NULL, NULL, NULL, K_PRIO_COOP(PRIORITY), 0,
 			K_NO_WAIT);
-	zassert_not_equal(rv, TC_FAIL, "thread was not aborted\n");
+	zassert_not_equal(rv, TC_FAIL, "thread was not aborted");
 #else
 	/*
 	 * We want the native OS to handle segfaults so we can debug it
@@ -186,7 +193,7 @@ void test_fatal(void)
 	zassert_equal(crash_reason, _NANO_ERR_KERNEL_OOPS,
 		      "bad reason code got %d expected %d\n",
 		      crash_reason, _NANO_ERR_KERNEL_OOPS);
-	zassert_not_equal(rv, TC_FAIL, "thread was not aborted\n");
+	zassert_not_equal(rv, TC_FAIL, "thread was not aborted");
 
 	TC_PRINT("test alt thread 3: initiate kernel panic\n");
 	k_thread_create(&alt_thread, alt_stack,
@@ -198,7 +205,7 @@ void test_fatal(void)
 	zassert_equal(crash_reason, _NANO_ERR_KERNEL_PANIC,
 		      "bad reason code got %d expected %d\n",
 		      crash_reason, _NANO_ERR_KERNEL_PANIC);
-	zassert_not_equal(rv, TC_FAIL, "thread was not aborted\n");
+	zassert_not_equal(rv, TC_FAIL, "thread was not aborted");
 
 #ifndef CONFIG_ARCH_POSIX
 	TC_PRINT("test stack overflow - timer irq\n");
@@ -217,12 +224,16 @@ void test_fatal(void)
 			NULL, NULL, NULL, K_PRIO_PREEMPT(PRIORITY), 0,
 			K_NO_WAIT);
 
-	expected_reason = _NANO_ERR_STACK_CHK_FAIL;
-
-	zassert_equal(crash_reason, expected_reason,
+#ifdef CONFIG_ARM
+	/* FIXME: See #7706 */
+	zassert_true(crash_reason == _NANO_ERR_STACK_CHK_FAIL ||
+		     crash_reason == _NANO_ERR_HW_EXCEPTION, NULL);
+#else
+	zassert_equal(crash_reason, _NANO_ERR_STACK_CHK_FAIL,
 		      "bad reason code got %d expected %d\n",
-		      crash_reason, expected_reason);
-	zassert_not_equal(rv, TC_FAIL, "thread was not aborted\n");
+		      crash_reason, _NANO_ERR_STACK_CHK_FAIL);
+#endif
+	zassert_not_equal(rv, TC_FAIL, "thread was not aborted");
 
 	/* Stack sentinel has to be invoked, make sure it happens during
 	 * a context switch. Also ensure HW-based solutions can run more
@@ -238,11 +249,16 @@ void test_fatal(void)
 			(k_thread_entry_t)stack_thread2,
 			NULL, NULL, NULL, K_PRIO_PREEMPT(PRIORITY), 0,
 			K_NO_WAIT);
+#ifdef CONFIG_CPU_HAS_NXP_MPU
+	/* FIXME: See #7706 */
+	zassert_true(crash_reason == _NANO_ERR_STACK_CHK_FAIL ||
+		     crash_reason == _NANO_ERR_HW_EXCEPTION, NULL);
+#else
 	zassert_equal(crash_reason, _NANO_ERR_STACK_CHK_FAIL,
 		      "bad reason code got %d expected %d\n",
 		      crash_reason, _NANO_ERR_STACK_CHK_FAIL);
-
-	zassert_not_equal(rv, TC_FAIL, "thread was not aborted\n");
+#endif
+	zassert_not_equal(rv, TC_FAIL, "thread was not aborted");
 #else
 	TC_PRINT("test stack overflow - skipped for POSIX arch\n");
 	/*

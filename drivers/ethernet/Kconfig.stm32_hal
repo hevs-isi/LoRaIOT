@@ -7,13 +7,11 @@
 #
 
 menuconfig ETH_STM32_HAL
-	bool
-	prompt "STM32 HAL Ethernet driver"
-	depends on NET_L2_ETHERNET
-	default n
+	bool "STM32 HAL Ethernet driver"
 	select USE_STM32_HAL_ETH
 	help
-	  Enable STM32 HAL based Ethernet driver.
+	  Enable STM32 HAL based Ethernet driver. It is available for
+          all Ethernet enabled variants of the F2, F4 and F7 series.
 
 if ETH_STM32_HAL
 
@@ -61,24 +59,30 @@ if !ETH_STM32_HAL_RANDOM_MAC
 config ETH_STM32_HAL_MAC3
 	hex "MAC Address Byte 3"
 	default 0
-	range 0 ff
+	range 0 0xff
 	help
 	  This is the byte 3 of the MAC address.
 
 config ETH_STM32_HAL_MAC4
 	hex "MAC Address Byte 4"
 	default 0
-	range 0 ff
+	range 0 0xff
 	help
 	  This is the byte 4 of the MAC address.
 
 config ETH_STM32_HAL_MAC5
 	hex "MAC Address Byte 5"
 	default 0
-	range 0 ff
+	range 0 0xff
 	help
 	  This is the byte 5 of the MAC address.
 endif
+
+config ETH_STM32_HAL_MII
+	bool "Use MII interface"
+	depends on ETH_STM32_HAL
+	help
+	  Use the MII physical interface instead of RMII.
 
 endif # ETH_STM32_HAL
 

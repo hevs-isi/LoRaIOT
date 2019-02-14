@@ -7,8 +7,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef __BT_GATT_H
-#define __BT_GATT_H
+#ifndef ZEPHYR_INCLUDE_BLUETOOTH_GATT_H_
+#define ZEPHYR_INCLUDE_BLUETOOTH_GATT_H_
 
 /**
  * @brief Generic Attribute Profile (GATT)
@@ -91,6 +91,13 @@ enum {
 	 * authorized but no data shall be written.
 	 */
 	BT_GATT_WRITE_FLAG_PREPARE = BIT(0),
+
+	/** Attribute write command flag
+	 *
+	 * If set, indicates that write operation is a command (Write without
+	 * response) which doesn't generate any response.
+	 */
+	BT_GATT_WRITE_FLAG_CMD = BIT(1),
 };
 
 /** @brief GATT Attribute structure. */
@@ -144,7 +151,7 @@ struct bt_gatt_service {
 	/** Service Attributes */
 	struct bt_gatt_attr	*attrs;
 	/** Service Attribute count */
-	u16_t			attr_count;
+	size_t			attr_count;
 	sys_snode_t		node;
 };
 
@@ -263,7 +270,9 @@ struct bt_gatt_ccc {
 struct bt_gatt_cpf {
 	/** Format of the value of the characteristic */
 	u8_t format;
-	/** Exponent field to determine how the value of this characteristic is further formatted */
+	/** Exponent field to determine how the value of this characteristic is
+	 * further formatted
+	 */
 	s8_t exponent;
 	/** Unit of the characteristic */
 	u16_t unit;
@@ -273,7 +282,11 @@ struct bt_gatt_cpf {
 	u16_t description;
 } __packed;
 
-/* Server API */
+/**
+ * @defgroup bt_gatt_server GATT Server APIs
+ * @ingroup bt_gatt
+ * @{
+ */
 
 /** @brief Register GATT service.
  *
@@ -336,7 +349,7 @@ struct bt_gatt_attr *bt_gatt_attr_next(const struct bt_gatt_attr *attr);
 
 /** @brief Generic Read Attribute value helper.
  *
- *  Read attribute value storing the result into buffer.
+ *  Read attribute value from local database storing the result into buffer.
  *
  *  @param conn Connection object.
  *  @param attr Attribute to read.
@@ -355,8 +368,8 @@ ssize_t bt_gatt_attr_read(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 
 /** @brief Read Service Attribute helper.
  *
- *  Read service attribute value storing the result into buffer after
- *  encoding it.
+ *  Read service attribute value from local database storing the result into
+ *  buffer after encoding it.
  *  NOTE: Only use this with attributes which user_data is a bt_uuid.
  *
  *  @param conn Connection object.
@@ -409,8 +422,8 @@ ssize_t bt_gatt_attr_read_service(struct bt_conn *conn,
 
 /** @brief Read Include Attribute helper.
  *
- *  Read include service attribute value storing the result into buffer after
- *  encoding it.
+ *  Read include service attribute value from local database storing the result
+ *  into buffer after encoding it.
  *  NOTE: Only use this with attributes which user_data is a bt_gatt_include.
  *
  *  @param conn Connection object.
@@ -439,8 +452,8 @@ ssize_t bt_gatt_attr_read_included(struct bt_conn *conn,
 
 /** @brief Read Characteristic Attribute helper.
  *
- *  Read characteristic attribute value storing the result into buffer after
- *  encoding it.
+ *  Read characteristic attribute value from local database storing the result
+ *  into buffer after encoding it.
  *  NOTE: Only use this with attributes which user_data is a bt_gatt_chrc.
  *
  *  @param conn Connection object.
@@ -479,11 +492,13 @@ ssize_t bt_gatt_attr_read_chrc(struct bt_conn *conn,
 #define BT_GATT_CCC_MAX (CONFIG_BT_MAX_PAIRED + CONFIG_BT_MAX_CONN)
 
 /** @brief GATT CCC configuration entry.
+ *  @param id   Local identity, BT_ID_DEFAULT in most cases.
  *  @param peer Remote peer address
  *  @param value Configuration value.
  *  @param data Configuration pointer data.
  */
 struct bt_gatt_ccc_cfg {
+	u8_t                    id;
 	bt_addr_le_t		peer;
 	u16_t			value;
 	u8_t			data[4] __aligned(4);
@@ -500,8 +515,8 @@ struct _bt_gatt_ccc {
 
 /** @brief Read Client Characteristic Configuration Attribute helper.
  *
- *  Read CCC attribute value storing the result into buffer after
- *  encoding it.
+ *  Read CCC attribute value from local database storing the result into buffer
+ *  after encoding it.
  *  NOTE: Only use this with attributes which user_data is a _bt_gatt_ccc.
  *
  *  @param conn Connection object.
@@ -554,8 +569,8 @@ ssize_t bt_gatt_attr_write_ccc(struct bt_conn *conn,
 
 /** @brief Read Characteristic Extended Properties Attribute helper
  *
- *  Read CEP attribute value storing the result into buffer after
- *  encoding it.
+ *  Read CEP attribute value from local database storing the result into buffer
+ *  after encoding it.
  *  NOTE: Only use this with attributes which user_data is a bt_gatt_cep.
  *
  *  @param conn Connection object
@@ -579,14 +594,15 @@ ssize_t bt_gatt_attr_read_cep(struct bt_conn *conn,
  *  @param _value Descriptor attribute value.
  */
 #define BT_GATT_CEP(_value)						\
-	BT_GATT_ATTRIBUTE(BT_UUID_GATT_CEP, BT_GATT_PERM_READ,		\
-			  bt_gatt_attr_read_cep, NULL, _value)
+	BT_GATT_DESCRIPTOR(BT_UUID_GATT_CEP, BT_GATT_PERM_READ,		\
+			  bt_gatt_attr_read_cep, NULL, (void *)_value)
 
 /** @brief Read Characteristic User Description Descriptor Attribute helper
  *
- *  Read CUD attribute value storing the result into buffer after
- *  encoding it.
- *  NOTE: Only use this with attributes which user_data is a NULL-terminated C string.
+ *  Read CUD attribute value from local database storing the result into buffer
+ *  after encoding it.
+ *  NOTE: Only use this with attributes which user_data is a NULL-terminated C
+ *  string.
  *
  *  @param conn Connection object
  *  @param attr Attribute to read
@@ -610,13 +626,13 @@ ssize_t bt_gatt_attr_read_cud(struct bt_conn *conn,
  *  @param _perm Descriptor attribute access permissions.
  */
 #define BT_GATT_CUD(_value, _perm)					\
-	BT_GATT_ATTRIBUTE(BT_UUID_GATT_CUD, _perm, bt_gatt_attr_read_cud, \
-			  NULL, _value)
+	BT_GATT_DESCRIPTOR(BT_UUID_GATT_CUD, _perm, bt_gatt_attr_read_cud, \
+			   NULL, (void *)_value)
 
 /** @brief Read Characteristic Presentation format Descriptor Attribute helper
  *
- *  Read CPF attribute value storing the result into buffer after
- *  encoding it.
+ *  Read CPF attribute value from local database storing the result into buffer
+ *  after encoding it.
  *  NOTE: Only use this with attributes which user_data is a bt_gatt_pf.
  *
  *  @param conn Connection object
@@ -640,8 +656,8 @@ ssize_t bt_gatt_attr_read_cpf(struct bt_conn *conn,
  *  @param _value Descriptor attribute value.
  */
 #define BT_GATT_CPF(_value)						\
-	BT_GATT_ATTRIBUTE(BT_UUID_GATT_CPF, BT_GATT_PERM_READ,		\
-			  bt_gatt_attr_read_cpf, NULL, _value)
+	BT_GATT_DESCRIPTOR(BT_UUID_GATT_CPF, BT_GATT_PERM_READ,		\
+			  bt_gatt_attr_read_cpf, NULL, (void *)_value)
 
 /** @def BT_GATT_DESCRIPTOR
  *  @brief Descriptor Declaration Macro.
@@ -677,23 +693,51 @@ ssize_t bt_gatt_attr_read_cpf(struct bt_conn *conn,
 	.user_data = _value,						\
 }
 
+/** @brief Notification complete result callback.
+ *
+ *  @param conn Connection object.
+ */
+typedef void (*bt_gatt_complete_func_t) (struct bt_conn *conn);
+
+/** @brief Notify attribute value change with callback.
+ *
+ *  This function works in the same way as @ref bt_gatt_notify.
+ *  With the addition that after sending the notification the
+ *  callback function will be called.
+ *
+ *  @param conn Connection object.
+ *  @param attr Characteristic or Characteristic Value attribute.
+ *  @param data Pointer to Attribute data.
+ *  @param len Attribute value length.
+ *  @param func Notification value callback.
+ */
+int bt_gatt_notify_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+		      const void *data, u16_t len,
+		      bt_gatt_complete_func_t func);
+
 /** @brief Notify attribute value change.
  *
  *  Send notification of attribute value change, if connection is NULL notify
  *  all peer that have notification enabled via CCC otherwise do a direct
  *  notification only the given connection.
  *
- *  The attribute object must be the so called Characteristic Value Descriptor,
- *  its usually declared with BT_GATT_DESCRIPTOR after BT_GATT_CHARACTERISTIC
- *  and before BT_GATT_CCC.
+ *  The attribute object can be the so called Characteristic Declaration,
+ *  which is usually declared with BT_GATT_CHARACTERISTIC followed by
+ *  BT_GATT_CCC, or the Characteristic Value Declaration which is automatically
+ *  created after the Characteristic Declaration when using
+ *  BT_GATT_CHARACTERISTIC.
  *
  *  @param conn Connection object.
- *  @param attr Characteristic Value Descriptor attribute.
+ *  @param attr Characteristic or Characteristic Value attribute.
  *  @param data Pointer to Attribute data.
  *  @param len Attribute value length.
  */
-int bt_gatt_notify(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-		   const void *data, u16_t len);
+static inline int bt_gatt_notify(struct bt_conn *conn,
+				 const struct bt_gatt_attr *attr,
+				 const void *data, u16_t len)
+{
+	return bt_gatt_notify_cb(conn, attr, data, len, NULL);
+}
 
 /** @typedef bt_gatt_indicate_func_t
  *  @brief Indication complete result callback.
@@ -749,7 +793,13 @@ int bt_gatt_indicate(struct bt_conn *conn,
  */
 u16_t bt_gatt_get_mtu(struct bt_conn *conn);
 
-/* Client API */
+/** @} */
+
+/**
+ * @defgroup bt_gatt_client GATT Client APIs
+ * @ingroup bt_gatt
+ * @{
+ */
 
 /** @brief GATT Exchange MTU parameters */
 struct bt_gatt_exchange_params {
@@ -949,6 +999,30 @@ struct bt_gatt_write_params {
  */
 int bt_gatt_write(struct bt_conn *conn, struct bt_gatt_write_params *params);
 
+/** @brief Write Attribute Value by handle without response with callback.
+ *
+ * This function works in the same way as @ref bt_gatt_write_without_response.
+ * With the addition that after sending the write the callback function will be
+ * called.
+ *
+ * Note: By using a callback it also disable the internal flow control
+ * which would prevent sending multiple commands without wainting their
+ * transmissions to complete, so if that is required the caller shall not
+ * submit more data until the callback is called.
+ *
+ * @param conn Connection object.
+ * @param handle Attribute handle.
+ * @param data Data to be written.
+ * @param length Data length.
+ * @param sign Whether to sign data
+ * @param func Transmission complete callback.
+ *
+ * @return 0 in case of success or negative value in case of error.
+ */
+int bt_gatt_write_without_response_cb(struct bt_conn *conn, u16_t handle,
+				      const void *data, u16_t length,
+				      bool sign, bt_gatt_complete_func_t func);
+
 /** @brief Write Attribute Value by handle without response
  *
  * This procedure write the attribute value without requiring an
@@ -962,9 +1036,13 @@ int bt_gatt_write(struct bt_conn *conn, struct bt_gatt_write_params *params);
  *
  * @return 0 in case of success or negative value in case of error.
  */
-int bt_gatt_write_without_response(struct bt_conn *conn, u16_t handle,
-				   const void *data, u16_t length,
-				   bool sign);
+static inline int bt_gatt_write_without_response(struct bt_conn *conn,
+						 u16_t handle, const void *data,
+						 u16_t length, bool sign)
+{
+	return bt_gatt_write_without_response_cb(conn, handle, data, length,
+						 sign, NULL);
+}
 
 struct bt_gatt_subscribe_params;
 
@@ -1053,6 +1131,8 @@ int bt_gatt_unsubscribe(struct bt_conn *conn,
  */
 void bt_gatt_cancel(struct bt_conn *conn, void *params);
 
+/** @} */
+
 #ifdef __cplusplus
 }
 #endif
@@ -1061,4 +1141,4 @@ void bt_gatt_cancel(struct bt_conn *conn, void *params);
  * @}
  */
 
-#endif /* __BT_GATT_H */
+#endif /* ZEPHYR_INCLUDE_BLUETOOTH_GATT_H_ */

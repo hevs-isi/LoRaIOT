@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2018 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+config BOARD_UP_SQUARED
+	bool "UP Squared"
+	depends on SOC_APOLLO_LAKE
+
+config SBL_FIXUP
+	bool "SBL specific fixup required"
+	depends on BOARD_UP_SQUARED

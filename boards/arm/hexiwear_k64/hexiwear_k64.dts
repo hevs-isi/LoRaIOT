@@ -31,30 +31,48 @@
 		led0 = &green_led;
 		led1 = &blue_led;
 		led2 = &red_led;
+		pwm-led0 = &green_pwm_led;
+		red-pwm-led = &red_pwm_led;
+		green-pwm-led = &green_pwm_led;
+		blue-pwm-led = &blue_pwm_led;
 	};
 
 	chosen {
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
+		zephyr,code-partition = &slot0_partition;
 		zephyr,console = &uart0;
-#ifdef CONFIG_BT
+		zephyr,shell-uart = &uart0;
 		zephyr,bt-uart = &uart4;
-#endif
 	};
 
 	leds {
 		compatible = "gpio-leds";
-		red_led: led@0 {
-			gpios = <&gpioc 8 GPIO_INT_ACTIVE_LOW>;
+		red_led: led_0 {
+			gpios = <&gpioc 8 0>;
 			label = "User LD1";
 		};
-		green_led: led@1 {
-			gpios = <&gpiod 0 GPIO_INT_ACTIVE_LOW>;
+		green_led: led_1 {
+			gpios = <&gpiod 0 0>;
 			label = "User LD2";
 		};
-		blue_led: led@2 {
-			gpios = <&gpioc 9 GPIO_INT_ACTIVE_LOW>;
+		blue_led: led_2 {
+			gpios = <&gpioc 9 0>;
 			label = "User LD3";
+		};
+	};
+
+	pwmleds {
+		compatible = "pwm-leds";
+
+		red_pwm_led: red_pwm_led {
+			pwms = <&pwm3 4 15625000>;
+		};
+		green_pwm_led: green_pwm_led {
+			pwms = <&pwm3 0 15625000>;
+		};
+		blue_pwm_led: blue_pwm_led {
+			pwms = <&pwm3 5 15625000>;
 		};
 	};
 };
@@ -106,17 +124,15 @@
 	current-speed = <115200>;
 };
 
-#ifdef CONFIG_BT
 &uart4 {
 	status = "ok";
 	current-speed = <115200>;
 };
-#endif
 
 &flash0 {
 	/*
 	 * For more information, see:
-	 * http://docs.zephyrproject.org/devices/dts/flash_partitions.html
+	 * http://docs.zephyrproject.org/latest/guides/dts/index.html#flash-partitions
 	 */
 	partitions {
 		compatible = "fixed-partitions";

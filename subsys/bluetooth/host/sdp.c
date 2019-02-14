@@ -16,6 +16,7 @@
 #include <bluetooth/sdp.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_SDP)
+#define LOG_MODULE_NAME bt_sdp
 #include "common/log.h"
 
 #include "hci_core.h"
@@ -180,7 +181,7 @@ static void bt_sdp_disconnected(struct bt_l2cap_chan *chan)
 
 	BT_DBG("chan %p cid 0x%04x", ch, ch->tx.cid);
 
-	memset(sdp, 0, sizeof(*sdp));
+	(void)memset(sdp, 0, sizeof(*sdp));
 }
 
 /* @brief Creates an SDP PDU
@@ -259,7 +260,7 @@ static void send_err_rsp(struct bt_l2cap_chan *chan, u16_t err,
 static u16_t parse_data_elem(struct net_buf *buf,
 				struct bt_sdp_data_elem *data_elem)
 {
-	u8_t size_field_len = 0; /* Space used to accommodate the size */
+	u8_t size_field_len = 0U; /* Space used to accommodate the size */
 
 	if (buf->len < 1) {
 		BT_WARN("Malformed packet");
@@ -461,7 +462,7 @@ static u16_t find_services(struct net_buf *buf,
 	struct bt_sdp_record *record;
 	u32_t uuid_list_size;
 	u16_t res;
-	u8_t att_idx, rec_idx = 0;
+	u8_t att_idx, rec_idx = 0U;
 	bool found;
 	union {
 		struct bt_uuid uuid;
@@ -527,7 +528,7 @@ static u16_t find_services(struct net_buf *buf,
 		/* Go over the list of services, and look for a service which
 		 * doesn't have this UUID
 		 */
-		for (rec_idx = 0; rec_idx < num_services; rec_idx++) {
+		for (rec_idx = 0U; rec_idx < num_services; rec_idx++) {
 			record = matching_recs[rec_idx];
 
 			if (!record) {
@@ -537,7 +538,7 @@ static u16_t find_services(struct net_buf *buf,
 			found = false;
 
 			/* Search for the UUID in all the attrs of the svc */
-			for (att_idx = 0; att_idx < record->attr_count;
+			for (att_idx = 0U; att_idx < record->attr_count;
 			     att_idx++) {
 				search_uuid(&record->attrs[att_idx].val,
 					    &u.uuid, &found, 1);
@@ -575,8 +576,8 @@ static u16_t sdp_svc_search_req(struct bt_sdp *sdp, struct net_buf *buf,
 	struct net_buf *resp_buf;
 	struct bt_sdp_record *record;
 	struct bt_sdp_record *matching_recs[BT_SDP_MAX_SERVICES];
-	u16_t max_rec_count, total_recs = 0, current_recs = 0, res;
-	u8_t cont_state_size, cont_state = 0, idx = 0, count = 0;
+	u16_t max_rec_count, total_recs = 0U, current_recs = 0U, res;
+	u8_t cont_state_size, cont_state = 0U, idx = 0U, count = 0U;
 	bool pkt_full = false;
 
 	res = find_services(buf, matching_recs);
@@ -594,7 +595,7 @@ static u16_t sdp_svc_search_req(struct bt_sdp *sdp, struct net_buf *buf,
 	cont_state_size = net_buf_pull_u8(buf);
 
 	/* Zero out the matching services beyond max_rec_count */
-	for (idx = 0; idx < num_services; idx++) {
+	for (idx = 0U; idx < num_services; idx++) {
 		if (count == max_rec_count) {
 			matching_recs[idx] = NULL;
 			continue;
@@ -810,7 +811,7 @@ static u8_t select_attrs(struct bt_sdp_attribute *attr, u8_t att_idx,
 	u32_t attr_size, seq_size;
 	u8_t idx_filter;
 
-	for (idx_filter = 0; idx_filter < sad->num_filters; idx_filter++) {
+	for (idx_filter = 0U; idx_filter < sad->num_filters; idx_filter++) {
 
 		att_id_lower = (sad->filter[idx_filter] >> 16);
 		att_id_upper = (sad->filter[idx_filter]);
@@ -866,7 +867,7 @@ static u8_t select_attrs(struct bt_sdp_attribute *attr, u8_t att_idx,
 				sad->seq = net_buf_add(sad->rsp_buf,
 						       sizeof(*sad->seq));
 				sad->seq->type = BT_SDP_SEQ16;
-				sad->seq->size = 0;
+				sad->seq->size = 0U;
 			}
 
 			/* Add attribute ID */
@@ -950,7 +951,7 @@ static u16_t create_attr_list(struct bt_sdp *sdp, struct bt_sdp_record *record,
 	sad.seq = NULL;
 	sad.filter = filter;
 	sad.state = state;
-	sad.att_list_len = 0;
+	sad.att_list_len = 0U;
 	sad.new_service = true;
 
 	idx_att = bt_sdp_foreach_attr(sad.rec, next_att, select_attrs, &sad);
@@ -983,7 +984,7 @@ static u16_t get_att_search_list(struct net_buf *buf, u32_t *filter,
 	u16_t res;
 	u32_t size;
 
-	*num_filters = 0;
+	*num_filters = 0U;
 	res = parse_data_elem(buf, &data_elem);
 	if (res) {
 		return res;
@@ -1070,7 +1071,7 @@ static u16_t sdp_svc_att_req(struct bt_sdp *sdp, struct net_buf *buf,
 	struct net_buf *rsp_buf;
 	u32_t svc_rec_hdl;
 	u16_t max_att_len, res, att_list_len;
-	u8_t num_filters, cont_state_size, next_att = 0;
+	u8_t num_filters, cont_state_size, next_att = 0U;
 
 	if (buf->len < 6) {
 		BT_WARN("Malformed packet");
@@ -1140,7 +1141,7 @@ static u16_t sdp_svc_att_req(struct bt_sdp *sdp, struct net_buf *buf,
 		/* For empty responses, add an empty data element sequence */
 		net_buf_add_u8(rsp_buf, BT_SDP_SEQ8);
 		net_buf_add_u8(rsp_buf, 0);
-		att_list_len = 2;
+		att_list_len = 2U;
 	}
 
 	/* Add continuation state */
@@ -1185,8 +1186,8 @@ static u16_t sdp_svc_search_att_req(struct bt_sdp *sdp, struct net_buf *buf,
 	struct bt_sdp_record *record;
 	struct bt_sdp_att_rsp *rsp;
 	struct bt_sdp_data_elem_seq *seq = NULL;
-	u16_t max_att_len, res, att_list_len = 0;
-	u8_t num_filters, cont_state_size, next_svc = 0, next_att = 0;
+	u16_t max_att_len, res, att_list_len = 0U;
+	u8_t num_filters, cont_state_size, next_svc = 0U, next_att = 0U;
 	bool dry_run = false;
 
 	res = find_services(buf, matching_recs);
@@ -1247,10 +1248,10 @@ static u16_t sdp_svc_search_att_req(struct bt_sdp *sdp, struct net_buf *buf,
 	if (!cont_state_size) {
 		seq = net_buf_add(rsp_buf, sizeof(*seq));
 		seq->type = BT_SDP_SEQ16;
-		seq->size = 0;
+		seq->size = 0U;
 
 		/* 3 bytes for Outer Data Element Sequence declaration */
-		att_list_len = 3;
+		att_list_len = 3U;
 	}
 
 	rsp_buf_cpy = rsp_buf;
@@ -1288,7 +1289,7 @@ static u16_t sdp_svc_search_att_req(struct bt_sdp *sdp, struct net_buf *buf,
 			rsp_buf_cpy = NULL;
 		}
 
-		next_att = 0;
+		next_att = 0U;
 	}
 
 	if (!dry_run) {
@@ -1296,7 +1297,7 @@ static u16_t sdp_svc_search_att_req(struct bt_sdp *sdp, struct net_buf *buf,
 			/* For empty responses, add an empty data elem seq */
 			net_buf_add_u8(rsp_buf, BT_SDP_SEQ8);
 			net_buf_add_u8(rsp_buf, 0);
-			att_list_len = 2;
+			att_list_len = 2U;
 		}
 		/* Search exhausted */
 		net_buf_add_u8(rsp_buf, 0);
@@ -1333,12 +1334,12 @@ static const struct {
  *
  *  @return None
  */
-static void bt_sdp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
+static int bt_sdp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 {
 	struct bt_l2cap_br_chan *ch = CONTAINER_OF(chan,
 			struct bt_l2cap_br_chan, chan);
 	struct bt_sdp *sdp = CONTAINER_OF(ch, struct bt_sdp, chan);
-	struct bt_sdp_hdr *hdr = (struct bt_sdp_hdr *)buf->data;
+	struct bt_sdp_hdr *hdr;
 	u16_t err = BT_SDP_INVALID_SYNTAX;
 	size_t i;
 
@@ -1348,12 +1349,11 @@ static void bt_sdp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 
 	if (buf->len < sizeof(*hdr)) {
 		BT_ERR("Too small SDP PDU received");
-		return;
+		return 0;
 	}
 
+	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
 	BT_DBG("Received SDP code 0x%02x len %u", hdr->op_code, buf->len);
-
-	net_buf_pull(buf, sizeof(*hdr));
 
 	if (sys_cpu_to_be16(hdr->param_len) != buf->len) {
 		err = BT_SDP_INVALID_PDU_SIZE;
@@ -1372,6 +1372,8 @@ static void bt_sdp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 		BT_WARN("SDP error 0x%02x", err);
 		send_err_rsp(chan, err, hdr->tid);
 	}
+
+	return 0;
 }
 
 /* @brief Callback for SDP connection accept
@@ -1575,7 +1577,7 @@ static void sdp_client_params_iterator(struct bt_sdp_client *session)
 		/* Invalidate cached param in context */
 		session->param = NULL;
 		/* Reset continuation state in current context */
-		memset(&session->cstate, 0, sizeof(session->cstate));
+		(void)memset(&session->cstate, 0, sizeof(session->cstate));
 
 		/* Check if there's valid next UUID */
 		if (!sys_slist_is_empty(&session->reqs)) {
@@ -1604,7 +1606,7 @@ static u16_t sdp_client_get_total(struct bt_sdp_client *session,
 	 */
 	if (session->cstate.length == 0) {
 		seq = net_buf_pull_u8(buf);
-		pulled = 1;
+		pulled = 1U;
 		switch (seq) {
 		case BT_SDP_SEQ8:
 			*total = net_buf_pull_u8(buf);
@@ -1616,14 +1618,14 @@ static u16_t sdp_client_get_total(struct bt_sdp_client *session,
 			break;
 		default:
 			BT_WARN("Sequence type 0x%02x not handled", seq);
-			*total = 0;
+			*total = 0U;
 			break;
 		}
 
 		BT_DBG("Total %u octets of all attributes", *total);
 	} else {
-		pulled = 0;
-		*total = 0;
+		pulled = 0U;
+		*total = 0U;
 	}
 
 	return pulled;
@@ -1645,7 +1647,7 @@ static u16_t get_record_len(struct net_buf *buf)
 		break;
 	default:
 		BT_WARN("Sequence type 0x%02x not handled", seq);
-		len = 0;
+		len = 0U;
 		break;
 	}
 
@@ -1713,10 +1715,10 @@ static void sdp_client_notify_result(struct bt_sdp_client *session,
 	}
 }
 
-static void sdp_client_receive(struct bt_l2cap_chan *chan, struct net_buf *buf)
+static int sdp_client_receive(struct bt_l2cap_chan *chan, struct net_buf *buf)
 {
 	struct bt_sdp_client *session = SDP_CLIENT_CHAN(chan);
-	struct bt_sdp_hdr *hdr = (void *)buf->data;
+	struct bt_sdp_hdr *hdr;
 	struct bt_sdp_pdu_cstate *cstate;
 	u16_t len, tid, frame_len;
 	u16_t total;
@@ -1725,28 +1727,28 @@ static void sdp_client_receive(struct bt_l2cap_chan *chan, struct net_buf *buf)
 
 	if (buf->len < sizeof(*hdr)) {
 		BT_ERR("Too small SDP PDU");
-		return;
+		return 0;
 	}
 
+	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
 	if (hdr->op_code == BT_SDP_ERROR_RSP) {
 		BT_INFO("Error SDP PDU response");
-		return;
+		return 0;
 	}
 
 	len = sys_be16_to_cpu(hdr->param_len);
 	tid = sys_be16_to_cpu(hdr->tid);
-	net_buf_pull(buf, sizeof(*hdr));
 
 	BT_DBG("SDP PDU tid %u len %u", tid, len);
 
 	if (buf->len != len) {
 		BT_ERR("SDP PDU length mismatch (%u != %u)", buf->len, len);
-		return;
+		return 0;
 	}
 
 	if (tid != session->tid) {
 		BT_ERR("Mismatch transaction ID value in SDP PDU");
-		return;
+		return 0;
 	}
 
 	switch (hdr->op_code) {
@@ -1756,12 +1758,12 @@ static void sdp_client_receive(struct bt_l2cap_chan *chan, struct net_buf *buf)
 		/* Check valid buf len for attribute list and cont state */
 		if (buf->len < frame_len + SDP_CONT_STATE_LEN_SIZE) {
 			BT_ERR("Invalid frame payload length");
-			return;
+			return 0;
 		}
 		/* Check valid range of attributes length */
 		if (frame_len < 2) {
 			BT_ERR("Invalid attributes data length");
-			return;
+			return 0;
 		}
 
 		/* Get PDU continuation state */
@@ -1770,13 +1772,13 @@ static void sdp_client_receive(struct bt_l2cap_chan *chan, struct net_buf *buf)
 		if (cstate->length > BT_SDP_MAX_PDU_CSTATE_LEN) {
 			BT_ERR("Invalid SDP PDU Continuation State length %u",
 			       cstate->length);
-			return;
+			return 0;
 		}
 
 		if ((frame_len + SDP_CONT_STATE_LEN_SIZE + cstate->length) >
 		     buf->len) {
 			BT_ERR("Invalid frame payload length");
-			return;
+			return 0;
 		}
 
 		/*
@@ -1834,6 +1836,8 @@ iterate:
 		BT_DBG("PDU 0x%0x response not handled", hdr->op_code);
 		break;
 	}
+
+	return 0;
 }
 
 static int sdp_client_chan_connect(struct bt_sdp_client *session)
@@ -1880,7 +1884,8 @@ static void sdp_client_disconnected(struct bt_l2cap_chan *chan)
 	 * Reset session excluding L2CAP channel member. Let's the channel
 	 * resets autonomous.
 	 */
-	memset(&session->reqs, 0, sizeof(*session) - sizeof(session->chan));
+	(void)memset(&session->reqs, 0,
+		     sizeof(*session) - sizeof(session->chan));
 }
 
 static struct bt_l2cap_chan_ops sdp_client_chan_ops = {
@@ -1910,7 +1915,7 @@ static struct bt_sdp_client *sdp_client_new_session(struct bt_conn *conn)
 
 		err = sdp_client_chan_connect(session);
 		if (err) {
-			memset(session, 0, sizeof(*session));
+			(void)memset(session, 0, sizeof(*session));
 			BT_ERR("Cannot connect %d", err);
 			return NULL;
 		}

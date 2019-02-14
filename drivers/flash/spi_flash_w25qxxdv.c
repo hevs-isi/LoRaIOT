@@ -14,6 +14,17 @@
 #include "spi_flash_w25qxxdv.h"
 #include "flash_priv.h"
 
+#if defined(CONFIG_MULTITHREADING)
+#define SYNC_INIT() k_sem_init( \
+		&((struct spi_flash_data *)dev->driver_data)->sem, 1, UINT_MAX)
+#define SYNC_LOCK() k_sem_take(&driver_data->sem, K_FOREVER)
+#define SYNC_UNLOCK() k_sem_give(&driver_data->sem)
+#else
+#define SYNC_INIT()
+#define SYNC_LOCK()
+#define SYNC_UNLOCK()
+#endif
+
 static int spi_flash_wb_access(struct spi_flash_data *ctx,
 			       u8_t cmd, bool addressed, off_t offset,
 			       void *data, size_t length, bool write)
@@ -73,7 +84,7 @@ static inline int spi_flash_wb_id(struct device *dev)
 	temp_data |= ((u32_t) buf[1]) << 8;
 	temp_data |= (u32_t) buf[2];
 
-	if (temp_data != W25QXXDV_RDID_VALUE) {
+	if (temp_data != CONFIG_SPI_FLASH_W25QXXDV_DEVICE_ID) {
 		return -ENODEV;
 	}
 
@@ -119,64 +130,32 @@ static int spi_flash_wb_read(struct device *dev, off_t offset, void *data,
 	struct spi_flash_data *const driver_data = dev->driver_data;
 	int ret;
 
-	if (len > CONFIG_SPI_FLASH_W25QXXDV_MAX_DATA_LEN || offset < 0) {
+	if (offset < 0) {
 		return -ENODEV;
 	}
 
-	k_sem_take(&driver_data->sem, K_FOREVER);
+	SYNC_LOCK();
 
 	wait_for_flash_idle(dev);
 
 	ret = spi_flash_wb_access(driver_data, W25QXXDV_CMD_READ,
 				  true, offset, data, len, false);
 
-	k_sem_give(&driver_data->sem);
+	SYNC_UNLOCK();
 
 	return ret;
 }
 
-static int spi_flash_wb_write(struct device *dev, off_t offset,
-			      const void *data, size_t len)
+static int spi_flash_wb_write_protection_set_with_lock(struct device *dev,
+						       bool enable, bool lock)
 {
 	struct spi_flash_data *const driver_data = dev->driver_data;
-	u8_t reg;
+	u8_t reg = 0U;
 	int ret;
 
-	if (len > CONFIG_SPI_FLASH_W25QXXDV_MAX_DATA_LEN || offset < 0) {
-		return -ENOTSUP;
+	if (lock) {
+		SYNC_LOCK();
 	}
-
-	k_sem_take(&driver_data->sem, K_FOREVER);
-
-	wait_for_flash_idle(dev);
-
-	reg = spi_flash_wb_reg_read(dev, W25QXXDV_CMD_RDSR);
-	if (!(reg & W25QXXDV_WEL_BIT)) {
-		k_sem_give(&driver_data->sem);
-		return -EIO;
-	}
-
-	wait_for_flash_idle(dev);
-
-	/* Assume write protection has been disabled. Note that w25qxxdv
-	 * flash automatically turns on write protection at the completion
-	 * of each write or erase transaction.
-	 */
-	ret = spi_flash_wb_access(driver_data, W25QXXDV_CMD_PP,
-				  true, offset, (void *)data, len, true);
-
-	k_sem_give(&driver_data->sem);
-
-	return ret;
-}
-
-static int spi_flash_wb_write_protection_set(struct device *dev, bool enable)
-{
-	struct spi_flash_data *const driver_data = dev->driver_data;
-	u8_t reg = 0;
-	int ret;
-
-	k_sem_take(&driver_data->sem, K_FOREVER);
 
 	wait_for_flash_idle(dev);
 
@@ -188,7 +167,103 @@ static int spi_flash_wb_write_protection_set(struct device *dev, bool enable)
 
 	ret = spi_flash_wb_reg_write(dev, reg);
 
-	k_sem_give(&driver_data->sem);
+	if (lock) {
+		SYNC_UNLOCK();
+	}
+
+	return ret;
+}
+
+static int spi_flash_wb_write_protection_set(struct device *dev, bool enable)
+{
+	return spi_flash_wb_write_protection_set_with_lock(dev, enable, true);
+}
+
+static int spi_flash_wb_program_page(struct device *dev, off_t offset,
+		const void *data, size_t len)
+{
+	u8_t reg;
+	struct spi_flash_data *const driver_data = dev->driver_data;
+
+	__ASSERT(len <= CONFIG_SPI_FLASH_W25QXXDV_PAGE_PROGRAM_SIZE,
+		 "Maximum length is %d for page programming (actual:%d)",
+		 CONFIG_SPI_FLASH_W25QXXDV_PAGE_PROGRAM_SIZE, len);
+
+	wait_for_flash_idle(dev);
+
+	reg = spi_flash_wb_reg_read(dev, W25QXXDV_CMD_RDSR);
+	if (!(reg & W25QXXDV_WEL_BIT)) {
+		return -EIO;
+	}
+
+	wait_for_flash_idle(dev);
+
+	/* Assume write protection has been disabled. Note that w25qxxdv
+	 * flash automatically turns on write protection at the completion
+	 * of each write or erase transaction.
+	 */
+	return spi_flash_wb_access(driver_data, W25QXXDV_CMD_PP,
+				  true, offset, (void *)data, len, true);
+
+}
+
+static int spi_flash_wb_write(struct device *dev, off_t offset,
+			      const void *data, size_t len)
+{
+	int ret;
+	off_t page_offset;
+	/* Cast `data`  to prevent `void*` arithmetic */
+	const u8_t *data_ptr = data;
+	struct spi_flash_data *const driver_data = dev->driver_data;
+
+	if (offset < 0) {
+		return -ENOTSUP;
+	}
+
+	SYNC_LOCK();
+
+	/* Calculate the offset in the first page we write */
+	page_offset = offset % CONFIG_SPI_FLASH_W25QXXDV_PAGE_PROGRAM_SIZE;
+
+	/*
+	 * Write all data that does not fit into a single programmable page.
+	 * By doing this logic, we can safely disable lock protection in
+	 * between pages as in case the user did not disable protection then
+	 * it will fail on the first write.
+	 */
+	while ((page_offset + len) >
+			CONFIG_SPI_FLASH_W25QXXDV_PAGE_PROGRAM_SIZE) {
+		size_t len_to_write_in_page =
+			CONFIG_SPI_FLASH_W25QXXDV_PAGE_PROGRAM_SIZE -
+			page_offset;
+
+		ret = spi_flash_wb_program_page(dev, offset,
+						data_ptr, len_to_write_in_page);
+		if (ret) {
+			goto end;
+		}
+
+		ret = spi_flash_wb_write_protection_set_with_lock(dev,
+				false, false);
+		if (ret) {
+			goto end;
+		}
+
+		len -= len_to_write_in_page;
+		offset += len_to_write_in_page;
+		data_ptr += len_to_write_in_page;
+
+		/*
+		 * For the subsequent pages we always start at the beginning
+		 * of a page
+		 */
+		page_offset = 0;
+	}
+
+	ret = spi_flash_wb_program_page(dev, offset, data_ptr, len);
+
+end:
+	SYNC_UNLOCK();
 
 	return ret;
 }
@@ -197,8 +272,8 @@ static inline int spi_flash_wb_erase_internal(struct device *dev,
 					      off_t offset, size_t size)
 {
 	struct spi_flash_data *const driver_data = dev->driver_data;
+	bool need_offset = true;
 	u8_t erase_opcode;
-	u32_t len;
 
 	if (offset < 0) {
 		return -ENOTSUP;
@@ -214,19 +289,16 @@ static inline int spi_flash_wb_erase_internal(struct device *dev,
 	switch (size) {
 	case W25QXXDV_SECTOR_SIZE:
 		erase_opcode = W25QXXDV_CMD_SE;
-		len = W25QXXDV_LEN_CMD_ADDRESS;
 		break;
 	case W25QXXDV_BLOCK32K_SIZE:
 		erase_opcode = W25QXXDV_CMD_BE32K;
-		len = W25QXXDV_LEN_CMD_ADDRESS;
 		break;
 	case W25QXXDV_BLOCK_SIZE:
 		erase_opcode = W25QXXDV_CMD_BE;
-		len = W25QXXDV_LEN_CMD_ADDRESS;
 		break;
 	case CONFIG_SPI_FLASH_W25QXXDV_FLASH_SIZE:
 		erase_opcode = W25QXXDV_CMD_CE;
-		len = 1;
+		need_offset = false;
 		break;
 	default:
 		return -EIO;
@@ -238,7 +310,7 @@ static inline int spi_flash_wb_erase_internal(struct device *dev,
 	 * of each write or erase transaction.
 	 */
 	return spi_flash_wb_access(driver_data, erase_opcode,
-				   true, offset, NULL, len, true);
+				   need_offset, offset, NULL, 0, true);
 }
 
 static int spi_flash_wb_erase(struct device *dev, off_t offset, size_t size)
@@ -255,12 +327,12 @@ static int spi_flash_wb_erase(struct device *dev, off_t offset, size_t size)
 		return -ENODEV;
 	}
 
-	k_sem_take(&driver_data->sem, K_FOREVER);
+	SYNC_LOCK();
 
 	reg = spi_flash_wb_reg_read(dev, W25QXXDV_CMD_RDSR);
 
 	if (!(reg & W25QXXDV_WEL_BIT)) {
-		k_sem_give(&driver_data->sem);
+		SYNC_UNLOCK();
 		return -EIO;
 	}
 
@@ -295,10 +367,22 @@ static int spi_flash_wb_erase(struct device *dev, off_t offset, size_t size)
 		}
 	}
 
-	k_sem_give(&driver_data->sem);
+	SYNC_UNLOCK();
 
 	return ret;
 }
+
+#if defined(CONFIG_FLASH_PAGE_LAYOUT)
+static struct flash_pages_layout dev_layout;
+
+static void flash_wb_pages_layout(struct device *dev,
+				  const struct flash_pages_layout **layout,
+				  size_t *layout_size)
+{
+	*layout = &dev_layout;
+	*layout_size = 1;
+}
+#endif /* CONFIG_FLASH_PAGE_LAYOUT */
 
 static const struct flash_driver_api spi_flash_api = {
 	.read = spi_flash_wb_read,
@@ -306,8 +390,7 @@ static const struct flash_driver_api spi_flash_api = {
 	.erase = spi_flash_wb_erase,
 	.write_protection = spi_flash_wb_write_protection_set,
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
-	.page_layout = (flash_api_pages_layout)
-		       flash_page_layout_not_implemented,
+	.page_layout = flash_wb_pages_layout,
 #endif
 	.write_block_size = 1,
 };
@@ -316,35 +399,54 @@ static int spi_flash_wb_configure(struct device *dev)
 {
 	struct spi_flash_data *data = dev->driver_data;
 
-	data->spi = device_get_binding(CONFIG_SPI_FLASH_W25QXXDV_SPI_NAME);
+	data->spi = device_get_binding(DT_WINBOND_W25Q16_0_BUS_NAME);
 	if (!data->spi) {
 		return -EINVAL;
 	}
 
-	data->spi_cfg.frequency = CONFIG_SPI_FLASH_W25QXXDV_SPI_FREQ_0;
+	data->spi_cfg.frequency = DT_WINBOND_W25Q16_0_SPI_MAX_FREQUENCY;
 	data->spi_cfg.operation = SPI_WORD_SET(8);
-	data->spi_cfg.slave = CONFIG_SPI_FLASH_W25QXXDV_SPI_SLAVE;
+	data->spi_cfg.slave = DT_WINBOND_W25Q16_0_BASE_ADDRESS;
+
+#if defined(CONFIG_SPI_FLASH_W25QXXDV_GPIO_SPI_CS)
+	data->cs_ctrl.gpio_dev = device_get_binding(
+		DT_WINBOND_W25Q16_0_CS_GPIO_CONTROLLER);
+	if (!data->cs_ctrl.gpio_dev) {
+		return -ENODEV;
+	}
+
+	data->cs_ctrl.gpio_pin = DT_WINBOND_W25Q16_0_CS_GPIO_PIN;
+	data->cs_ctrl.delay = CONFIG_SPI_FLASH_W25QXXDV_GPIO_CS_WAIT_DELAY;
+
+	data->spi_cfg.cs = &data->cs_ctrl;
+#endif /* CONFIG_SPI_FLASH_W25QXXDV_GPIO_SPI_CS */
 
 	return spi_flash_wb_id(dev);
 }
 
 static int spi_flash_init(struct device *dev)
 {
-	struct spi_flash_data *data = dev->driver_data;
 	int ret;
 
-	k_sem_init(&data->sem, 1, UINT_MAX);
+	SYNC_INIT();
 
 	ret = spi_flash_wb_configure(dev);
-	if (ret) {
-		dev->driver_api = &spi_flash_api;
-	}
+
+#if defined(CONFIG_FLASH_PAGE_LAYOUT)
+	/*
+	 * Note: we use the sector size rather than the page size as some
+	 * modules that consumes the flash page layout assume the page
+	 * size is the minimal size they can erase.
+	 */
+	dev_layout.pages_count = (CONFIG_SPI_FLASH_W25QXXDV_FLASH_SIZE / W25QXXDV_SECTOR_SIZE);
+	dev_layout.pages_size = W25QXXDV_SECTOR_SIZE;
+#endif
 
 	return ret;
 }
 
 static struct spi_flash_data spi_flash_memory_data;
 
-DEVICE_INIT(spi_flash_memory, CONFIG_SPI_FLASH_W25QXXDV_DRV_NAME,
+DEVICE_AND_API_INIT(spi_flash_memory, CONFIG_SPI_FLASH_W25QXXDV_DRV_NAME,
 	    spi_flash_init, &spi_flash_memory_data, NULL, POST_KERNEL,
-	    CONFIG_SPI_FLASH_W25QXXDV_INIT_PRIORITY);
+	    CONFIG_SPI_FLASH_W25QXXDV_INIT_PRIORITY, &spi_flash_api);

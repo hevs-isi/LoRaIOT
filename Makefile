@@ -1,17 +1,25 @@
 #
-# Top level makefile for things not covered by cmake
+# Top level makefile for documentation build
 #
 
-ifeq ($(VERBOSE),1)
-  Q =
-else
-  Q = @
+ifndef ZEPHYR_BASE
+$(error The ZEPHYR_BASE environment variable must be set)
 endif
 
-MAKEFLAGS += --no-print-directory
-export Q
+BUILDDIR ?= doc/_build
+DOC_TAG ?= development
+SPHINXOPTS ?= -q
 
 # Documentation targets
 # ---------------------------------------------------------------------------
+clean:
+	rm -rf ${BUILDDIR}
+
 htmldocs:
-	$(Q)$(MAKE) -C doc htmldocs
+	mkdir -p ${BUILDDIR} && cmake -GNinja -DDOC_TAG=${DOC_TAG} -DSPHINXOPTS=${SPHINXOPTS} -B${BUILDDIR} -Hdoc/ && ninja -C ${BUILDDIR} htmldocs
+
+htmldocs-fast:
+	mkdir -p ${BUILDDIR} && cmake -GNinja -DKCONFIG_TURBO_MODE=1 -DDOC_TAG=${DOC_TAG} -DSPHINXOPTS=${SPHINXOPTS} -B${BUILDDIR} -Hdoc/ && ninja -C ${BUILDDIR} htmldocs
+
+pdfdocs:
+	mkdir -p ${BUILDDIR} && cmake -GNinja -DDOC_TAG=${DOC_TAG} -DSPHINXOPTS=${SPHINXOPTS} -B${BUILDDIR} -Hdoc/ && ninja -C ${BUILDDIR} pdfdocs

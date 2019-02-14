@@ -6,8 +6,8 @@
 * SPDX-License-Identifier: Apache-2.0
 */
 
-#ifndef __SENSOR_LSM9DS0_GYRO_H__
-#define __SENSOR_LSM9DS0_GYRO_H__
+#ifndef ZEPHYR_DRIVERS_SENSOR_LSM9DS0_GYRO_LSM9DS0_GYRO_H_
+#define ZEPHYR_DRIVERS_SENSOR_LSM9DS0_GYRO_LSM9DS0_GYRO_H_
 
 #include <zephyr/types.h>
 #include <i2c.h>
@@ -186,8 +186,6 @@
 						 BIT(0))
 #define LSM9DS0_GYRO_SHIFT_INT1_DURATION_G_D    0
 
-#define LSM9DS0_GYRO_I2C_ADDR          		CONFIG_LSM9DS0_GYRO_I2C_ADDR
-
 #if defined(CONFIG_LSM9DS0_GYRO_FULLSCALE_245)
 	#define LSM9DS0_GYRO_DEFAULT_FULLSCALE  0
 #elif defined(CONFIG_LSM9DS0_GYRO_FULLSCALE_500)
@@ -255,7 +253,4 @@ int lsm9ds0_gyro_trigger_set(struct device *dev,
 int lsm9ds0_gyro_init_interrupt(struct device *dev);
 #endif
 
-#define SYS_LOG_DOMAIN "LSM9DS0_GYRO"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
-#endif /* __SENSOR_LSM9DS0_GYRO_H__ */
+#endif /* ZEPHYR_DRIVERS_SENSOR_LSM9DS0_GYRO_LSM9DS0_GYRO_H_ */

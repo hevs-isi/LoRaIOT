@@ -6,13 +6,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_IEEE802154_DRIVER_LEVEL
-#define SYS_LOG_DOMAIN "IEEE802154_KW41Z"
-#include <logging/sys_log.h>
+#define LOG_MODULE_NAME ieee802154_kw41z
+#define LOG_LEVEL CONFIG_IEEE802154_DRIVER_LOG_LEVEL
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <zephyr.h>
 #include <kernel.h>
-#include <board.h>
 #include <device.h>
 #include <init.h>
 #include <irq.h>
@@ -183,7 +184,7 @@ static inline void kw41z_wait_for_idle(void)
 	}
 
 	if (state != KW41Z_STATE_IDLE) {
-		SYS_LOG_ERR("Error waiting for idle state");
+		LOG_ERR("Error waiting for idle state");
 	}
 }
 
@@ -412,7 +413,7 @@ static int kw41z_filter(struct device *dev,
 			enum ieee802154_filter_type type,
 			const struct ieee802154_filter *filter)
 {
-	SYS_LOG_DBG("Applying filter %u", type);
+	LOG_DBG("Applying filter %u", type);
 
 	if (!set) {
 		return -ENOTSUP;
@@ -478,7 +479,7 @@ static inline void kw41z_rx(struct kw41z_context *kw41z, u8_t len)
 	u8_t pkt_len, hw_lqi;
 	int rslt;
 
-	SYS_LOG_DBG("ENTRY: len: %d", len);
+	LOG_DBG("ENTRY: len: %d", len);
 
 #if defined(CONFIG_NET_L2_OPENTHREAD)
 	/*
@@ -489,15 +490,15 @@ static inline void kw41z_rx(struct kw41z_context *kw41z, u8_t len)
 	pkt_len = len - KW41Z_FCS_LENGTH;
 #endif
 
-	pkt = net_pkt_get_reserve_rx(0, K_NO_WAIT);
+	pkt = net_pkt_get_reserve_rx(K_NO_WAIT);
 	if (!pkt) {
-		SYS_LOG_ERR("No buf available");
+		LOG_ERR("No buf available");
 		goto out;
 	}
 
 	frag = net_pkt_get_frag(pkt, K_NO_WAIT);
 	if (!frag) {
-		SYS_LOG_ERR("No frag available");
+		LOG_ERR("No frag available");
 		goto out;
 	}
 
@@ -542,7 +543,7 @@ static inline void kw41z_rx(struct kw41z_context *kw41z, u8_t len)
 
 	rslt = net_recv_data(kw41z->iface, pkt);
 	if (rslt < 0) {
-		SYS_LOG_ERR("RCV Packet dropped by NET stack: %d", rslt);
+		LOG_ERR("RCV Packet dropped by NET stack: %d", rslt);
 		goto out;
 	}
 
@@ -557,7 +558,7 @@ static int kw41z_tx(struct device *dev, struct net_pkt *pkt,
 		    struct net_buf *frag)
 {
 	struct kw41z_context *kw41z = dev->driver_data;
-	u8_t payload_len = net_pkt_ll_reserve(pkt) + frag->len;
+	u8_t payload_len = frag->len;
 	u32_t tx_timeout;
 	u8_t xcvseq;
 	int key;
@@ -568,12 +569,12 @@ static int kw41z_tx(struct device *dev, struct net_pkt *pkt,
 	 * state.
 	 */
 	if (kw41z_get_seq_state() != KW41Z_STATE_IDLE) {
-		SYS_LOG_WRN("Can't initiate new SEQ state");
+		LOG_WRN("Can't initiate new SEQ state");
 		return -EBUSY;
 	}
 
 	if (payload_len > KW41Z_PSDU_LENGTH) {
-		SYS_LOG_ERR("Payload too long");
+		LOG_ERR("Payload too long");
 		return 0;
 	}
 
@@ -586,11 +587,11 @@ static int kw41z_tx(struct device *dev, struct net_pkt *pkt,
 #if CONFIG_SOC_MKW41Z4
 	((u8_t *)ZLL->PKT_BUFFER_TX)[0] = payload_len + KW41Z_FCS_LENGTH;
 	memcpy(((u8_t *)ZLL->PKT_BUFFER_TX) + 1,
-		(void *)(frag->data - net_pkt_ll_reserve(pkt)), payload_len);
+		(void *)frag->data, payload_len);
 #else /* CONFIG_SOC_MKW40Z4 */
 	((u8_t *)ZLL->PKT_BUFFER)[0] = payload_len + KW41Z_FCS_LENGTH;
 	memcpy(((u8_t *)ZLL->PKT_BUFFER) + 1,
-		(void *)(frag->data - net_pkt_ll_reserve(pkt)), payload_len);
+		(void *)frag->data, payload_len);
 #endif
 
 	/* Set CCA mode */
@@ -605,21 +606,20 @@ static int kw41z_tx(struct device *dev, struct net_pkt *pkt,
 	 */
 
 	/* Perform automatic reception of ACK frame, if required */
-	if (ieee802154_is_ar_flag_set(pkt)) {
+	if (ieee802154_is_ar_flag_set(frag)) {
 		tx_timeout = kw41z->tx_warmup_time + KW41Z_SHR_PHY_TIME +
 				 payload_len * KW41Z_PER_BYTE_TIME + 10 +
 				 KW41Z_ACK_WAIT_TIME;
 
-		SYS_LOG_DBG("AUTOACK ENABLED: len: %d, timeout: %d, seq: %d",
-			payload_len, tx_timeout,
-			(frag->data - net_pkt_ll_reserve(pkt))[2]);
+		LOG_DBG("AUTOACK ENABLED: len: %d, timeout: %d, seq: %d",
+			payload_len, tx_timeout, frag->data[2]);
 
 		kw41z_tmr3_set_timeout(tx_timeout);
 		ZLL->PHY_CTRL |= ZLL_PHY_CTRL_RXACKRQD_MASK;
 		xcvseq = KW41Z_STATE_TXRX;
 	} else {
-		SYS_LOG_DBG("AUTOACK DISABLED: len: %d, seq: %d",
-			payload_len, (frag->data - net_pkt_ll_reserve(pkt))[2]);
+		LOG_DBG("AUTOACK DISABLED: len: %d, seq: %d",
+			payload_len, frag->data[2]);
 
 		ZLL->PHY_CTRL &= ~ZLL_PHY_CTRL_RXACKRQD_MASK;
 		xcvseq = KW41Z_STATE_TX;
@@ -638,7 +638,7 @@ static int kw41z_tx(struct device *dev, struct net_pkt *pkt,
 	irq_unlock(key);
 	k_sem_take(&kw41z->seq_sync, K_FOREVER);
 
-	SYS_LOG_DBG("seq_retval: %d", kw41z->seq_retval);
+	LOG_DBG("seq_retval: %d", kw41z->seq_retval);
 	return kw41z->seq_retval;
 }
 
@@ -646,18 +646,16 @@ static void kw41z_isr(int unused)
 {
 	u32_t irqsts = ZLL->IRQSTS;
 	u8_t state = kw41z_get_seq_state();
-	u8_t restart_rx = 1;
+	u8_t restart_rx = 1U;
 	u32_t rx_len;
-#if defined(CONFIG_KW41_DBG_TRACE) || \
-	(CONFIG_SYS_LOG_IEEE802154_DRIVER_LEVEL > SYS_LOG_LEVEL_INFO)
+
 	/*
 	 * Variable is used in debug output to capture the state of the
 	 * sequencer at interrupt.
 	 */
 	u32_t seq_state = ZLL->SEQ_STATE;
-#endif
 
-	SYS_LOG_DBG("ENTRY: irqsts: 0x%08X, PHY_CTRL: 0x%08X, "
+	LOG_DBG("ENTRY: irqsts: 0x%08X, PHY_CTRL: 0x%08X, "
 		"SEQ_STATE: 0x%08X, SEQ_CTRL: 0x%08X, TMR: %d, state: %d",
 		irqsts, (unsigned int)ZLL->PHY_CTRL,
 		(unsigned int)seq_state,
@@ -669,7 +667,7 @@ static void kw41z_isr(int unused)
 	ZLL->IRQSTS = irqsts;
 
 	if (irqsts & ZLL_IRQSTS_FILTERFAIL_IRQ_MASK) {
-		SYS_LOG_DBG("Incoming RX failed packet filtering rules: "
+		LOG_DBG("Incoming RX failed packet filtering rules: "
 			"CODE: 0x%08X, irqsts: 0x%08X, PHY_CTRL: 0x%08X, "
 			"SEQ_STATE: 0x%08X, state: %d",
 			(unsigned int)ZLL->FILTERFAIL_CODE,
@@ -677,7 +675,7 @@ static void kw41z_isr(int unused)
 			(unsigned int)ZLL->PHY_CTRL,
 			(unsigned int)seq_state, state);
 
-		restart_rx = 0;
+		restart_rx = 0U;
 
 	} else if ((!(ZLL->PHY_CTRL & ZLL_PHY_CTRL_RX_WMRK_MSK_MASK)) &&
 	    (irqsts & ZLL_IRQSTS_RXWTRMRKIRQ_MASK)) {
@@ -698,7 +696,7 @@ static void kw41z_isr(int unused)
 
 		if (rx_len > IEEE802154_ACK_LENGTH) {
 
-			SYS_LOG_DBG("WMRK irq: seq_state: 0x%08x, rx_len: %d",
+			LOG_DBG("WMRK irq: seq_state: 0x%08x, rx_len: %d",
 				seq_state, rx_len);
 			/*
 			 * Assume the RX includes an auto-ACK so set the
@@ -714,7 +712,7 @@ static void kw41z_isr(int unused)
 			rx_len = rx_len * 2 + 12 + 22 + 2;
 			kw41z_tmr3_set_timeout(rx_len);
 		}
-		restart_rx = 0;
+		restart_rx = 0U;
 	}
 
 	/* Sequence done IRQ */
@@ -724,9 +722,9 @@ static void kw41z_isr(int unused)
 		 * PLL unlock
 		 */
 		if (irqsts & ZLL_IRQSTS_PLL_UNLOCK_IRQ_MASK) {
-			SYS_LOG_ERR("PLL unlock error");
+			LOG_ERR("PLL unlock error");
 			kw41z_isr_seq_cleanup();
-			restart_rx = 1;
+			restart_rx = 1U;
 		}
 		/*
 		 * TMR3 timeout, the autosequence has been aborted due to
@@ -736,7 +734,7 @@ static void kw41z_isr(int unused)
 			(!(irqsts & ZLL_IRQSTS_RXIRQ_MASK)) &&
 			(state != KW41Z_STATE_TX)) {
 
-			SYS_LOG_DBG("a) TMR3 timeout: irqsts: 0x%08X, "
+			LOG_DBG("a) TMR3 timeout: irqsts: 0x%08X, "
 				"seq_state: 0x%08X, PHY_CTRL: 0x%08X, "
 				"state: %d",
 				irqsts, seq_state,
@@ -746,7 +744,7 @@ static void kw41z_isr(int unused)
 				(unsigned int)ZLL->PHY_CTRL, seq_state);
 
 			kw41z_isr_timeout_cleanup();
-			restart_rx = 1;
+			restart_rx = 1U;
 
 			if (state == KW41Z_STATE_TXRX) {
 				/* TODO: What is the right error for no ACK? */
@@ -759,7 +757,7 @@ static void kw41z_isr(int unused)
 
 			switch (state) {
 			case KW41Z_STATE_RX:
-				SYS_LOG_DBG("RX seq done: SEQ_STATE: 0x%08X",
+				LOG_DBG("RX seq done: SEQ_STATE: 0x%08X",
 					(unsigned int)seq_state);
 
 				KW_DBG_TRACE(KW41_DBG_TRACE_RX, irqsts,
@@ -777,13 +775,13 @@ static void kw41z_isr(int unused)
 							rx_len);
 					}
 				}
-				restart_rx = 1;
+				restart_rx = 1U;
 				break;
 			case KW41Z_STATE_TXRX:
-				SYS_LOG_DBG("TXRX seq done");
+				LOG_DBG("TXRX seq done");
 				kw41z_tmr3_disable();
 			case KW41Z_STATE_TX:
-				SYS_LOG_DBG("TX seq done");
+				LOG_DBG("TX seq done");
 				KW_DBG_TRACE(KW41_DBG_TRACE_TX, irqsts,
 					(unsigned int)ZLL->PHY_CTRL, seq_state);
 				if (irqsts & ZLL_IRQSTS_CCA_MASK) {
@@ -797,30 +795,30 @@ static void kw41z_isr(int unused)
 				}
 
 				k_sem_give(&kw41z_context_data.seq_sync);
-				restart_rx = 1;
+				restart_rx = 1U;
 
 				break;
 			case KW41Z_STATE_CCA:
-				SYS_LOG_DBG("CCA seq done");
+				LOG_DBG("CCA seq done");
 				KW_DBG_TRACE(KW41_DBG_TRACE_CCA, irqsts,
 					(unsigned int)ZLL->PHY_CTRL, seq_state);
 				if (irqsts & ZLL_IRQSTS_CCA_MASK) {
 					atomic_set(
 						&kw41z_context_data.seq_retval,
 						-EBUSY);
-					restart_rx = 1;
+					restart_rx = 1U;
 				} else {
 					atomic_set(
 						&kw41z_context_data.seq_retval,
 						0);
-					restart_rx = 0;
+					restart_rx = 0U;
 				}
 
 				k_sem_give(&kw41z_context_data.seq_sync);
 				break;
 			default:
-				SYS_LOG_DBG("Unhandled state: %d", state);
-				restart_rx = 1;
+				LOG_DBG("Unhandled state: %d", state);
+				restart_rx = 1U;
 				break;
 			}
 		}
@@ -829,15 +827,15 @@ static void kw41z_isr(int unused)
 		if ((irqsts & ZLL_IRQSTS_TMR3IRQ_MASK) &&
 			(!(irqsts & ZLL_IRQSTS_TMR3MSK_MASK))) {
 
-			SYS_LOG_DBG("b) TMR3 timeout: irqsts: 0x%08X, "
+			LOG_DBG("b) TMR3 timeout: irqsts: 0x%08X, "
 				"seq_state: 0x%08X, state: %d",
 				irqsts, seq_state, state);
 
 			kw41z_tmr3_disable();
-			restart_rx = 0;
+			restart_rx = 0U;
 			if (state != KW41Z_STATE_IDLE) {
 				kw41z_isr_timeout_cleanup();
-				restart_rx = 1;
+				restart_rx = 1U;
 				/* If we are not running an automated
 				 * sequence then handle event. TMR3 can expire
 				 * during Recv/Ack sequence where the transmit
@@ -849,7 +847,7 @@ static void kw41z_isr(int unused)
 
 	/* Restart RX */
 	if (restart_rx) {
-		SYS_LOG_DBG("RESET RX");
+		LOG_DBG("RESET RX");
 		kw41z_phy_abort();
 		kw41z_set_seq_state(KW41Z_STATE_RX);
 		kw41z_enable_seq_irq();
@@ -1009,7 +1007,6 @@ static void kw41z_iface_init(struct net_if *iface)
 
 static struct ieee802154_radio_api kw41z_radio_api = {
 	.iface_api.init	= kw41z_iface_init,
-	.iface_api.send	= ieee802154_radio_send,
 
 	.get_capabilities	= kw41z_get_capabilities,
 	.cca			= kw41z_cca,

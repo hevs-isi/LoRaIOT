@@ -18,8 +18,8 @@
  *
  */
 
-#ifndef _STM32_EXTI_H_
-#define _STM32_EXTI_H_
+#ifndef ZEPHYR_DRIVERS_INTERRUPT_CONTROLLER_EXTI_STM32_H_
+#define ZEPHYR_DRIVERS_INTERRUPT_CONTROLLER_EXTI_STM32_H_
 
 #include <zephyr/types.h>
 
@@ -31,7 +31,7 @@
  *
  * @param line EXTI# line
  */
-void stm32_exti_enable(int line);
+int stm32_exti_enable(int line);
 
 /**
  * @brief disable EXTI interrupt for specific line
@@ -68,7 +68,8 @@ typedef void (*stm32_exti_callback_t) (int line, void *user);
  * @param cb   user callback
  * @param arg  user arg
  */
-void stm32_exti_set_callback(int line, stm32_exti_callback_t cb, void *data);
+int stm32_exti_set_callback(int line, int port, stm32_exti_callback_t cb,
+				void *data);
 
 /**
  * @brief unset EXTI interrupt callback
@@ -77,4 +78,4 @@ void stm32_exti_set_callback(int line, stm32_exti_callback_t cb, void *data);
  */
 void stm32_exti_unset_callback(int line);
 
-#endif /* _STM32_EXTI_H_ */
+#endif /* ZEPHYR_DRIVERS_INTERRUPT_CONTROLLER_EXTI_STM32_H_ */

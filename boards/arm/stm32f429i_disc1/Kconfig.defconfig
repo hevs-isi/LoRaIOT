@@ -8,11 +8,11 @@
 if BOARD_STM32F429I_DISC1
 
 config BOARD
-	default stm32f429i_disc1
+	default "stm32f429i_disc1"
 
 if UART_CONSOLE
 
-config UART_STM32_PORT_1
+config UART_1
 	default y
 
 endif # UART_CONSOLE

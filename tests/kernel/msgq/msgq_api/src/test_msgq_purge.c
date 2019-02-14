@@ -9,8 +9,8 @@
 K_THREAD_STACK_EXTERN(tstack);
 extern struct k_thread tdata;
 extern struct k_msgq msgq;
-static char __aligned(4) tbuffer[MSG_SIZE * MSGQ_LEN];
-static u32_t data[MSGQ_LEN] = { MSG0, MSG1 };
+static ZTEST_BMEM char __aligned(4) tbuffer[MSG_SIZE * MSGQ_LEN];
+static ZTEST_DMEM u32_t data[MSGQ_LEN] = { MSG0, MSG1 };
 
 static void tThread_entry(void *p1, void *p2, void *p3)
 {
@@ -44,11 +44,14 @@ static void purge_when_put(struct k_msgq *q)
 }
 
 /**
- * @brief Verify zephyr msgq purge under different scenario
- * @addtogroup kernel_message_queue
+ * @addtogroup kernel_message_queue_tests
  * @{
  */
 
+/**
+ * @brief Test purge a message queue
+ * @see k_msgq_init(), k_msgq_purge(), k_msgq_put()
+ */
 void test_msgq_purge_when_put(void)
 {
 	k_msgq_init(&msgq, tbuffer, MSG_SIZE, MSGQ_LEN);
@@ -57,6 +60,10 @@ void test_msgq_purge_when_put(void)
 }
 
 #ifdef CONFIG_USERSPACE
+/**
+ * @brief Test purge a message queue
+ * @see k_msgq_init(), k_msgq_purge(), k_msgq_put()
+ */
 void test_msgq_user_purge_when_put(void)
 {
 	struct k_msgq *q;

@@ -6,9 +6,10 @@
 
 struct bt_settings_handler {
 	const char *name;
-	int (*set)(int argc, char **argv, char *val);
+	int (*set)(int argc, char **argv, void *value_ctx);
 	int (*commit)(void);
-	int (*export)(int (*func)(const char *name, char *val));
+	int (*export)(int (*func)(const char *name, void *val,
+				  size_t val_len));
 };
 
 #define BT_SETTINGS_DEFINE(_name, _set, _commit, _export)               \
@@ -30,5 +31,7 @@ struct bt_settings_handler {
 void bt_settings_encode_key(char *path, size_t path_size, const char *subsys,
 			    bt_addr_le_t *addr, const char *key);
 int bt_settings_decode_key(char *key, bt_addr_le_t *addr);
+
+void bt_settings_save_id(void);
 
 int bt_settings_init(void);

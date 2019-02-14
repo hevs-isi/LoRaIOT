@@ -57,7 +57,7 @@
   * @{
   */
 
-/** 
+/**
   * @brief HAL State structures definition
   */
 typedef enum
@@ -68,8 +68,8 @@ typedef enum
   HAL_DAC_STATE_TIMEOUT           = 0x03U,  /*!< DAC timeout state                    */
   HAL_DAC_STATE_ERROR             = 0x04U   /*!< DAC error state                      */
 }HAL_DAC_StateTypeDef;
- 
-/** 
+
+/**
   * @brief DAC handle Structure definition
   */
 typedef struct
@@ -88,7 +88,7 @@ typedef struct
 
 }DAC_HandleTypeDef;
 
-/** 
+/**
   * @brief DAC Configuration regular Channel structure definition
   */
 typedef struct
@@ -123,14 +123,14 @@ typedef struct
   * @{
   */
 
-#define DAC_TRIGGER_NONE                   ((uint32_t)0x00000000U) /*!< Conversion is automatic once the DAC1_DHRxxxx register 
+#define DAC_TRIGGER_NONE                   ((uint32_t)0x00000000U) /*!< Conversion is automatic once the DAC1_DHRxxxx register
                                                                        has been loaded, and not by external trigger */
 #define DAC_TRIGGER_T2_TRGO                ((uint32_t)(DAC_CR_TSEL1_2 | DAC_CR_TEN1)) /*!< TIM2 TRGO selected as external conversion trigger for DAC channel */
 #define DAC_TRIGGER_T4_TRGO                ((uint32_t)(DAC_CR_TSEL1_2 | DAC_CR_TSEL1_0 | DAC_CR_TEN1)) /*!< TIM4 TRGO selected as external conversion trigger for DAC channel */
 #define DAC_TRIGGER_T5_TRGO                ((uint32_t)(DAC_CR_TSEL1_1 | DAC_CR_TSEL1_0 | DAC_CR_TEN1)) /*!< TIM5 TRGO selected as external conversion trigger for DAC channel */
 #define DAC_TRIGGER_T6_TRGO                ((uint32_t)DAC_CR_TEN1) /*!< TIM6 TRGO selected as external conversion trigger for DAC channel */
 #define DAC_TRIGGER_T7_TRGO                ((uint32_t)(DAC_CR_TSEL1_1 | DAC_CR_TEN1)) /*!< TIM7 TRGO selected as external conversion trigger for DAC channel */
-#define DAC_TRIGGER_T8_TRGO                ((uint32_t)(DAC_CR_TSEL1_0 | DAC_CR_TEN1)) /*!< TIM8 TRGO selected as external conversion trigger for DAC channel */                                                                       
+#define DAC_TRIGGER_T8_TRGO                ((uint32_t)(DAC_CR_TSEL1_0 | DAC_CR_TEN1)) /*!< TIM8 TRGO selected as external conversion trigger for DAC channel */
 
 #define DAC_TRIGGER_EXT_IT9                ((uint32_t)(DAC_CR_TSEL1_2 | DAC_CR_TSEL1_1 | DAC_CR_TEN1)) /*!< EXTI Line9 event selected as external conversion trigger for DAC channel */
 #define DAC_TRIGGER_SOFTWARE               ((uint32_t)(DAC_CR_TSEL1 | DAC_CR_TEN1)) /*!< Conversion started by software trigger for DAC channel */
@@ -168,7 +168,7 @@ typedef struct
 
 /** @defgroup DAC_flags_definition DAC Flags Definition
   * @{
-  */ 
+  */
 #define DAC_FLAG_DMAUDR1                   ((uint32_t)DAC_SR_DMAUDR1)
 #define DAC_FLAG_DMAUDR2                   ((uint32_t)DAC_SR_DMAUDR2)
 /**
@@ -177,7 +177,7 @@ typedef struct
 
 /** @defgroup DAC_IT_definition DAC IT Definition
   * @{
-  */ 
+  */
 #define DAC_IT_DMAUDR1                   ((uint32_t)DAC_SR_DMAUDR1)
 #define DAC_IT_DMAUDR2                   ((uint32_t)DAC_SR_DMAUDR2)
 /**
@@ -194,22 +194,22 @@ typedef struct
   */
 
 /** @brief Reset DAC handle state
-  * @param  __HANDLE__: specifies the DAC handle.
+  * @param  __HANDLE__ specifies the DAC handle.
   * @retval None
   */
 #define __HAL_DAC_RESET_HANDLE_STATE(__HANDLE__) ((__HANDLE__)->State = HAL_DAC_STATE_RESET)
 
 /** @brief Enable the DAC channel
-  * @param  __HANDLE__: specifies the DAC handle.
-  * @param  __DAC_CHANNEL__: specifies the DAC channel
+  * @param  __HANDLE__ specifies the DAC handle.
+  * @param  __DAC_CHANNEL__ specifies the DAC channel
   * @retval None
   */
 #define __HAL_DAC_ENABLE(__HANDLE__, __DAC_CHANNEL__) \
 ((__HANDLE__)->Instance->CR |=  (DAC_CR_EN1 << (__DAC_CHANNEL__)))
 
 /** @brief Disable the DAC channel
-  * @param  __HANDLE__: specifies the DAC handle
-  * @param  __DAC_CHANNEL__: specifies the DAC channel.
+  * @param  __HANDLE__ specifies the DAC handle
+  * @param  __DAC_CHANNEL__ specifies the DAC channel.
   * @retval None
   */
 #define __HAL_DAC_DISABLE(__HANDLE__, __DAC_CHANNEL__) \
@@ -217,22 +217,22 @@ typedef struct
 
 
 /** @brief Enable the DAC interrupt
-  * @param  __HANDLE__: specifies the DAC handle
-  * @param  __INTERRUPT__: specifies the DAC interrupt.
+  * @param  __HANDLE__ specifies the DAC handle
+  * @param  __INTERRUPT__ specifies the DAC interrupt.
   * @retval None
   */
 #define __HAL_DAC_ENABLE_IT(__HANDLE__, __INTERRUPT__) (((__HANDLE__)->Instance->CR) |= (__INTERRUPT__))
 
 /** @brief Disable the DAC interrupt
-  * @param  __HANDLE__: specifies the DAC handle
-  * @param  __INTERRUPT__: specifies the DAC interrupt.
+  * @param  __HANDLE__ specifies the DAC handle
+  * @param  __INTERRUPT__ specifies the DAC interrupt.
   * @retval None
   */
 #define __HAL_DAC_DISABLE_IT(__HANDLE__, __INTERRUPT__) (((__HANDLE__)->Instance->CR) &= ~(__INTERRUPT__))
 
 /** @brief  Checks if the specified DAC interrupt source is enabled or disabled.
-  * @param __HANDLE__: DAC handle
-  * @param __INTERRUPT__: DAC interrupt source to check
+  * @param __HANDLE__ DAC handle
+  * @param __INTERRUPT__ DAC interrupt source to check
   *          This parameter can be any combination of the following values:
   *            @arg DAC_IT_DMAUDR1: DAC channel 1 DMA underrun interrupt
   *            @arg DAC_IT_DMAUDR2: DAC channel 2 DMA underrun interrupt
@@ -241,8 +241,8 @@ typedef struct
 #define __HAL_DAC_GET_IT_SOURCE(__HANDLE__, __INTERRUPT__) (((__HANDLE__)->Instance->CR & (__INTERRUPT__)) == (__INTERRUPT__))
 
 /** @brief  Get the selected DAC's flag status.
-  * @param  __HANDLE__: specifies the DAC handle.
-  * @param  __FLAG__: specifies the flag to clear.
+  * @param  __HANDLE__ specifies the DAC handle.
+  * @param  __FLAG__ specifies the flag to clear.
   *         This parameter can be any combination of the following values:
   *            @arg DAC_FLAG_DMAUDR1: DMA underrun 1 flag
   *            @arg DAC_FLAG_DMAUDR2: DMA underrun 2 flag
@@ -251,8 +251,8 @@ typedef struct
 #define __HAL_DAC_GET_FLAG(__HANDLE__, __FLAG__) ((((__HANDLE__)->Instance->SR) & (__FLAG__)) == (__FLAG__))
 
 /** @brief  Clear the DAC's flag.
-  * @param  __HANDLE__: specifies the DAC handle.
-  * @param  __FLAG__: specifies the flag to clear.
+  * @param  __HANDLE__ specifies the DAC handle.
+  * @param  __FLAG__ specifies the flag to clear.
   *         This parameter can be any combination of the following values:
   *            @arg DAC_FLAG_DMAUDR1: DMA underrun 1 flag
   *            @arg DAC_FLAG_DMAUDR2: DMA underrun 2 flag
@@ -360,19 +360,19 @@ void HAL_DAC_DMAUnderrunCallbackCh1(DAC_HandleTypeDef *hdac);
                                  ((TRIGGER) == DAC_TRIGGER_SOFTWARE))
 
 /** @brief Set DHR12R1 alignment
-  * @param  __ALIGNMENT__: specifies the DAC alignment
+  * @param  __ALIGNMENT__ specifies the DAC alignment
   * @retval None
   */
 #define DAC_DHR12R1_ALIGNMENT(__ALIGNMENT__) (((uint32_t)0x00000008U) + (__ALIGNMENT__))
 
 /** @brief  Set DHR12R2 alignment
-  * @param  __ALIGNMENT__: specifies the DAC alignment
+  * @param  __ALIGNMENT__ specifies the DAC alignment
   * @retval None
   */
 #define DAC_DHR12R2_ALIGNMENT(__ALIGNMENT__) (((uint32_t)0x00000014U) + (__ALIGNMENT__))
 
 /** @brief  Set DHR12RD alignment
-  * @param  __ALIGNMENT__: specifies the DAC alignment
+  * @param  __ALIGNMENT__ specifies the DAC alignment
   * @retval None
   */
 #define DAC_DHR12RD_ALIGNMENT(__ALIGNMENT__) (((uint32_t)0x00000020U) + (__ALIGNMENT__))
@@ -396,7 +396,7 @@ void HAL_DAC_DMAUnderrunCallbackCh1(DAC_HandleTypeDef *hdac);
 /**
   * @}
   */
-  
+
 #ifdef __cplusplus
 }
 #endif

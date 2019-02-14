@@ -2,6 +2,7 @@ sample:
   name: Blinky Sample
 tests:
   test:
-    platform_whitelist: arduino_101
-    tags: samples
+    tags: LED gpio
+    # The filters below are from DTS
+    filter: LED0_GPIO_CONTROLLER
     depends_on: gpio

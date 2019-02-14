@@ -10,12 +10,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __NET_CORE_H
-#define __NET_CORE_H
+#ifndef ZEPHYR_INCLUDE_NET_NET_CORE_H_
+#define ZEPHYR_INCLUDE_NET_NET_CORE_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <stdbool.h>
 
 /**
  * @brief Networking
@@ -32,41 +34,18 @@ extern "C" {
  */
 
 /* Network subsystem logging helpers */
+#include <logging/log.h>
 
-#if defined(NET_LOG_ENABLED)
-#if !defined(SYS_LOG_DOMAIN)
-#define SYS_LOG_DOMAIN "net"
-#endif /* !SYS_LOG_DOMAIN */
+#define NET_DBG(fmt, ...) LOG_DBG("(%p): " fmt, k_current_get(), \
+				  ##__VA_ARGS__)
+#define NET_ERR(fmt, ...) LOG_ERR(fmt, ##__VA_ARGS__)
+#define NET_WARN(fmt, ...) LOG_WRN(fmt, ##__VA_ARGS__)
+#define NET_INFO(fmt, ...) LOG_INF(fmt,  ##__VA_ARGS__)
 
-#undef SYS_LOG_LEVEL
-#ifndef NET_SYS_LOG_LEVEL
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_NET_LEVEL
-#else
-#define SYS_LOG_LEVEL NET_SYS_LOG_LEVEL
-#endif /* !NET_SYS_LOG_LEVEL */
+#include <misc/__assert.h>
 
-#define NET_DBG(fmt, ...) SYS_LOG_DBG("(%p): " fmt, k_current_get(), \
-				      ##__VA_ARGS__)
-#define NET_ERR(fmt, ...) SYS_LOG_ERR(fmt, ##__VA_ARGS__)
-#define NET_WARN(fmt, ...) SYS_LOG_WRN(fmt, ##__VA_ARGS__)
-#define NET_INFO(fmt, ...) SYS_LOG_INF(fmt,  ##__VA_ARGS__)
-#define NET_ASSERT(cond) do {				     \
-		if (!(cond)) {					     \
-			NET_ERR("{assert: '" #cond "' failed}");     \
-		} } while (0)
-#define NET_ASSERT_INFO(cond, fmt, ...) do {			     \
-		if (!(cond)) {					     \
-			NET_ERR("{assert: '" #cond "' failed} " fmt, \
-				##__VA_ARGS__);			     \
-		} } while (0)
-#else /* NET_LOG_ENABLED */
-#define NET_DBG(...)
-#define NET_ERR(...)
-#define NET_INFO(...)
-#define NET_WARN(...)
-#define NET_ASSERT(...)
-#define NET_ASSERT_INFO(...)
-#endif /* NET_LOG_ENABLED */
+#define NET_ASSERT(cond) __ASSERT_NO_MSG(cond)
+#define NET_ASSERT_INFO(cond, fmt, ...) __ASSERT(cond, fmt, ##__VA_ARGS__)
 
 #include <kernel.h>
 
@@ -75,7 +54,6 @@ struct net_pkt;
 struct net_context;
 struct net_if;
 
-#include <logging/sys_log.h>
 #include <string.h>
 
 /**
@@ -205,19 +183,8 @@ static inline void net_analyze_stack_get_values(const char *stack,
 	*pcnt = ((size - *unused) * 100) / size;
 }
 
-static inline void net_analyze_stack(const char *name,
-				     const char *stack,
-				     size_t size)
-{
-	unsigned int pcnt, unused;
+void net_analyze_stack(const char *name, const char *stack, size_t size);
 
-	net_analyze_stack_get_values(stack, size, &pcnt, &unused);
-
-	NET_INFO("net (%p): %s stack real size %zu "
-		 "unused %u usage %zu/%zu (%u %%)",
-		 k_current_get(), name,
-		 size, unused, size - unused, size, pcnt);
-}
 #else
 #define net_analyze_stack(...)
 #define net_analyze_stack_get_values(...)
@@ -248,4 +215,4 @@ static inline void net_analyze_stack(const char *name,
 }
 #endif
 
-#endif /* __NET_CORE_H */
+#endif /* ZEPHYR_INCLUDE_NET_NET_CORE_H_ */

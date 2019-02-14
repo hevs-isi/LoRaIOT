@@ -53,10 +53,18 @@ SECTION_FUNC(TEXT, _rirq_enter)
 
 
 #ifdef CONFIG_ARC_STACK_CHECKING
+#ifdef CONFIG_ARC_HAS_SECURE
+	lr r2, [_ARC_V2_SEC_STAT]
+	bclr r2, r2, _ARC_V2_SEC_STAT_SSC_BIT
+	/* sflag r2 */
+	/* sflag instruction is not supported in current ARC GNU */
+	.long 0x00bf302f
+#else
 	/* disable stack checking */
 	lr r2, [_ARC_V2_STATUS32]
 	bclr r2, r2, _ARC_V2_STATUS32_SC_BIT
 	kflag r2
+#endif
 #endif
 	clri
 	ld r1, [exc_nest_count]
@@ -109,16 +117,6 @@ SECTION_FUNC(TEXT, _rirq_exit)
 	 * point on until return from interrupt.
 	 */
 
-
-	/*
-	 * Non-preemptible thread ? Do not schedule (see explanation of
-	 * preempt field in kernel_struct.h).
-	 */
-	ldh_s r0, [r2, _thread_offset_to_preempt]
-	mov r3, _NON_PREEMPT_THRESHOLD
-	cmp_s r0, r3
-	bhs.d _rirq_no_reschedule
-
 	/*
 	 * Both (a)reschedule and (b)non-reschedule cases need to load the
 	 * current thread's stack, but don't have to use it until the decision
@@ -153,11 +151,7 @@ _rirq_common_interrupt_swap:
 	/* r2 contains pointer to new thread */
 
 #ifdef CONFIG_ARC_STACK_CHECKING
-	/* Use stack top and base registers from restored context */
-	ld r3, [r2, _thread_offset_to_stack_base]
-	sr r3, [_ARC_V2_KSTACK_BASE]
-	ld r3, [r2, _thread_offset_to_stack_top]
-	sr r3, [_ARC_V2_KSTACK_TOP]
+	_load_stack_check_regs
 #endif
 	/*
 	 * _load_callee_saved_regs expects incoming thread in r2.
@@ -205,6 +199,9 @@ _rirq_return_from_coop:
 	/* update return value on stack */
 	ld_s r0, [r2, _thread_offset_to_return_value]
 	st_s r0, [sp, ___isf_t_r0_OFFSET]
+
+	/* reset zero-overhead loops */
+	st 0, [sp, ___isf_t_lp_end_OFFSET]
 
 	/*
 	 * r13 is part of both the callee and caller-saved register sets because

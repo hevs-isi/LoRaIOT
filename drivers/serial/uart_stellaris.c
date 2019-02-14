@@ -21,7 +21,7 @@
 #include <kernel.h>
 #include <arch/cpu.h>
 #include <misc/__assert.h>
-#include <board.h>
+#include <soc.h>
 #include <init.h>
 #include <uart.h>
 #include <linker/sections.h>
@@ -70,7 +70,8 @@ struct uart_stellaris_dev_data_t {
 	u32_t baud_rate;	/* Baud rate */
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
-	uart_irq_callback_t	cb;	/**< Callback function pointer */
+	uart_irq_callback_user_data_t cb;	/**< Callback function pointer */
+	void *cb_data;	/**< Callback function arg */
 #endif
 };
 
@@ -320,10 +321,8 @@ static int uart_stellaris_poll_in(struct device *dev, unsigned char *c)
  *
  * @param dev UART device struct
  * @param c Character to send
- *
- * @return Sent character
  */
-static unsigned char uart_stellaris_poll_out(struct device *dev,
+static void uart_stellaris_poll_out(struct device *dev,
 					     unsigned char c)
 {
 	volatile struct _uart *uart = UART_STRUCT(dev);
@@ -333,7 +332,6 @@ static unsigned char uart_stellaris_poll_out(struct device *dev,
 
 	/* send a character */
 	uart->dr = (u32_t)c;
-	return c;
 }
 
 #if CONFIG_UART_INTERRUPT_DRIVEN
@@ -351,7 +349,7 @@ static int uart_stellaris_fifo_fill(struct device *dev, const u8_t *tx_data,
 				    int len)
 {
 	volatile struct _uart *uart = UART_STRUCT(dev);
-	u8_t num_tx = 0;
+	u8_t num_tx = 0U;
 
 	while ((len - num_tx > 0) && ((uart->fr & UARTFR_TXFF) == 0)) {
 		uart->dr = (u32_t)tx_data[num_tx++];
@@ -373,7 +371,7 @@ static int uart_stellaris_fifo_read(struct device *dev, u8_t *rx_data,
 				    const int size)
 {
 	volatile struct _uart *uart = UART_STRUCT(dev);
-	u8_t num_rx = 0;
+	u8_t num_rx = 0U;
 
 	while ((size - num_rx > 0) && ((uart->fr & UARTFR_RXFE) == 0)) {
 		rx_data[num_rx++] = (u8_t)uart->dr;
@@ -392,7 +390,7 @@ static int uart_stellaris_fifo_read(struct device *dev, u8_t *rx_data,
 static void uart_stellaris_irq_tx_enable(struct device *dev)
 {
 	static u8_t first_time =
-		1;	   /* used to allow the first transmission */
+		1U;	   /* used to allow the first transmission */
 	u32_t saved_ctl;  /* saved UARTCTL (control) register */
 	u32_t saved_ibrd; /* saved UARTIBRD (integer baud rate) register */
 	u32_t saved_fbrd; /* saved UARTFBRD (fractional baud rate) register
@@ -407,7 +405,7 @@ static void uart_stellaris_irq_tx_enable(struct device *dev)
 		 * work,
 		 * so send one via loopback mode.
 		 */
-		first_time = 0;
+		first_time = 0U;
 
 		/* save current control and baud rate settings */
 		saved_ctl = uart->ctl;
@@ -416,11 +414,11 @@ static void uart_stellaris_irq_tx_enable(struct device *dev)
 
 		/* send a character with default settings via loopback */
 		disable(dev);
-		uart->fbrd = 0;
-		uart->ibrd = 1;
-		uart->lcrh = 0;
+		uart->fbrd = 0U;
+		uart->ibrd = 1U;
+		uart->lcrh = 0U;
 		uart->ctl = (UARTCTL_UARTEN | UARTCTL_TXEN | UARTCTL_LBE);
-		uart->dr = 0;
+		uart->dr = 0U;
 
 		while (uart->fr & UARTFR_BUSY)
 			;
@@ -572,11 +570,13 @@ static int uart_stellaris_irq_update(struct device *dev)
  * @return N/A
  */
 static void uart_stellaris_irq_callback_set(struct device *dev,
-					    uart_irq_callback_t cb)
+					    uart_irq_callback_user_data_t cb,
+					    void *cb_data)
 {
 	struct uart_stellaris_dev_data_t * const dev_data = DEV_DATA(dev);
 
 	dev_data->cb = cb;
+	dev_data->cb_data = cb_data;
 }
 
 /**
@@ -594,7 +594,7 @@ static void uart_stellaris_isr(void *arg)
 	struct uart_stellaris_dev_data_t * const dev_data = DEV_DATA(dev);
 
 	if (dev_data->cb) {
-		dev_data->cb(dev);
+		dev_data->cb(dev_data->cb_data);
 	}
 }
 
@@ -632,8 +632,8 @@ static void irq_config_func_0(struct device *port);
 #endif
 
 static const struct uart_device_config uart_stellaris_dev_cfg_0 = {
-	.base = (u8_t *)TI_STELLARIS_UART_4000C000_BASE_ADDRESS,
-	.sys_clk_freq = UART_STELLARIS_CLK_FREQ,
+	.base = (u8_t *)DT_TI_STELLARIS_UART_4000C000_BASE_ADDRESS,
+	.sys_clk_freq = DT_UART_STELLARIS_CLK_FREQ,
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 	.irq_config_func = irq_config_func_0,
@@ -641,10 +641,10 @@ static const struct uart_device_config uart_stellaris_dev_cfg_0 = {
 };
 
 static struct uart_stellaris_dev_data_t uart_stellaris_dev_data_0 = {
-	.baud_rate = TI_STELLARIS_UART_4000C000_CURRENT_SPEED,
+	.baud_rate = DT_TI_STELLARIS_UART_4000C000_CURRENT_SPEED,
 };
 
-DEVICE_AND_API_INIT(uart_stellaris0, TI_STELLARIS_UART_4000C000_LABEL,
+DEVICE_AND_API_INIT(uart_stellaris0, DT_TI_STELLARIS_UART_4000C000_LABEL,
 		    &uart_stellaris_init,
 		    &uart_stellaris_dev_data_0, &uart_stellaris_dev_cfg_0,
 		    PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,
@@ -653,11 +653,11 @@ DEVICE_AND_API_INIT(uart_stellaris0, TI_STELLARIS_UART_4000C000_LABEL,
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 static void irq_config_func_0(struct device *dev)
 {
-	IRQ_CONNECT(TI_STELLARIS_UART_4000C000_IRQ_0,
-		    TI_STELLARIS_UART_4000C000_IRQ_0_PRIORITY,
+	IRQ_CONNECT(DT_TI_STELLARIS_UART_4000C000_IRQ_0,
+		    DT_TI_STELLARIS_UART_4000C000_IRQ_0_PRIORITY,
 		    uart_stellaris_isr, DEVICE_GET(uart_stellaris0),
 		    0);
-	irq_enable(TI_STELLARIS_UART_4000C000_IRQ_0);
+	irq_enable(DT_TI_STELLARIS_UART_4000C000_IRQ_0);
 }
 #endif
 
@@ -670,8 +670,8 @@ static void irq_config_func_1(struct device *port);
 #endif
 
 static struct uart_device_config uart_stellaris_dev_cfg_1 = {
-	.base = (u8_t *)TI_STELLARIS_UART_4000D000_BASE_ADDRESS,
-	.sys_clk_freq = UART_STELLARIS_CLK_FREQ,
+	.base = (u8_t *)DT_TI_STELLARIS_UART_4000D000_BASE_ADDRESS,
+	.sys_clk_freq = DT_UART_STELLARIS_CLK_FREQ,
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 	.irq_config_func = irq_config_func_1,
@@ -679,10 +679,10 @@ static struct uart_device_config uart_stellaris_dev_cfg_1 = {
 };
 
 static struct uart_stellaris_dev_data_t uart_stellaris_dev_data_1 = {
-	.baud_rate = TI_STELLARIS_UART_4000D000_CURRENT_SPEED,
+	.baud_rate = DT_TI_STELLARIS_UART_4000D000_CURRENT_SPEED,
 };
 
-DEVICE_AND_API_INIT(uart_stellaris1, TI_STELLARIS_UART_4000D000_LABEL,
+DEVICE_AND_API_INIT(uart_stellaris1, DT_TI_STELLARIS_UART_4000D000_LABEL,
 		    &uart_stellaris_init,
 		    &uart_stellaris_dev_data_1, &uart_stellaris_dev_cfg_1,
 		    PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,
@@ -691,11 +691,11 @@ DEVICE_AND_API_INIT(uart_stellaris1, TI_STELLARIS_UART_4000D000_LABEL,
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 static void irq_config_func_1(struct device *dev)
 {
-	IRQ_CONNECT(TI_STELLARIS_UART_4000D000_IRQ_0,
-		    TI_STELLARIS_UART_4000D000_IRQ_0_PRIORITY,
+	IRQ_CONNECT(DT_TI_STELLARIS_UART_4000D000_IRQ_0,
+		    DT_TI_STELLARIS_UART_4000D000_IRQ_0_PRIORITY,
 		    uart_stellaris_isr, DEVICE_GET(uart_stellaris1),
 		    0);
-	irq_enable(TI_STELLARIS_UART_4000D000_IRQ_0);
+	irq_enable(DT_TI_STELLARIS_UART_4000D000_IRQ_0);
 }
 #endif
 
@@ -708,8 +708,8 @@ static void irq_config_func_2(struct device *port);
 #endif
 
 static const struct uart_device_config uart_stellaris_dev_cfg_2 = {
-	.base = (u8_t *)TI_STELLARIS_UART_4000E000_BASE_ADDRESS,
-	.sys_clk_freq = UART_STELLARIS_CLK_FREQ,
+	.base = (u8_t *)DT_TI_STELLARIS_UART_4000E000_BASE_ADDRESS,
+	.sys_clk_freq = DT_UART_STELLARIS_CLK_FREQ,
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 	.irq_config_func = irq_config_func_2,
@@ -717,10 +717,10 @@ static const struct uart_device_config uart_stellaris_dev_cfg_2 = {
 };
 
 static struct uart_stellaris_dev_data_t uart_stellaris_dev_data_2 = {
-	.baud_rate = TI_STELLARIS_UART_4000E000_CURRENT_SPEED,
+	.baud_rate = DT_TI_STELLARIS_UART_4000E000_CURRENT_SPEED,
 };
 
-DEVICE_AND_API_INIT(uart_stellaris2, TI_STELLARIS_UART_4000E000_LABEL,
+DEVICE_AND_API_INIT(uart_stellaris2, DT_TI_STELLARIS_UART_4000E000_LABEL,
 		    &uart_stellaris_init,
 		    &uart_stellaris_dev_data_2, &uart_stellaris_dev_cfg_2,
 		    PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,
@@ -729,11 +729,11 @@ DEVICE_AND_API_INIT(uart_stellaris2, TI_STELLARIS_UART_4000E000_LABEL,
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 static void irq_config_func_2(struct device *dev)
 {
-	IRQ_CONNECT(TI_STELLARIS_UART_4000E000_IRQ_0,
-		    TI_STELLARIS_UART_4000E000_IRQ_0_PRIORITY,
+	IRQ_CONNECT(DT_TI_STELLARIS_UART_4000E000_IRQ_0,
+		    DT_TI_STELLARIS_UART_4000E000_IRQ_0_PRIORITY,
 		    uart_stellaris_isr, DEVICE_GET(uart_stellaris2),
 		    0);
-	irq_enable(TI_STELLARIS_UART_4000E000_IRQ_0);
+	irq_enable(DT_TI_STELLARIS_UART_4000E000_IRQ_0);
 }
 #endif
 

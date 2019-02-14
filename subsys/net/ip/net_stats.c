@@ -5,13 +5,17 @@
  */
 
 #if defined(CONFIG_NET_STATISTICS_PERIODIC_OUTPUT)
-#define SYS_LOG_DOMAIN "net/stats"
-#define NET_SYS_LOG_LEVEL SYS_LOG_LEVEL_INFO
-#define NET_LOG_ENABLED 1
+#define NET_LOG_LEVEL LOG_LEVEL_INF
+#else
+#define NET_LOG_LEVEL CONFIG_NET_STATISTICS_LOG_LEVEL
 #endif
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(net_stats, NET_LOG_LEVEL);
 
 #include <kernel.h>
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <net/net_core.h>
 
@@ -54,16 +58,19 @@ static const char *priority2str(enum net_priority priority)
 }
 #endif
 
+static inline s64_t cmp_val(u64_t val1, u64_t val2)
+{
+	return (s64_t)(val1 - val2);
+}
+
 static inline void stats(struct net_if *iface)
 {
-	static s64_t next_print;
-	s64_t curr = k_uptime_get();
+	static u64_t next_print;
+	u64_t curr = k_uptime_get();
+	s64_t cmp = cmp_val(curr, next_print);
 	int i;
 
-	if (!next_print || (next_print < curr &&
-	    (!((curr - next_print) > PRINT_STATISTICS_INTERVAL)))) {
-		s64_t new_print;
-
+	if (!next_print || (abs(cmp) > PRINT_STATISTICS_INTERVAL)) {
 		if (iface) {
 			NET_INFO("Interface %p [%d]", iface,
 				 net_if_get_by_iface(iface));
@@ -146,40 +153,6 @@ static inline void stats(struct net_if *iface)
 			 GET_STAT(iface, tcp.connrst));
 #endif
 
-#if defined(CONFIG_NET_STATISTICS_RPL)
-		NET_INFO("RPL DIS recv   %d\tsent\t%d\tdrop\t%d",
-			 GET_STAT(iface, rpl.dis.recv),
-			 GET_STAT(iface, rpl.dis.sent),
-			 GET_STAT(iface, rpl.dis.drop));
-		NET_INFO("RPL DIO recv   %d\tsent\t%d\tdrop\t%d",
-			 GET_STAT(iface, rpl.dio.recv),
-			 GET_STAT(iface, rpl.dio.sent),
-			 GET_STAT(iface, rpl.dio.drop));
-		NET_INFO("RPL DAO recv   %d\tsent\t%d\tdrop\t%d\tforwarded\t%d",
-			 GET_STAT(iface, rpl.dao.recv),
-			 GET_STAT(iface, rpl.dao.sent),
-			 GET_STAT(iface, rpl.dao.drop),
-			 GET_STAT(iface, rpl.dao.forwarded));
-		NET_INFO("RPL DAOACK rcv %d\tsent\t%d\tdrop\t%d",
-			 GET_STAT(iface, rpl.dao_ack.recv),
-			 GET_STAT(iface, rpl.dao_ack.sent),
-			 GET_STAT(iface, rpl.dao_ack.drop));
-		NET_INFO("RPL overflows  %d\tl-repairs\t%d\tg-repairs\t%d",
-			 GET_STAT(iface, rpl.mem_overflows),
-			 GET_STAT(iface, rpl.local_repairs),
-			 GET_STAT(iface, rpl.global_repairs));
-		NET_INFO("RPL malformed  %d\tresets   \t%d\tp-switch\t%d",
-			 GET_STAT(iface, rpl.malformed_msgs),
-			 GET_STAT(iface, rpl.resets),
-			 GET_STAT(iface, rpl.parent_switch));
-		NET_INFO("RPL f-errors   %d\tl-errors\t%d\tl-warnings\t%d",
-			 GET_STAT(iface, rpl.forward_errors),
-			 GET_STAT(iface, rpl.loop_errors),
-			 GET_STAT(iface, rpl.loop_warnings));
-		NET_INFO("RPL r-repairs  %d",
-			 GET_STAT(iface, rpl.root_repairs));
-#endif /* CONFIG_NET_STATISTICS_RPL */
-
 		NET_INFO("Bytes received %u", GET_STAT(iface, bytes.received));
 		NET_INFO("Bytes sent     %u", GET_STAT(iface, bytes.sent));
 		NET_INFO("Processing err %d",
@@ -217,14 +190,7 @@ static inline void stats(struct net_if *iface)
 		ARG_UNUSED(i);
 #endif /* NET_TC_COUNT > 1 */
 
-		new_print = curr + PRINT_STATISTICS_INTERVAL;
-		if (new_print > curr) {
-			next_print = new_print;
-		} else {
-			/* Overflow */
-			next_print = PRINT_STATISTICS_INTERVAL -
-				(LLONG_MAX - curr);
-		}
+		next_print = curr + PRINT_STATISTICS_INTERVAL;
 	}
 }
 
@@ -318,12 +284,6 @@ static int net_stats_get(u32_t mgmt_request, struct net_if *iface,
 		src = GET_STAT_ADDR(iface, tcp);
 		break;
 #endif
-#if defined(CONFIG_NET_STATISTICS_RPL)
-	case NET_REQUEST_STATS_CMD_GET_RPL:
-		len_chk = sizeof(struct net_stats_rpl);
-		src = GET_STAT_ADDR(iface, rpl);
-		break;
-#endif
 	}
 
 	if (len != len_chk || !src) {
@@ -374,11 +334,6 @@ NET_MGMT_REGISTER_REQUEST_HANDLER(NET_REQUEST_STATS_GET_UDP,
 
 #if defined(CONFIG_NET_STATISTICS_TCP)
 NET_MGMT_REGISTER_REQUEST_HANDLER(NET_REQUEST_STATS_GET_TCP,
-				  net_stats_get);
-#endif
-
-#if defined(CONFIG_NET_STATISTICS_RPL)
-NET_MGMT_REGISTER_REQUEST_HANDLER(NET_REQUEST_STATS_GET_RPL,
 				  net_stats_get);
 #endif
 

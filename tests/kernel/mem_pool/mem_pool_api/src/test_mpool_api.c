@@ -7,6 +7,7 @@
 #include <ztest.h>
 #include <irq_offload.h>
 #include "test_mpool.h"
+#include <kernel_internal.h>
 
 /** TESTPOINT: Statically define and initialize a memory pool*/
 K_MEM_POOL_DEFINE(kmpool, BLK_SIZE_MIN, BLK_SIZE_MAX, BLK_NUM_MAX, BLK_ALIGN);
@@ -14,7 +15,7 @@ K_MEM_POOL_DEFINE(kmpool, BLK_SIZE_MIN, BLK_SIZE_MAX, BLK_NUM_MAX, BLK_ALIGN);
 void tmpool_alloc_free(void *data)
 {
 	ARG_UNUSED(data);
-	struct k_mem_block block[BLK_NUM_MIN];
+	static struct k_mem_block block[BLK_NUM_MIN];
 
 	for (int i = 0; i < BLK_NUM_MIN; i++) {
 		/**
@@ -57,19 +58,47 @@ void tmpool_alloc_free(void *data)
 }
 
 /*test cases*/
+/**
+ * @ingroup kernel_memory_pool_tests
+ * @brief Verify alloc and free of different block sizes.
+ *
+ * @details The test is basically checking if allocation
+ * happens for MAX_SIZE and MIN_SIZE defined in memory pool.
+ *
+ * @see k_mem_pool_alloc(), k_mem_pool_free()
+ */
 void test_mpool_alloc_free_thread(void)
 {
 	tmpool_alloc_free(NULL);
 }
 
+/**
+ * @ingroup kernel_memory_pool_tests
+ * @brief Test to validate alloc and free on IRQ context
+ *
+ * @details The test is run on IRQ context.
+ * The test checks allocation of MAX_SIZE and MIN_SIZE
+ * defined in memory pool.
+ *
+ * @see k_mem_pool_alloc(), k_mem_pool_free()
+ */
 void test_mpool_alloc_free_isr(void)
 {
 	irq_offload(tmpool_alloc_free, NULL);
 }
 
+/**
+ * @ingroup kernel_memory_pool_tests
+ * @brief Validates breaking a block into quarters feature
+ *
+ * @details The test case validates how a mem_pool provides
+ * functionality to break a block into quarters and repeatedly
+ * allocate and free the blocks.
+ * @see k_mem_pool_alloc(), k_mem_pool_free()
+ */
 void test_mpool_alloc_size(void)
 {
-	struct k_mem_block block[BLK_NUM_MIN];
+	static struct k_mem_block block[BLK_NUM_MIN];
 	size_t size = BLK_SIZE_MAX;
 	int i = 0;
 
@@ -108,9 +137,14 @@ void test_mpool_alloc_size(void)
 	}
 }
 
+/**
+ * @see k_mem_pool_alloc(), k_mem_pool_free()
+ * @brief Verify memory pool allocation with timeouts
+ * @see k_mem_pool_alloc(), k_mem_pool_free()
+ */
 void test_mpool_alloc_timeout(void)
 {
-	struct k_mem_block block[BLK_NUM_MIN], fblock;
+	static struct k_mem_block block[BLK_NUM_MIN], fblock;
 	s64_t tms;
 
 	for (int i = 0; i < BLK_NUM_MIN; i++) {
@@ -138,3 +172,20 @@ void test_mpool_alloc_timeout(void)
 	}
 }
 
+/**
+ * @brief Validate allocation and free from system heap memory pool
+ *
+ * @see k_thread_system_pool_assign(), z_thread_malloc(), k_free()
+ */
+void test_sys_heap_mem_pool_assign(void)
+{
+	void *ptr;
+
+	k_thread_system_pool_assign(k_current_get());
+	ptr = (char *)z_thread_malloc(BLK_SIZE_MIN/2);
+	zassert_not_null(ptr, "bytes allocation failed from system pool");
+	k_free(ptr);
+
+	zassert_is_null((char *)z_thread_malloc(BLK_SIZE_MAX * 2),
+						"overflow check failed");
+}

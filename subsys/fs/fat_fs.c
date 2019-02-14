@@ -70,7 +70,7 @@ static int fatfs_open(struct fs_file_t *zfp, const char *file_name)
 	void *ptr;
 
 	if (k_mem_slab_alloc(&fatfs_filep_pool, &ptr, K_NO_WAIT) == 0) {
-		memset(ptr, 0, sizeof(FIL));
+		(void)memset(ptr, 0, sizeof(FIL));
 		zfp->filep = ptr;
 	} else {
 		return -ENOMEM;
@@ -101,6 +101,24 @@ static int fatfs_unlink(struct fs_mount_t *mountp, const char *path)
 
 	res = f_unlink(&path[1]);
 
+	return translate_error(res);
+}
+
+static int fatfs_rename(struct fs_mount_t *mountp, const char *from,
+			const char *to)
+{
+	FRESULT res;
+	FILINFO fno;
+
+	/* Check if 'to' path exists; remove it if it does */
+	res = f_stat(&to[1], &fno);
+	if (FR_OK == res) {
+		res = f_unlink(&to[1]);
+		if (FR_OK != res)
+			return translate_error(res);
+	}
+
+	res = f_rename(&from[1], &to[1]);
 	return translate_error(res);
 }
 
@@ -196,7 +214,7 @@ static int fatfs_truncate(struct fs_file_t *zfp, off_t length)
 		 * optimization.
 		 */
 		unsigned int bw;
-		u8_t c = 0;
+		u8_t c = 0U;
 
 		for (int i = cur_length; i < length; i++) {
 			res = f_write(zfp->filep, &c, 1, &bw);
@@ -233,7 +251,7 @@ static int fatfs_opendir(struct fs_dir_t *zdp, const char *path)
 	void *ptr;
 
 	if (k_mem_slab_alloc(&fatfs_dirp_pool, &ptr, K_NO_WAIT) == 0) {
-		memset(ptr, 0, sizeof(DIR));
+		(void)memset(ptr, 0, sizeof(DIR));
 		zdp->dirp = ptr;
 	} else {
 		return -ENOMEM;
@@ -351,6 +369,7 @@ static struct fs_file_system_t fatfs_fs = {
 	.closedir = fatfs_closedir,
 	.mount = fatfs_mount,
 	.unlink = fatfs_unlink,
+	.rename = fatfs_rename,
 	.mkdir = fatfs_mkdir,
 	.stat = fatfs_stat,
 	.statvfs = fatfs_statvfs,

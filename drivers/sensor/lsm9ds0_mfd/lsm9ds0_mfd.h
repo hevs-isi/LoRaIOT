@@ -8,8 +8,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __SENSOR_LSM9DS0_MFD_H__
-#define __SENSOR_LSM9DS0_MFD_H__
+#ifndef ZEPHYR_DRIVERS_SENSOR_LSM9DS0_MFD_LSM9DS0_MFD_H_
+#define ZEPHYR_DRIVERS_SENSOR_LSM9DS0_MFD_LSM9DS0_MFD_H_
 
 #include <zephyr/types.h>
 #include <misc/util.h>
@@ -394,8 +394,6 @@
 						 BIT(1) | BIT(0))
 #define LMS9DS0_MFD_SHIFT_ACT_DUR_ACTD          0
 
-#define LSM9DS0_MFD_I2C_ADDR			CONFIG_LSM9DS0_MFD_I2C_ADDR
-
 #if defined(CONFIG_LSM9DS0_MFD_ACCEL_SAMPLING_RATE_0)
 	#define LSM9DS0_MFD_ACCEL_DEFAULT_AODR	0
 #elif defined(CONFIG_LSM9DS0_MFD_ACCEL_SAMPLING_RATE_3_125)
@@ -557,7 +555,4 @@ struct lsm9ds0_mfd_data {
 #endif
 };
 
-#define SYS_LOG_DOMAIN "LSM9DS0_MFD"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
-#endif /* __SENSOR_LSM9DS0_MFD_H__ */
+#endif /* ZEPHYR_DRIVERS_SENSOR_LSM9DS0_MFD_LSM9DS0_MFD_H_ */

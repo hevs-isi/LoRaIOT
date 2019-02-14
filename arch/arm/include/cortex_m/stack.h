@@ -11,8 +11,8 @@
  * Stack helper functions.
  */
 
-#ifndef _ARM_CORTEXM_STACK__H_
-#define _ARM_CORTEXM_STACK__H_
+#ifndef ZEPHYR_ARCH_ARM_INCLUDE_CORTEX_M_STACK_H_
+#define ZEPHYR_ARCH_ARM_INCLUDE_CORTEX_M_STACK_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,7 +24,7 @@ extern "C" {
 
 #else
 
-#include "arch/arm/cortex_m/cmsis.h"
+#include <arch/arm/cortex_m/cmsis.h>
 
 extern K_THREAD_STACK_DEFINE(_interrupt_stack, CONFIG_ISR_STACK_SIZE);
 
@@ -55,6 +55,17 @@ static ALWAYS_INLINE void _InterruptStackSetup(void)
 #error "Built-in MSP limit checks not supported by HW"
 #endif
 #endif /* CONFIG_BUILTIN_STACK_GUARD */
+
+#if defined(CONFIG_STACK_ALIGN_DOUBLE_WORD)
+	/* Enforce double-word stack alignment on exception entry
+	 * for Cortex-M3 and Cortex-M4 (ARMv7-M) MCUs. For the rest
+	 * of ARM Cortex-M processors this setting is enforced by
+	 * default and it is not configurable.
+	 */
+#if defined(CONFIG_CPU_CORTEX_M3) || defined(CONFIG_CPU_CORTEX_M4)
+	SCB->CCR |= SCB_CCR_STKALIGN_Msk;
+#endif
+#endif /* CONFIG_STACK_ALIGN_DOUBLE_WORD */
 }
 
 #endif /* _ASMLANGUAGE */
@@ -63,4 +74,4 @@ static ALWAYS_INLINE void _InterruptStackSetup(void)
 }
 #endif
 
-#endif /* _ARM_CORTEXM_STACK__H_ */
+#endif /* ZEPHYR_ARCH_ARM_INCLUDE_CORTEX_M_STACK_H_ */

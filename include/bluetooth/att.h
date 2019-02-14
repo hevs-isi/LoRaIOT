@@ -7,8 +7,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef __BT_ATT_H
-#define __BT_ATT_H
+#ifndef ZEPHYR_INCLUDE_BLUETOOTH_ATT_H_
+#define ZEPHYR_INCLUDE_BLUETOOTH_ATT_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,6 +34,8 @@ extern "C" {
 #define BT_ATT_ERR_INSUFFICIENT_ENCRYPTION	0x0f
 #define BT_ATT_ERR_UNSUPPORTED_GROUP_TYPE	0x10
 #define BT_ATT_ERR_INSUFFICIENT_RESOURCES	0x11
+#define BT_ATT_ERR_DB_OUT_OF_SYNC		0x12
+#define BT_ATT_ERR_VALUE_NOT_ALLOWED		0x13
 
 /* Common Profile Error Codes (from CSS) */
 #define BT_ATT_ERR_WRITE_REQ_REJECTED		0xfc
@@ -62,4 +64,4 @@ struct bt_att_req {
 }
 #endif
 
-#endif /* __BT_ATT_H */
+#endif /* ZEPHYR_INCLUDE_BLUETOOTH_ATT_H_ */

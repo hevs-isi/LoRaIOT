@@ -117,12 +117,16 @@ static int _to_dec(char *buf, int32_t value, int fplus, int fspace, int precisio
 
 	if (value < 0) {
 		*buf++ = '-';
-		if (value != 0x80000000)
+		if (value != 0x80000000) {
 			value = -value;
-	} else if (fplus)
+		}
+	} else if (fplus) {
 		*buf++ = '+';
-	else if (fspace)
+	} else if (fspace) {
 		*buf++ = ' ';
+	} else {
+		/* unreachable */
+	}
 
 	return (buf + _to_udec(buf, (uint32_t) value, precision)) - start;
 }
@@ -150,7 +154,7 @@ static	void _rlrshift(uint64_t *v)
 static void _ldiv5(uint64_t *v)
 {
 	uint32_t i, hi;
-	uint64_t rem = *v, quot = 0, q;
+	uint64_t rem = *v, quot = 0U, q;
 	static const char shifts[] = { 32, 3, 0 };
 
 	/* Usage in this file wants rounded behavior, not truncation.  So add
@@ -158,7 +162,7 @@ static void _ldiv5(uint64_t *v)
 	 */
 	rem += 2;
 
-	for (i = 0; i < 3; i++) {
+	for (i = 0U; i < 3; i++) {
 		hi = rem >> shifts[i];
 		q = (uint64_t)(hi / 5) << shifts[i];
 		rem -= q * 5;
@@ -177,8 +181,10 @@ static	char _get_digit(uint64_t *fr, int *digit_count)
 		*fr = *fr * 10;
 		rval = ((*fr >> 60) & 0xF) + '0';
 		*fr &= 0x0FFFFFFFFFFFFFFFull;
-	} else
+	} else {
 		rval = '0';
+	}
+
 	return (char) (rval);
 }
 
@@ -225,26 +231,45 @@ static int _to_float(char *buf, uint64_t double_temp, int c,
 
 
 	if (exp == 0x7ff) {
+		if (sign) {
+			*buf++ = '-';
+		}
 		if (!fract) {
-			*buf++ = sign ? '-' : '+';
-			*buf++ = 'I';
-			*buf++ = 'N';
-			*buf++ = 'F';
+			if (isupper(c)) {
+				*buf++ = 'I';
+				*buf++ = 'N';
+				*buf++ = 'F';
+			} else {
+				*buf++ = 'i';
+				*buf++ = 'n';
+				*buf++ = 'f';
+			}
 		} else {
-			*buf++ = 'N';
-			*buf++ = 'a';
-			*buf++ = 'N';
+			if (isupper(c)) {
+				*buf++ = 'N';
+				*buf++ = 'A';
+				*buf++ = 'N';
+			} else {
+				*buf++ = 'n';
+				*buf++ = 'a';
+				*buf++ = 'n';
+			}
 		}
 		*buf = 0;
 		return buf - start;
+	}
+
+	if (c == 'F') {
+		c = 'f';
 	}
 
 	if ((exp | fract) != 0) {
 		exp -= (1023 - 1);	/* +1 since .1 vs 1. */
 		fract |= HIGHBIT64;
 		decexp = true;		/* Wasn't zero */
-	} else
+	} else {
 		decexp = false;		/* It was zero */
+	}
 
 	if (decexp && sign) {
 		*buf++ = '-';
@@ -252,6 +277,8 @@ static int _to_float(char *buf, uint64_t double_temp, int c,
 		*buf++ = '+';
 	} else if (fspace) {
 		*buf++ = ' ';
+	} else {
+		/* unreachable */
 	}
 
 	decexp = 0;
@@ -289,26 +316,32 @@ static int _to_float(char *buf, uint64_t double_temp, int c,
 		precision = 6;		/* Default precision if none given */
 	prune_zero = false;		/* Assume trailing 0's allowed     */
 	if ((c == 'g') || (c == 'G')) {
-		if (!falt && (precision > 0))
+		if (!falt && (precision > 0)) {
 			prune_zero = true;
+		}
 		if ((decexp < (-4 + 1)) || (decexp > (precision + 1))) {
-			if (c == 'g')
+			if (c == 'g') {
 				c = 'e';
-			else
+			} else {
 				c = 'E';
-		} else
+			}
+		} else {
 			c = 'f';
+		}
 	}
 
 	if (c == 'f') {
 		exp = precision + decexp;
-		if (exp < 0)
+		if (exp < 0) {
 			exp = 0;
-	} else
+		}
+	} else {
 		exp = precision + 1;
+	}
 	digit_count = 16;
-	if (exp > 16)
+	if (exp > 16) {
 		exp = 16;
+	}
 
 	ltemp = 0x0800000000000000;
 	while (exp--) {
@@ -329,32 +362,39 @@ static int _to_float(char *buf, uint64_t double_temp, int c,
 				*buf++ = _get_digit(&fract, &digit_count);
 				decexp--;
 			}
-		} else
+		} else {
 			*buf++ = '0';
-		if (falt || (precision > 0))
+		}
+		if (falt || (precision > 0)) {
 			*buf++ = '.';
+		}
 		while (precision-- > 0) {
 			if (decexp < 0) {
 				*buf++ = '0';
 				decexp++;
-			} else
+			} else {
 				*buf++ = _get_digit(&fract, &digit_count);
+			}
 		}
 	} else {
 		*buf = _get_digit(&fract, &digit_count);
-		if (*buf++ != '0')
+		if (*buf++ != '0') {
 			decexp--;
-		if (falt || (precision > 0))
+		}
+		if (falt || (precision > 0)) {
 			*buf++ = '.';
-		while (precision-- > 0)
+		}
+		while (precision-- > 0) {
 			*buf++ = _get_digit(&fract, &digit_count);
+		}
 	}
 
 	if (prune_zero) {
 		while (*--buf == '0')
 			;
-		if (*buf != '.')
+		if (*buf != '.') {
 			buf++;
+		}
 	}
 
 	if ((c == 'e') || (c == 'E')) {
@@ -362,10 +402,9 @@ static int _to_float(char *buf, uint64_t double_temp, int c,
 		if (decexp < 0) {
 			decexp = -decexp;
 			*buf++ = '-';
-		} else
+		} else {
 			*buf++ = '+';
-		*buf++ = (char) ((decexp / 100) + '0');
-		decexp %= 100;
+		}
 		*buf++ = (char) ((decexp / 10) + '0');
 		decexp %= 10;
 		*buf++ = (char) (decexp + '0');
@@ -383,8 +422,9 @@ static int _atoi(char **sptr)
 	i = 0;
 	p = *sptr;
 	p--;
-	while (isdigit(((int) *p)))
+	while (isdigit(((int) *p))) {
 		i = 10 * i + *p++ - '0';
+	}
 	*sptr = p;
 	return i;
 }
@@ -467,9 +507,9 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 					width = -width;
 				}
 				c = *format++;
-			} else if (!isdigit(c))
+			} else if (!isdigit(c)) {
 				width = 0;
-			else {
+			} else {
 				width = _atoi(&format);	/* Find width */
 				c = *format++;
 			}
@@ -489,11 +529,14 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 				if (c == '*') {
 					precision = (int32_t)
 					va_arg(vargs, int32_t);
-				} else
+				} else {
 					precision = _atoi(&format);
+				}
 
-				if (precision > MAXFLD)
+				if (precision > MAXFLD) {
 					precision = -1;
+				}
+
 				c = *format++;
 			}
 
@@ -535,20 +578,31 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 			case 'i':
 				int32_temp = (int32_t) va_arg(vargs, int32_t);
 				c = _to_dec(buf, int32_temp, fplus, fspace, precision);
-				if (fplus || fspace || (int32_temp < 0))
+				if (fplus || fspace || (int32_temp < 0)) {
 					prefix = 1;
+				}
 				need_justifying = true;
-				if (precision != -1)
+				if (precision != -1) {
 					pad = ' ';
+				}
 				break;
 
 			case 'e':
 			case 'E':
 			case 'f':
+			case 'F':
 			case 'g':
 			case 'G':
 				/* standard platforms which supports double */
 			{
+#ifdef CONFIG_X86_64
+				/* Can't use a double here because
+				 * we're operating in -mno-sse and
+				 * va_arg() will expect this to be a
+				 * register argument.
+				 */
+				double_temp = va_arg(vargs, uint64_t);
+#else
 				union {
 					double d;
 					uint64_t i;
@@ -556,12 +610,14 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 
 				u.d = (double) va_arg(vargs, double);
 				double_temp = u.i;
+#endif
 			}
 
 				c = _to_float(buf, double_temp, c, falt, fplus,
 					      fspace, precision);
-				if (fplus || fspace || (buf[0] == '-'))
+				if (fplus || fspace || (buf[0] == '-')) {
 					prefix = 1;
+				}
 				need_justifying = true;
 				break;
 
@@ -574,16 +630,18 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 				uint32_temp = (uint32_t) va_arg(vargs, uint32_t);
 				c = _to_octal(buf, uint32_temp, falt, precision);
 				need_justifying = true;
-				if (precision != -1)
+				if (precision != -1) {
 					pad = ' ';
+				}
 				break;
 
 			case 'p':
 				uint32_temp = (uint32_t) va_arg(vargs, uint32_t);
 				c = _to_hex(buf, uint32_temp, true, 8, (int) 'x');
 				need_justifying = true;
-				if (precision != -1)
+				if (precision != -1) {
 					pad = ' ';
+				}
 				break;
 
 			case 's':
@@ -594,8 +652,9 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 						break;
 					}
 				}
-				if ((precision >= 0) && (precision < c))
+				if ((precision >= 0) && (precision < c)) {
 					c = precision;
+				}
 				if (c > 0) {
 					memcpy(buf, cptr_temp, (size_t) c);
 					need_justifying = true;
@@ -606,19 +665,22 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 				uint32_temp = (uint32_t) va_arg(vargs, uint32_t);
 				c = _to_udec(buf, uint32_temp, precision);
 				need_justifying = true;
-				if (precision != -1)
+				if (precision != -1) {
 					pad = ' ';
+				}
 				break;
 
 			case 'x':
 			case 'X':
 				uint32_temp = (uint32_t) va_arg(vargs, uint32_t);
 				c = _to_hex(buf, uint32_temp, falt, precision, c);
-				if (falt)
+				if (falt) {
 					prefix = 2;
+				}
 				need_justifying = true;
-				if (precision != -1)
+				if (precision != -1) {
 					pad = ' ';
+				}
 				break;
 
 			case '%':
@@ -633,12 +695,13 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 				return count;
 			}
 
-			if (c >= MAXFLD + 1)
+			if (c >= MAXFLD + 1) {
 				return EOF;
+			}
 
 			if (need_justifying) {
 				if (c < width) {
-					if (fminus)	{
+					if (fminus) {
 						/* Left justify? */
 						for (i = c; i < width; i++)
 							buf[i] = ' ';
@@ -656,8 +719,9 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 				}
 
 				for (cptr = buf; c > 0; c--, cptr++, count++) {
-					if ((*func)(*cptr, dest) == EOF)
+					if ((*func)(*cptr, dest) == EOF) {
 						return EOF;
+					}
 				}
 			}
 		}

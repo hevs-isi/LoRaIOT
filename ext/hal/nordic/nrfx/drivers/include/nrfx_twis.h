@@ -1,21 +1,21 @@
-/**
+/*
  * Copyright (c) 2015 - 2018, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -62,6 +62,12 @@ enum {
 #endif
 #if NRFX_CHECK(NRFX_TWIS1_ENABLED)
     NRFX_TWIS1_INST_IDX,
+#endif
+#if NRFX_CHECK(NRFX_TWIS2_ENABLED)
+    NRFX_TWIS2_INST_IDX,
+#endif
+#if NRFX_CHECK(NRFX_TWIS3_ENABLED)
+    NRFX_TWIS3_INST_IDX,
 #endif
     NRFX_TWIS_ENABLED_COUNT
 };
@@ -385,6 +391,8 @@ __STATIC_INLINE size_t nrfx_twis_rx_amount(nrfx_twis_t const * p_instance)
 
 void nrfx_twis_0_irq_handler(void);
 void nrfx_twis_1_irq_handler(void);
+void nrfx_twis_2_irq_handler(void);
+void nrfx_twis_3_irq_handler(void);
 
 
 /** @} */

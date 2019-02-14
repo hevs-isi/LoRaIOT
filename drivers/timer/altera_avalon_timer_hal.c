@@ -13,34 +13,48 @@
 #include "altera_avalon_timer_regs.h"
 #include "altera_avalon_timer.h"
 
+#include "legacy_api.h"
+
 static u32_t accumulated_cycle_count;
+
+static s32_t _sys_idle_elapsed_ticks = 1;
 
 static void timer_irq_handler(void *unused)
 {
 	ARG_UNUSED(unused);
 
-	accumulated_cycle_count += sys_clock_hw_cycles_per_tick;
+#ifdef CONFIG_EXECUTION_BENCHMARKING
+	extern void read_timer_start_of_tick_handler(void);
+	read_timer_start_of_tick_handler();
+#endif
+
+	accumulated_cycle_count += sys_clock_hw_cycles_per_tick();
 
 	/* Clear the interrupt */
 	alt_handle_irq((void *)TIMER_0_BASE, TIMER_0_IRQ);
 
-	_sys_clock_tick_announce();
+	z_clock_announce(_sys_idle_elapsed_ticks);
+
+#ifdef CONFIG_EXECUTION_BENCHMARKING
+	extern void read_timer_end_of_tick_handler(void);
+	read_timer_end_of_tick_handler();
+#endif
 }
 
-int _sys_clock_driver_init(struct device *device)
+int z_clock_driver_init(struct device *device)
 {
 	ARG_UNUSED(device);
 
 	IOWR_ALTERA_AVALON_TIMER_PERIODL(TIMER_0_BASE,
-			sys_clock_hw_cycles_per_tick & 0xFFFF);
+			sys_clock_hw_cycles_per_tick() & 0xFFFF);
 	IOWR_ALTERA_AVALON_TIMER_PERIODH(TIMER_0_BASE,
-			(sys_clock_hw_cycles_per_tick >> 16) & 0xFFFF);
+			(sys_clock_hw_cycles_per_tick() >> 16) & 0xFFFF);
 
 	IRQ_CONNECT(TIMER_0_IRQ, 0, timer_irq_handler, NULL, 0);
 	irq_enable(TIMER_0_IRQ);
 
 	alt_avalon_timer_sc_init((void *)TIMER_0_BASE, 0,
-			TIMER_0_IRQ, sys_clock_hw_cycles_per_tick);
+			TIMER_0_IRQ, sys_clock_hw_cycles_per_tick());
 
 	return 0;
 }

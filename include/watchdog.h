@@ -10,13 +10,13 @@
  * @brief Public API for watchdog drivers.
  */
 
-#ifndef _WDT_H_
-#define _WDT_H_
+#ifndef ZEPHYR_INCLUDE_WATCHDOG_H_
+#define ZEPHYR_INCLUDE_WATCHDOG_H_
 
 /**
  * @brief Watchdog Interface
  * @defgroup watchdog_interface Watchdog Interface
- * @ingroup timer_counter_interfaces
+ * @ingroup io_interfaces
  * @{
  */
 
@@ -27,19 +27,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/**
- * @name Deprecated Watchdog API types.
- * @{
- */
-#define WDT_MODE		(BIT(1))
-#define WDT_MODE_OFFSET		(1)
-#define WDT_TIMEOUT_MASK	(0xF)
-
-enum wdt_mode {
-	WDT_MODE_RESET = 0,
-	WDT_MODE_INTERRUPT_RESET
-};
 
 /**
  * WDT clock cycles for timeout type.
@@ -68,7 +55,6 @@ enum wdt_clock_timeout_cycles {
  */
 struct wdt_config {
 	u32_t timeout;
-	enum wdt_mode mode;
 	void (*interrupt_fn)(struct device *dev);
 };
 /**
@@ -182,51 +168,12 @@ typedef int (*wdt_api_install_timeout)(struct device *dev,
  */
 typedef int (*wdt_api_feed)(struct device *dev, int channel_id);
 
-/**
- * @typedef wdt_api_enable
- * @brief Callback API for enabling watchdog.
- * See wdt_enable() for argument descriptions. Please note that this function
- * is deprecated.
- */
-typedef void (*wdt_api_enable)(struct device *dev);
-
-/**
- * @typedef wdt_api_get_config
- * @brief Callback API for getting current watchdog configuration.
- * See wdt_get_config() for argument descriptions. Please note that this
- * function is deprecated.
- */
-typedef void (*wdt_api_get_config)(struct device *dev,
-				   struct wdt_config *config);
-
-/**
- * @typedef wdt_api_set_config
- * @brief Callback API for setting current watchdog configuration.
- * See wdt_set_config() for argument descriptions. Please note that this
- * function is deprecated.
- */
-typedef int (*wdt_api_set_config)(struct device *dev,
-				  struct wdt_config *config);
-
-/**
- * @typedef wdt_api_reload
- * @brief Callback API for reloading watchdog.
- * See wdt_reload() for argument descriptions. Please note that this function
- * is deprecated.
- */
-typedef void (*wdt_api_reload)(struct device *dev);
-
 /** @cond INTERNAL_HIDDEN */
 struct wdt_driver_api {
 	wdt_api_setup setup;
 	wdt_api_disable disable;
 	wdt_api_install_timeout install_timeout;
 	wdt_api_feed feed;
-	/** Deprecated functions */
-	wdt_api_enable enable;
-	wdt_api_get_config get_config;
-	wdt_api_set_config set_config;
-	wdt_api_reload reload;
 };
 /**
  * @endcond
@@ -238,7 +185,7 @@ struct wdt_driver_api {
  * This function is used for configuring global watchdog settings that
  * affect all timeouts. It should be called after installing timeouts.
  * After successful return, all installed timeouts are valid and must be
- * serviced periodically by callig wdt_feed().
+ * serviced periodically by calling wdt_feed().
  *
  * @param dev Pointer to the device structure for the driver instance.
  * @param options Configuration options as defined by the WDT_OPT_* constants
@@ -285,7 +232,10 @@ static inline int wdt_disable(struct device *dev)
  * @param dev Pointer to the device structure for the driver instance.
  * @param cfg Pointer to timeout configuration structure.
  *
- * @retval 0 If successful.
+ * @retval channel_id If successful, a non-negative value indicating the index
+ *                    of the channel to which the timeout was assigned. This
+ *                    value is supposed to be used as the parameter in calls to
+ *                    wdt_feed().
  * @retval -EBUSY If timeout can not be installed while watchdog has already
  *		  been setup.
  * @retval -ENOMEM If no more timeouts can be installed.
@@ -308,7 +258,7 @@ static inline int wdt_install_timeout(struct device *dev,
  * @brief Feed specified watchdog timeout.
  *
  * @param dev Pointer to the device structure for the driver instance.
- * @param channel_id Index of the feeded channel.
+ * @param channel_id Index of the fed channel.
  *
  * @retval 0 If successful.
  * @retval -EINVAL If there is no installed timeout for supplied channel.
@@ -321,39 +271,6 @@ static inline int wdt_feed(struct device *dev, int channel_id)
 	return api->feed(dev, channel_id);
 }
 
-static inline void __deprecated wdt_enable(struct device *dev)
-{
-	const struct wdt_driver_api *api =
-		(const struct wdt_driver_api *)dev->driver_api;
-
-	api->enable(dev);
-}
-
-static inline void __deprecated wdt_get_config(struct device *dev,
-				  struct wdt_config *config)
-{
-	const struct wdt_driver_api *api =
-		(const struct wdt_driver_api *)dev->driver_api;
-
-	api->get_config(dev, config);
-}
-
-static inline int __deprecated wdt_set_config(struct device *dev,
-				 struct wdt_config *config)
-{
-	const struct wdt_driver_api *api =
-		(const struct wdt_driver_api *)dev->driver_api;
-
-	return api->set_config(dev, config);
-}
-
-static inline void __deprecated wdt_reload(struct device *dev)
-{
-	const struct wdt_driver_api *api =
-		(const struct wdt_driver_api *)dev->driver_api;
-
-	api->reload(dev);
-}
 #ifdef __cplusplus
 }
 #endif
@@ -362,4 +279,4 @@ static inline void __deprecated wdt_reload(struct device *dev)
  * @}
  */
 
-#endif /* __WDT_H__ */
+#endif /* _ZEPHYR_WATCHDOG_H__ */

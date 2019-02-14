@@ -3,10 +3,21 @@ if("${ARCH}" STREQUAL "x86")
 else()
   set_ifndef(QEMU_binary_suffix ${ARCH})
 endif()
+
+set(qemu_alternate_path $ENV{QEMU_BIN_PATH})
+if(qemu_alternate_path)
+find_program(
+  QEMU
+  PATHS ${qemu_alternate_path}
+  NO_DEFAULT_PATH
+  NAMES qemu-system-${QEMU_binary_suffix}
+  )
+else()
 find_program(
   QEMU
   qemu-system-${QEMU_binary_suffix}
   )
+endif()
 
 set(qemu_targets
   run
@@ -61,8 +72,10 @@ endif()
 # pass data between them. The QEMU flags are not set for standalone
 # tests defined by CONFIG_NET_TEST.
 if(CONFIG_NETWORKING)
-  if(CONFIG_NET_SLIP_TAP)
-    set(QEMU_NET_STACK 1)
+  if(CONFIG_NET_QEMU_SLIP)
+    if((CONFIG_NET_SLIP_TAP) OR (CONFIG_IEEE802154_UPIPE))
+      set(QEMU_NET_STACK 1)
+    endif()
   endif()
 endif()
 
@@ -206,6 +219,10 @@ if(CONFIG_X86_IAMCU)
     )
 endif()
 
+if(CONFIG_X86_64)
+  set(QEMU_KERNEL_FILE "${CMAKE_BINARY_DIR}/zephyr-qemu.elf")
+endif()
+
 if(NOT QEMU_PIPE)
   set(QEMU_PIPE_COMMENT "\nTo exit from QEMU enter: 'CTRL+a, x'\n")
 endif()
@@ -217,9 +234,15 @@ list(APPEND QEMU_EXTRA_FLAGS ${env_qemu})
 
 list(APPEND MORE_FLAGS_FOR_debugserver -s -S)
 
-set_ifndef(QEMU_KERNEL_OPTION
-  "-kernel;$<TARGET_FILE:${logical_target_for_zephyr_elf}>"
-  )
+# Architectures can define QEMU_KERNEL_FILE to use a specific output
+# file to pass to qemu (and a "qemu_kernel_target" target to generate
+# it), or set QEMU_KERNEL_OPTION if they want to replace the "-kernel
+# ..." option entirely.
+if(DEFINED QEMU_KERNEL_FILE)
+  set(QEMU_KERNEL_OPTION "-kernel;${QEMU_KERNEL_FILE}")
+elseif(NOT DEFINED QEMU_KERNEL_OPTION)
+  set(QEMU_KERNEL_OPTION "-kernel;$<TARGET_FILE:${logical_target_for_zephyr_elf}>")
+endif()
 
 foreach(target ${qemu_targets})
   add_custom_target(${target}
@@ -237,4 +260,7 @@ foreach(target ${qemu_targets})
     COMMENT "${QEMU_PIPE_COMMENT}[QEMU] CPU: ${QEMU_CPU_TYPE_${ARCH}}"
     USES_TERMINAL
     )
+  if(DEFINED QEMU_KERNEL_FILE)
+    add_dependencies(${target} qemu_kernel_target)
+  endif()
 endforeach()

@@ -5,7 +5,7 @@
  */
 
 /dts-v1/;
-#include <st/stm32f412.dtsi>
+#include <st/f4/stm32f412cg.dtsi>
 
 / {
 	model = "Tocoding Argonkey 96boards";
@@ -13,17 +13,18 @@
 
 	chosen {
 		zephyr,console = &usart1;
+		zephyr,shell-uart = &usart1;
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
 	};
 
 	leds {
 		compatible = "gpio-leds";
-		green_led_0: led@0 {
+		green_led_0: led_0 {
 			gpios = <&gpioc 13 GPIO_INT_ACTIVE_HIGH>;
 			label = "USR0 LED";
 		};
-		green_led_1: led@1 {
+		green_led_1: led_1 {
 			gpios = <&gpiob 2 GPIO_INT_ACTIVE_HIGH>;
 			label = "USR1 LED";
 		};
@@ -31,7 +32,7 @@
 
 	gpio_keys {
 		compatible = "gpio-keys";
-		user_button: button@0 {
+		user_button: button {
 			label = "User";
 			gpios = <&gpioa 2 GPIO_INT_ACTIVE_LOW>;
 		};
@@ -51,16 +52,30 @@
 	status = "ok";
 };
 
+&spi1 {
+	status = "ok";
+};
+
 &spi2 {
 	status = "ok";
 
 	/* ST Microelectronics LSM6DSL accel/gyro sensor */
 	lsm6dsl@1 {
-		compatible = "st,lsm6dsl-spi";
+		compatible = "st,lsm6dsl";
 		reg = <1>;
 		spi-max-frequency = <1000000>;
 		irq-gpios = <&gpiob 1 0>;
-		label = "LSM6DSL-SPI";
+		label = "LSM6DSL_SPI";
+	};
+};
+
+&i2s5 {
+	status = "ok";
+
+	mp34dt05@0 {
+		compatible = "st,mpxxdtyy";
+		reg = <0>;
+		label = "MP34DT05";
 	};
 };
 
@@ -77,6 +92,7 @@
 		compatible = "st,hts221";
 		reg = <0x5f>;
 		label = "HTS221";
+		drdy-gpios = <&gpioa 2 GPIO_INT_ACTIVE_LOW>;
 	};
 
 	lps22hb-press@5d {
@@ -94,5 +110,15 @@
 
 &i2c3 {
 	status = "ok";
-	clock-frequency = <I2C_BITRATE_STANDARD>;
+	clock-frequency = <I2C_BITRATE_FAST>;
+
+	lp3943@60 {
+		compatible = "ti,lp3943";
+		reg = <0x60>;
+		label = "LP3943";
+	};
+};
+
+&rtc {
+	status = "ok";
 };

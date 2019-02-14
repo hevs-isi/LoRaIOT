@@ -20,9 +20,14 @@
 MMU_BOOT_REGION((u32_t)&_image_rom_start, (u32_t)&_image_rom_size,
 		MMU_ENTRY_READ | MMU_ENTRY_USER);
 
-#ifdef CONFIG_APPLICATION_MEMORY
-/* User threads by default can read/write app-level memory. */
-MMU_BOOT_REGION((u32_t)&__app_ram_start, (u32_t)&__app_ram_size,
+#ifdef CONFIG_APP_SHARED_MEM
+MMU_BOOT_REGION((u32_t)&_app_smem_start, (u32_t)&_app_smem_size,
+		MMU_ENTRY_WRITE | MMU_ENTRY_RUNTIME_USER |
+		MMU_ENTRY_EXECUTE_DISABLE);
+#endif
+
+#ifdef CONFIG_COVERAGE_GCOV
+MMU_BOOT_REGION((u32_t)&__gcov_bss_start, (u32_t)&__gcov_bss_size,
 		MMU_ENTRY_WRITE | MMU_ENTRY_USER | MMU_ENTRY_EXECUTE_DISABLE);
 #endif
 
@@ -43,7 +48,7 @@ void _x86_mmu_get_flags(void *addr,
 	*pde_flags = (x86_page_entry_data_t)(X86_MMU_GET_PDE(addr)->value &
 				~(x86_page_entry_data_t)MMU_PDE_PAGE_TABLE_MASK);
 
-	if (*pde_flags & MMU_ENTRY_PRESENT) {
+	if ((*pde_flags & MMU_ENTRY_PRESENT) != 0) {
 		*pte_flags = (x86_page_entry_data_t)
 			(X86_MMU_GET_PTE(addr)->value &
 			 ~(x86_page_entry_data_t)MMU_PTE_PAGE_MASK);
@@ -61,48 +66,37 @@ int _arch_buffer_validate(void *addr, size_t size, int write)
 	u32_t ending_pte_num;
 	u32_t pde;
 	u32_t pte;
-#ifdef CONFIG_X86_PAE_MODE
-	union x86_mmu_pae_pte pte_value;
+	union x86_mmu_pte pte_value;
 	u32_t start_pdpte_num = MMU_PDPTE_NUM(addr);
 	u32_t end_pdpte_num = MMU_PDPTE_NUM((char *)addr + size - 1);
 	u32_t pdpte;
-#else
-	union x86_mmu_pte pte_value;
-#endif
-	struct x86_mmu_page_table *pte_address;
-
+	struct x86_mmu_pt *pte_address;
 
 	start_pde_num = MMU_PDE_NUM(addr);
 	end_pde_num = MMU_PDE_NUM((char *)addr + size - 1);
 	starting_pte_num = MMU_PAGE_NUM((char *)addr);
 
-#ifdef CONFIG_X86_PAE_MODE
 	for (pdpte = start_pdpte_num; pdpte <= end_pdpte_num; pdpte++) {
 		if (pdpte != start_pdpte_num) {
-			start_pde_num = 0;
+			start_pde_num = 0U;
 		}
 
 		if (pdpte != end_pdpte_num) {
-			end_pde_num = 0;
+			end_pde_num = 0U;
 		} else {
 			end_pde_num = MMU_PDE_NUM((char *)addr + size - 1);
 		}
 
-		struct x86_mmu_page_directory *pd_address =
+		struct x86_mmu_pd *pd_address =
 			X86_MMU_GET_PD_ADDR_INDEX(pdpte);
-#endif
+
 		/* Iterate for all the pde's the buffer might take up.
 		 * (depends on the size of the buffer and start address
 		 * of the buff)
 		 */
 		for (pde = start_pde_num; pde <= end_pde_num; pde++) {
-#ifdef CONFIG_X86_PAE_MODE
-			union x86_mmu_pae_pde pde_value =
-				pd_address->entry[pde];
-#else
 			union x86_mmu_pde_pt pde_value =
-				X86_MMU_PD->entry[pde].pt;
-#endif
+				pd_address->entry[pde].pt;
 
 			if (!pde_value.p ||
 			    !pde_value.us ||
@@ -110,8 +104,8 @@ int _arch_buffer_validate(void *addr, size_t size, int write)
 				return -EPERM;
 			}
 
-			pte_address = (struct x86_mmu_page_table *)
-				(pde_value.page_table << MMU_PAGE_SHIFT);
+			pte_address = (struct x86_mmu_pt *)
+				(pde_value.pt << MMU_PAGE_SHIFT);
 
 			/* loop over all the possible page tables for the
 			 * required size. If the pde is not the last one
@@ -122,7 +116,7 @@ int _arch_buffer_validate(void *addr, size_t size, int write)
 			 * of the buffer.
 			 */
 			if (pde != end_pde_num) {
-				ending_pte_num = 1023;
+				ending_pte_num = 1023U;
 			} else {
 				ending_pte_num =
 					MMU_PAGE_NUM((char *)addr + size - 1);
@@ -132,7 +126,7 @@ int _arch_buffer_validate(void *addr, size_t size, int write)
 			 * will have the start pte number as zero.
 			 */
 			if (pde != start_pde_num) {
-				starting_pte_num = 0;
+				starting_pte_num = 0U;
 			}
 
 			pte_value.value = 0xFFFFFFFF;
@@ -154,9 +148,7 @@ int _arch_buffer_validate(void *addr, size_t size, int write)
 				return -EPERM;
 			}
 		}
-#ifdef CONFIG_X86_PAE_MODE
 	}
-#endif
 
 	return 0;
 }
@@ -177,26 +169,17 @@ void _x86_mmu_set_flags(void *ptr,
 			x86_page_entry_data_t flags,
 			x86_page_entry_data_t mask)
 {
-#ifdef CONFIG_X86_PAE_MODE
-	union x86_mmu_pae_pte *pte;
-#else
 	union x86_mmu_pte *pte;
-#endif
 
 	u32_t addr = (u32_t)ptr;
 
 	__ASSERT(!(addr & MMU_PAGE_MASK), "unaligned address provided");
 	__ASSERT(!(size & MMU_PAGE_MASK), "unaligned size provided");
 
-	while (size) {
+	while (size != 0) {
 
-#ifdef CONFIG_X86_PAE_MODE
 		/* TODO we're not generating 2MB entries at the moment */
 		__ASSERT(X86_MMU_GET_PDE(addr)->ps != 1, "2MB PDE found");
-#else
-		/* TODO we're not generating 4MB entries at the moment */
-		__ASSERT(X86_MMU_GET_4MB_PDE(addr)->ps != 1, "4MB PDE found");
-#endif
 		pte = X86_MMU_GET_PTE(addr);
 
 		pte->value = (pte->value & ~mask) | flags;
@@ -233,8 +216,8 @@ static inline void _x86_mem_domain_pages_update(struct k_mem_domain *mem_domain,
 	 * For x86: interate over all the partitions and set the
 	 * required flags in the correct MMU page tables.
 	 */
-	partitions_count = 0;
-	for (partition_index = 0;
+	partitions_count = 0U;
+	for (partition_index = 0U;
 	     partitions_count < total_partitions;
 	     partition_index++) {
 
@@ -281,15 +264,13 @@ void _arch_mem_domain_destroy(struct k_mem_domain *domain)
 void _arch_mem_domain_partition_remove(struct k_mem_domain *domain,
 				       u32_t  partition_id)
 {
-	u32_t total_partitions;
 	struct k_mem_partition partition;
 
 	if (domain == NULL) {
 		goto out;
 	}
 
-	total_partitions = domain->num_partitions;
-	__ASSERT(partition_id <= total_partitions,
+	__ASSERT(partition_id <= domain->num_partitions,
 		 "invalid partitions");
 
 	partition = domain->partitions[partition_id];
@@ -307,29 +288,4 @@ int _arch_mem_domain_max_partitions_get(void)
 {
 	return CONFIG_MAX_DOMAIN_PARTITIONS;
 }
-
-#ifdef CONFIG_NEWLIB_LIBC
-static int newlib_mmu_prepare(struct device *unused)
-{
-	ARG_UNUSED(unused);
-	void *heap_base;
-	size_t heap_size;
-
-	z_newlib_get_heap_bounds(&heap_base, &heap_size);
-
-	/* Set up the newlib heap area as a globally user-writable region.
-	 * We can't do this at build time with MMU_BOOT_REGION() as the _end
-	 * pointer shifts significantly between build phases due to the
-	 * introduction of page tables.
-	 */
-	_x86_mmu_set_flags(heap_base, heap_size,
-			   MMU_ENTRY_PRESENT | MMU_ENTRY_WRITE |
-			   MMU_ENTRY_USER,
-			   MMU_PTE_P_MASK | MMU_PTE_RW_MASK | MMU_PTE_US_MASK);
-
-	return 0;
-}
-
-SYS_INIT(newlib_mmu_prepare, APPLICATION, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
-#endif /* CONFIG_NEWLIB_LIBC */
 #endif	/* CONFIG_X86_USERSPACE*/

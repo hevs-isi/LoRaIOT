@@ -4,5 +4,10 @@ type: mcu
 arch: arm
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
 ram: 20
+supported:
+  - i2c
+  - pwm
+  - spi

@@ -3,6 +3,8 @@ sample:
   name: big_http_download
 tests:
   test:
+    filter: TOOLCHAIN_HAS_NEWLIB == 1
     harness: net
     min_ram: 32
-    tags: net
+    min_flash: 128
+    tags: net socket

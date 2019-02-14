@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <posix/unistd.h>
+#include <posix/dirent.h>
 #include "test_fs.h"
 
 extern int test_file_write(void);
@@ -67,7 +68,8 @@ static int test_lsdir(const char *path)
 	entry = readdir(dirp);
 
 	/* entry.name[0] == 0 means end-of-dir */
-	if ((entry == NULL) || (entry->d_name == NULL)) {
+	if (entry == NULL) {
+		closedir(dirp);
 		return -EIO;
 	} else {
 		TC_PRINT("[FILE] %s\n", entry->d_name);

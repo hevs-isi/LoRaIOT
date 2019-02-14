@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __SENSOR_BMA280_H__
-#define __SENSOR_BMA280_H__
+#ifndef ZEPHYR_DRIVERS_SENSOR_BMA280_BMA280_H_
+#define ZEPHYR_DRIVERS_SENSOR_BMA280_BMA280_H_
 
 #include <device.h>
 #include <misc/util.h>
@@ -155,7 +155,4 @@ int bma280_attr_set(struct device *dev,
 int bma280_init_interrupt(struct device *dev);
 #endif
 
-#define SYS_LOG_DOMAIN "BMA280"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
-#endif /* __SENSOR_BMA280_H__ */
+#endif /* ZEPHYR_DRIVERS_SENSOR_BMA280_BMA280_H_ */

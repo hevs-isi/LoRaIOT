@@ -5,7 +5,6 @@
 #
 ---
 title: CAN Device Base Structure
-id: can-device
 version: 0.1
 
 description: >
@@ -19,6 +18,7 @@ properties:
       type: string
       category: required
       description: compatible strings
+      generation: define
     reg:
       type: array
       description: register base address
@@ -28,10 +28,5 @@ properties:
       type: string
       category: required
       description: Human readable string describing the device (used by Zephyr for API name)
-      generation: define
-    bus-speed:
-      type: int
-      category: required
-      description: bus spees in Baud/s
       generation: define
 ...

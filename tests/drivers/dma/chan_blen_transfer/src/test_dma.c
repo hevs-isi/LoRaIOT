@@ -29,7 +29,7 @@
 static const char tx_data[] = "It is harder to be kind than to be wise";
 static char rx_data[RX_BUFF_SIZE] = { 0 };
 
-static void test_done(struct device *dev, u32_t id, int error_code)
+static void test_done(void *arg, u32_t id, int error_code)
 {
 	if (error_code == 0) {
 		TC_PRINT("DMA transfer done\n");
@@ -64,7 +64,7 @@ static int test_task(u32_t chan_id, u32_t blen)
 			chan_id, blen >> 3);
 
 	TC_PRINT("Starting the transfer\n");
-	memset(rx_data, 0, sizeof(rx_data));
+	(void)memset(rx_data, 0, sizeof(rx_data));
 	dma_block_cfg.block_size = sizeof(tx_data);
 	dma_block_cfg.source_address = (u32_t)tx_data;
 	dma_block_cfg.dest_address = (u32_t)rx_data;

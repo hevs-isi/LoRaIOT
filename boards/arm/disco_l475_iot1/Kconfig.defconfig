@@ -8,7 +8,32 @@
 if BOARD_DISCO_L475_IOT1
 
 config BOARD
-	default disco_l475_iot1
+	default "disco_l475_iot1"
+
+if BT
+
+choice CLOCK_STM32_SYSCLK_SRC
+	default CLOCK_STM32_SYSCLK_SRC_MSI
+endchoice
+
+if CLOCK_STM32_SYSCLK_SRC_MSI
+
+config CLOCK_STM32_MSI_RANGE
+	default 8
+
+config SYS_CLOCK_HW_CYCLES_PER_SEC
+	default 16000000
+
+endif # CLOCK_STM32_SYSCLK_SRC_MSI
+
+endif #BT
+
+if !BT
+choice CLOCK_STM32_SYSCLK_SRC
+	default CLOCK_STM32_SYSCLK_SRC_PLL
+endchoice
+
+endif #BT
 
 if CLOCK_STM32_SYSCLK_SRC_PLL
 
@@ -32,19 +57,19 @@ endif # CLOCK_STM32_PLL_SRC_HSI
 
 endif # CLOCK_STM32_SYSCLK_SRC_PLL
 
-if CLOCK_STM32_SYSCLK_SRC_MSI
-
-config SYS_CLOCK_HW_CYCLES_PER_SEC
-	default 16000000
-
-endif # CLOCK_STM32_SYSCLK_SRC_MSI
-
 if UART_CONSOLE
 
-config UART_STM32_PORT_1
+config UART_1
 	default y
 
 endif # UART_CONSOLE
+
+if SERIAL
+
+config UART_4
+	default y
+
+endif # SERIAL
 
 if I2C
 
@@ -61,6 +86,9 @@ if SPI
 config SPI_STM32_INTERRUPT
 	default y
 
+config SPI_1
+	default y
+
 config SPI_3
 	default y
 
@@ -68,13 +96,19 @@ endif # SPI
 
 if PWM
 
-config PWM_STM32_1
-	default n
-
 config PWM_STM32_2
 	default y
 
 endif # PWM
+
+choice LIS3MDL_TRIGGER_MODE
+	default LIS3MDL_TRIGGER_NONE
+endchoice
+
+choice HTS221_TRIGGER_MODE
+	default HTS221_TRIGGER_NONE
+endchoice
+
 
 if VL53L0X
 
@@ -88,5 +122,45 @@ config VL53L0X_XSHUT_GPIO_PIN_NUM
 	default 6
 
 endif #VL53L0X
+
+if LSM6DSL
+
+choice LSM6DSL_TRIGGER_MODE
+	default LSM6DSL_TRIGGER_GLOBAL_THREAD
+endchoice
+
+endif # LSM6DSL
+
+if BT
+
+config SPI
+	default y
+
+choice BT_HCI_BUS_TYPE
+	default BT_SPI
+endchoice
+
+config BT_SPI_BLUENRG
+	default y
+
+config BT_BLUENRG_ACI
+	default y
+# Disable Flow control
+config BT_HCI_ACL_FLOW_CONTROL
+	default n
+config BT_HCI_VS_EXT
+	default n
+
+endif #BT
+
+if WIFI
+
+config SPI
+	default y
+
+config WIFI_ESWIFI
+	default y
+
+endif #WIFI
 
 endif # BOARD_DISCO_L475_IOT1

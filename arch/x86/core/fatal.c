@@ -21,6 +21,8 @@
 #include <arch/x86/segmentation.h>
 #include <exception.h>
 #include <inttypes.h>
+#include <exc_handle.h>
+#include <logging/log_ctrl.h>
 
 __weak void _debug_fatal_hook(const NANO_ESF *esf) { ARG_UNUSED(esf); }
 
@@ -38,7 +40,7 @@ static void unwind_stack(u32_t base_ptr)
 	struct stack_frame *frame;
 	int i;
 
-	if (!base_ptr) {
+	if (base_ptr == 0) {
 		printk("NULL base ptr\n");
 		return;
 	}
@@ -50,7 +52,7 @@ static void unwind_stack(u32_t base_ptr)
 		}
 
 		frame = (struct stack_frame *)base_ptr;
-		if (!frame || !frame->ret_addr) {
+		if ((frame == NULL) || (frame->ret_addr == 0)) {
 			break;
 		}
 #ifdef CONFIG_X86_IAMCU
@@ -82,6 +84,8 @@ static void unwind_stack(u32_t base_ptr)
 FUNC_NORETURN void _NanoFatalErrorHandler(unsigned int reason,
 					  const NANO_ESF *pEsf)
 {
+	LOG_PANIC();
+
 	_debug_fatal_hook(pEsf);
 
 #ifdef CONFIG_PRINTK
@@ -158,17 +162,17 @@ FUNC_NORETURN void _arch_syscall_oops(void *ssf_ptr)
 {
 	struct _x86_syscall_stack_frame *ssf =
 		(struct _x86_syscall_stack_frame *)ssf_ptr;
-	NANO_ESF oops_esf = {
+	NANO_ESF oops = {
 		.eip = ssf->eip,
 		.cs = ssf->cs,
 		.eflags = ssf->eflags
 	};
 
-	if (oops_esf.cs == USER_CODE_SEG) {
-		oops_esf.esp = ssf->esp;
+	if (oops.cs == USER_CODE_SEG) {
+		oops.esp = ssf->esp;
 	}
 
-	_NanoFatalErrorHandler(_NANO_ERR_KERNEL_OOPS, &oops_esf);
+	_NanoFatalErrorHandler(_NANO_ERR_KERNEL_OOPS, &oops);
 }
 
 #ifdef CONFIG_X86_KERNEL_OOPS
@@ -216,12 +220,18 @@ static FUNC_NORETURN void generic_exc_handle(unsigned int vector,
 					     const NANO_ESF *pEsf)
 {
 	printk("***** ");
-	if (vector == 13) {
+	switch (vector) {
+	case IV_GENERAL_PROTECTION:
 		printk("General Protection Fault\n");
-	} else {
+		break;
+	case IV_DEVICE_NOT_AVAILABLE:
+		printk("Floating point unit not enabled\n");
+		break;
+	default:
 		printk("CPU exception %d\n", vector);
+		break;
 	}
-	if ((1 << vector) & _EXC_ERROR_CODE_FAULTS) {
+	if ((BIT(vector) & _EXC_ERROR_CODE_FAULTS) != 0) {
 		printk("***** Exception code: 0x%x\n", pEsf->errorCode);
 	}
 	_NanoFatalErrorHandler(_NANO_ERR_CPU_EXCEPTION, pEsf);
@@ -279,7 +289,6 @@ EXC_FUNC_NOCODE(IV_MACHINE_CHECK);
 #ifdef CONFIG_X86_MMU
 static void dump_entry_flags(x86_page_entry_data_t flags)
 {
-#ifdef CONFIG_X86_PAE_MODE
 	printk("0x%x%x %s, %s, %s, %s\n", (u32_t)(flags>>32),
 	       (u32_t)(flags),
 	       flags & (x86_page_entry_data_t)MMU_ENTRY_PRESENT ?
@@ -290,15 +299,6 @@ static void dump_entry_flags(x86_page_entry_data_t flags)
 	       "User" : "Supervisor",
 	       flags & (x86_page_entry_data_t)MMU_ENTRY_EXECUTE_DISABLE ?
 	       "Execute Disable" : "Execute Enabled");
-#else
-	printk("0x%03x %s, %s, %s\n", flags,
-	       flags & (x86_page_entry_data_t)MMU_ENTRY_PRESENT ?
-	       "Present" : "Non-present",
-	       flags & (x86_page_entry_data_t)MMU_ENTRY_WRITE ?
-	       "Writable" : "Read-only",
-	       flags & (x86_page_entry_data_t)MMU_ENTRY_USER ?
-	       "User" : "Supervisor");
-#endif
 }
 
 static void dump_mmu_flags(void *addr)
@@ -313,16 +313,16 @@ static void dump_mmu_flags(void *addr)
 	printk("PTE: ");
 	dump_entry_flags(pte_flags);
 }
-#endif
+#endif /* CONFIG_X86_MMU */
 
-FUNC_NORETURN void page_fault_handler(const NANO_ESF *pEsf)
+static void dump_page_fault(NANO_ESF *esf)
 {
 	u32_t err, cr2;
 
 	/* See Section 6.15 of the IA32 Software Developer's Manual vol 3 */
 	__asm__ ("mov %%cr2, %0" : "=r" (cr2));
 
-	err = pEsf->errorCode;
+	err = esf->errorCode;
 	printk("***** CPU Page Fault (error code 0x%08x)\n", err);
 
 	printk("%s thread %s address 0x%08x\n",
@@ -333,11 +333,37 @@ FUNC_NORETURN void page_fault_handler(const NANO_ESF *pEsf)
 #ifdef CONFIG_X86_MMU
 	dump_mmu_flags((void *)cr2);
 #endif
+}
+#endif /* CONFIG_EXCEPTION_DEBUG */
 
-	_NanoFatalErrorHandler(_NANO_ERR_CPU_EXCEPTION, pEsf);
+#ifdef CONFIG_USERSPACE
+Z_EXC_DECLARE(z_arch_user_string_nlen);
+
+static const struct z_exc_handle exceptions[] = {
+	Z_EXC_HANDLE(z_arch_user_string_nlen)
+};
+#endif
+
+void page_fault_handler(NANO_ESF *esf)
+{
+#ifdef CONFIG_USERSPACE
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(exceptions); i++) {
+		if ((void *)esf->eip >= exceptions[i].start &&
+		    (void *)esf->eip < exceptions[i].end) {
+			esf->eip = (unsigned int)(exceptions[i].fixup);
+			return;
+		}
+	}
+#endif
+#ifdef CONFIG_EXCEPTION_DEBUG
+	dump_page_fault(esf);
+#endif
+	_NanoFatalErrorHandler(_NANO_ERR_CPU_EXCEPTION, esf);
+	CODE_UNREACHABLE;
 }
 _EXCEPTION_CONNECT_CODE(page_fault_handler, IV_PAGE_FAULT);
-#endif /* CONFIG_EXCEPTION_DEBUG */
 
 #ifdef CONFIG_X86_ENABLE_TSS
 static __noinit volatile NANO_ESF _df_esf;
@@ -364,11 +390,7 @@ struct task_state_segment _df_tss = {
 	.es = DATA_SEG,
 	.ss = DATA_SEG,
 	.eip = (u32_t)_df_handler_top,
-#ifdef CONFIG_X86_PAE_MODE
 	.cr3 = (u32_t)X86_MMU_PDPT
-#else
-	.cr3 = (u32_t)X86_MMU_PD
-#endif
 };
 
 static FUNC_NORETURN __used void _df_handler_bottom(void)
@@ -385,8 +407,8 @@ static FUNC_NORETURN __used void _df_handler_bottom(void)
 	 * one byte, since if a single push operation caused the fault ESP
 	 * wouldn't be decremented
 	 */
-	_x86_mmu_get_flags((void *)_df_esf.esp - 1, &pde_flags, &pte_flags);
-	if (pte_flags & MMU_ENTRY_PRESENT) {
+	_x86_mmu_get_flags((u8_t *)_df_esf.esp - 1, &pde_flags, &pte_flags);
+	if ((pte_flags & MMU_ENTRY_PRESENT) != 0) {
 		printk("***** Double Fault *****\n");
 		reason = _NANO_ERR_CPU_EXCEPTION;
 	} else {
@@ -423,11 +445,8 @@ static FUNC_NORETURN __used void _df_handler_top(void)
 	_main_tss.es = DATA_SEG;
 	_main_tss.ss = DATA_SEG;
 	_main_tss.eip = (u32_t)_df_handler_bottom;
-#ifdef CONFIG_X86_PAE_MODE
 	_main_tss.cr3 = (u32_t)X86_MMU_PDPT;
-#else
-	_main_tss.cr3 = (u32_t)X86_MMU_PD;
-#endif
+	_main_tss.eflags = 0;
 
 	/* NT bit is set in EFLAGS so we will task switch back to _main_tss
 	 * and run _df_handler_bottom

@@ -51,13 +51,13 @@ mqd_t mq_open(const char *name, int oflags, ...)
 	va_list va;
 	mode_t mode;
 	mq_attr *attrs = NULL;
-	u32_t msg_size = 0, max_msgs = 0;
+	long msg_size = 0U, max_msgs = 0U;
 	mqueue_object *msg_queue;
 	mqueue_desc *msg_queue_desc = NULL, *mqd = (mqueue_desc *)(-1);
 	char *mq_desc_ptr, *mq_obj_ptr, *mq_buf_ptr, *mq_name_ptr;
 
 	va_start(va, oflags);
-	if (oflags & O_CREAT) {
+	if ((oflags & O_CREAT) != 0) {
 		mode = va_arg(va, mode_t);
 		attrs = va_arg(va, mq_attr*);
 	}
@@ -68,8 +68,8 @@ mqd_t mq_open(const char *name, int oflags, ...)
 		max_msgs = attrs->mq_maxmsg;
 	}
 
-	if (name == NULL || ((oflags & O_CREAT) && (msg_size <= 0 ||
-						    max_msgs <= 0))) {
+	if ((name == NULL) || ((oflags & O_CREAT) != 0 && (msg_size <= 0 ||
+						      max_msgs <= 0))) {
 		errno = EINVAL;
 		return (mqd_t)mqd;
 	}
@@ -84,20 +84,21 @@ mqd_t mq_open(const char *name, int oflags, ...)
 	msg_queue = find_in_list(name);
 	k_sem_give(&mq_sem);
 
-	if ((msg_queue != NULL) && (oflags & O_CREAT) && (oflags & O_EXCL)) {
+	if ((msg_queue != NULL) && (oflags & O_CREAT) != 0 &&
+	    (oflags & O_EXCL) != 0) {
 		/* Message queue has alreadey been opened and O_EXCL is set */
 		errno = EEXIST;
 		return (mqd_t)mqd;
 	}
 
-	if (msg_queue == NULL && !(oflags & O_CREAT)) {
+	if ((msg_queue == NULL) && (oflags & O_CREAT) == 0) {
 		errno = ENOENT;
 		return (mqd_t)mqd;
 	}
 
 	mq_desc_ptr = k_malloc(sizeof(struct mqueue_desc));
 	if (mq_desc_ptr != NULL) {
-		memset(mq_desc_ptr, 0, sizeof(struct mqueue_desc));
+		(void)memset(mq_desc_ptr, 0, sizeof(struct mqueue_desc));
 		msg_queue_desc = (struct mqueue_desc *)mq_desc_ptr;
 		msg_queue_desc->mem_desc = mq_desc_ptr;
 	} else {
@@ -116,7 +117,7 @@ mqd_t mq_open(const char *name, int oflags, ...)
 
 		mq_obj_ptr = k_malloc(sizeof(mqueue_object));
 		if (mq_obj_ptr != NULL) {
-			memset(mq_obj_ptr, 0, sizeof(mqueue_object));
+			(void)memset(mq_obj_ptr, 0, sizeof(mqueue_object));
 			msg_queue = (mqueue_object *)mq_obj_ptr;
 			msg_queue->mem_obj = mq_obj_ptr;
 
@@ -126,7 +127,7 @@ mqd_t mq_open(const char *name, int oflags, ...)
 
 		mq_name_ptr = k_malloc(strlen(name) + 1);
 		if (mq_name_ptr != NULL) {
-			memset(mq_name_ptr, 0, strlen(name) + 1);
+			(void)memset(mq_name_ptr, 0, strlen(name) + 1);
 			msg_queue->name = mq_name_ptr;
 
 		} else {
@@ -137,14 +138,14 @@ mqd_t mq_open(const char *name, int oflags, ...)
 
 		mq_buf_ptr = k_malloc(msg_size * max_msgs * sizeof(u8_t));
 		if (mq_buf_ptr != NULL) {
-			memset(mq_buf_ptr, 0,
-			       msg_size * max_msgs * sizeof(u8_t));
+			(void)memset(mq_buf_ptr, 0,
+				     msg_size * max_msgs * sizeof(u8_t));
 			msg_queue->mem_buffer = mq_buf_ptr;
 		} else {
 			goto free_mq_buffer;
 		}
 
-		atomic_set(&msg_queue->ref_count, 1);
+		(void)atomic_set(&msg_queue->ref_count, 1);
 		/* initialize zephyr message queue */
 		k_msgq_init(&msg_queue->queue, msg_queue->mem_buffer, msg_size,
 			    max_msgs);
@@ -157,7 +158,7 @@ mqd_t mq_open(const char *name, int oflags, ...)
 	}
 
 	msg_queue_desc->mqueue = msg_queue;
-	msg_queue_desc->flags = (oflags & O_NONBLOCK) ? O_NONBLOCK : 0;
+	msg_queue_desc->flags = (oflags & O_NONBLOCK) != 0 ? O_NONBLOCK : 0;
 	return (mqd_t)msg_queue_desc;
 
 free_mq_buffer:
@@ -374,7 +375,7 @@ static s32_t send_message(mqueue_desc *mqd, const char *msg_ptr, size_t msg_len,
 		return ret;
 	}
 
-	if (mqd->flags & O_NONBLOCK) {
+	if ((mqd->flags & O_NONBLOCK) != 0) {
 		timeout = K_NO_WAIT;
 	}
 
@@ -406,7 +407,7 @@ static s32_t receive_message(mqueue_desc *mqd, char *msg_ptr, size_t msg_len,
 		return ret;
 	}
 
-	if (mqd->flags & O_NONBLOCK) {
+	if ((mqd->flags & O_NONBLOCK) != 0) {
 		timeout = K_NO_WAIT;
 	}
 

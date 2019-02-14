@@ -15,6 +15,10 @@
 /* Each work item takes 100ms */
 #define WORK_ITEM_WAIT          100
 
+/* In fact, each work item could take up to this value */
+#define WORK_ITEM_WAIT_ALIGNED	\
+	__ticks_to_ms(_ms_to_ticks(WORK_ITEM_WAIT) + _TICK_ALIGN)
+
 /*
  * Wait 50ms between work submissions, to ensure co-op and prempt
  * preempt thread submit alternatively.
@@ -46,6 +50,10 @@ static void work_handler(struct k_work *work)
 	results[num_results++] = ti->key;
 }
 
+/**
+ * @ingroup kernel_workqueue_tests
+ * @see k_work_init()
+ */
 static void test_items_init(void)
 {
 	int i;
@@ -83,6 +91,10 @@ static void coop_work_main(int arg1, int arg2)
 	}
 }
 
+/**
+ * @ingroup kernel_workqueue_tests
+ * @see k_work_submit()
+ */
 static void test_items_submit(void)
 {
 	int i;
@@ -115,6 +127,13 @@ static void check_results(int num_tests)
 
 }
 
+/**
+ * @brief Test work queue items submission sequence
+ *
+ * @ingroup kernel_workqueue_tests
+ *
+ * @see k_work_init(), k_work_submit()
+ */
 static void test_sequence(void)
 {
 	TC_PRINT(" - Initializing test items\n");
@@ -124,7 +143,7 @@ static void test_sequence(void)
 	test_items_submit();
 
 	TC_PRINT(" - Waiting for work to finish\n");
-	k_sleep((NUM_TEST_ITEMS + 1) * WORK_ITEM_WAIT);
+	k_sleep(NUM_TEST_ITEMS * WORK_ITEM_WAIT_ALIGNED);
 
 	check_results(NUM_TEST_ITEMS);
 	reset_results();
@@ -146,7 +165,13 @@ static void resubmit_work_handler(struct k_work *work)
 		k_work_submit(work);
 	}
 }
-
+/**
+ * @brief Test work queue item resubmission
+ *
+ * @ingroup kernel_workqueue_tests
+ *
+ * @see k_work_submit()
+ */
 static void test_resubmit(void)
 {
 	TC_PRINT("Starting resubmit test\n");
@@ -158,7 +183,7 @@ static void test_resubmit(void)
 	k_work_submit(&tests[0].work.work);
 
 	TC_PRINT(" - Waiting for work to finish\n");
-	k_sleep((NUM_TEST_ITEMS + 1) * WORK_ITEM_WAIT);
+	k_sleep(NUM_TEST_ITEMS * WORK_ITEM_WAIT_ALIGNED);
 
 	TC_PRINT(" - Checking results\n");
 	check_results(NUM_TEST_ITEMS);
@@ -174,6 +199,13 @@ static void delayed_work_handler(struct k_work *work)
 	results[num_results++] = ti->key;
 }
 
+/**
+ * @brief Test delayed work queue init
+ *
+ * @ingroup kernel_workqueue_tests
+ *
+ * @see k_delayed_work_init()
+ */
 static void test_delayed_init(void)
 {
 	int i;
@@ -202,6 +234,13 @@ static void coop_delayed_work_main(int arg1, int arg2)
 	}
 }
 
+/**
+ * @brief Test delayed workqueue submit
+ *
+ * @ingroup kernel_workqueue_tests
+ *
+ * @see k_delayed_work_init(), k_delayed_work_submit()
+ */
 static void test_delayed_submit(void)
 {
 	int i;
@@ -230,13 +269,21 @@ static void coop_delayed_work_cancel_main(int arg1, int arg2)
 	k_delayed_work_cancel(&tests[1].work);
 
 #if defined(CONFIG_POLL)
-	k_delayed_work_submit(&tests[2].work, 0 /* Submit immeditelly */);
+	k_delayed_work_submit(&tests[2].work, 0 /* Submit immediately */);
 
 	TC_PRINT(" - Cancel pending delayed work from coop thread\n");
 	k_delayed_work_cancel(&tests[2].work);
 #endif
 }
 
+/**
+ * @brief Test work queue delayed cancel
+ *
+ * @ingroup kernel_workqueue_tests
+ *
+ * @see k_delayed_work_init(), k_delayed_work_submit(),
+ * k_delayed_work_cancel()
+ */
 static void test_delayed_cancel(void)
 {
 	TC_PRINT("Starting delayed cancel test\n");
@@ -251,7 +298,7 @@ static void test_delayed_cancel(void)
 			NULL, NULL, NULL, K_HIGHEST_THREAD_PRIO, 0, 0);
 
 	TC_PRINT(" - Waiting for work to finish\n");
-	k_sleep(2 * WORK_ITEM_WAIT);
+	k_sleep(WORK_ITEM_WAIT_ALIGNED);
 
 	TC_PRINT(" - Checking results\n");
 	check_results(0);
@@ -270,6 +317,13 @@ static void delayed_resubmit_work_handler(struct k_work *work)
 	}
 }
 
+/**
+ * @brief Test delayed resubmission of work queue item
+ *
+ * @ingroup kernel_workqueue_tests
+ *
+ * @see k_delayed_work_init(), k_delayed_work_submit()
+ */
 static void test_delayed_resubmit(void)
 {
 	TC_PRINT("Starting delayed resubmit test\n");
@@ -281,7 +335,7 @@ static void test_delayed_resubmit(void)
 	k_delayed_work_submit(&tests[0].work, WORK_ITEM_WAIT);
 
 	TC_PRINT(" - Waiting for work to finish\n");
-	k_sleep((NUM_TEST_ITEMS + 1) * WORK_ITEM_WAIT);
+	k_sleep(NUM_TEST_ITEMS * WORK_ITEM_WAIT_ALIGNED);
 
 	TC_PRINT(" - Checking results\n");
 	check_results(NUM_TEST_ITEMS);
@@ -308,6 +362,14 @@ static void coop_delayed_work_resubmit(void)
 	}
 }
 
+
+/**
+ * @brief Test delayed resubmission of work queue thread
+ *
+ * @ingroup kernel_workqueue_tests
+ *
+ * @see k_delayed_work_init()
+ */
 static void test_delayed_resubmit_thread(void)
 {
 	TC_PRINT("Starting delayed resubmit from coop thread test\n");
@@ -320,13 +382,20 @@ static void test_delayed_resubmit_thread(void)
 			NULL, NULL, NULL, K_PRIO_COOP(10), 0, 0);
 
 	TC_PRINT(" - Waiting for work to finish\n");
-	k_sleep(WORK_ITEM_WAIT);
+	k_sleep(WORK_ITEM_WAIT_ALIGNED);
 
 	TC_PRINT(" - Checking results\n");
 	check_results(1);
 	reset_results();
 }
 
+/**
+ * @brief Test delayed work items
+ *
+ * @ingroup kernel_workqueue_tests
+ *
+ * @see k_delayed_work_init(), k_delayed_work_submit()
+ */
 static void test_delayed(void)
 {
 	TC_PRINT("Starting delayed test\n");
@@ -338,7 +407,7 @@ static void test_delayed(void)
 	test_delayed_submit();
 
 	TC_PRINT(" - Waiting for delayed work to finish\n");
-	k_sleep((NUM_TEST_ITEMS + 2) * WORK_ITEM_WAIT);
+	k_sleep(NUM_TEST_ITEMS * WORK_ITEM_WAIT_ALIGNED);
 
 	TC_PRINT(" - Checking results\n");
 	check_results(NUM_TEST_ITEMS);

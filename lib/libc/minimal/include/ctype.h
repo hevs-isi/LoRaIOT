@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __INC_ctype_h__
-#define __INC_ctype_h__
+#ifndef ZEPHYR_LIB_LIBC_MINIMAL_INCLUDE_CTYPE_H_
+#define ZEPHYR_LIB_LIBC_MINIMAL_INCLUDE_CTYPE_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,7 +47,7 @@ static inline int isxdigit(int a)
 {
 	unsigned int ua = (unsigned int)a;
 
-	return ((ua - '0') < 10) || ((ua - 'a') < 6) || ((ua - 'A') < 6);
+	return ((ua - '0') < 10U) || ((ua | 32U) - 'a' < 6);
 }
 
 static inline int tolower(int chr)
@@ -69,4 +69,4 @@ static inline int isalnum(int chr)
 }
 #endif
 
-#endif  /* __INC_ctype_h__ */
+#endif  /* ZEPHYR_LIB_LIBC_MINIMAL_INCLUDE_CTYPE_H_ */

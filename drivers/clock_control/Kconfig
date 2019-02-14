@@ -10,9 +10,7 @@
 # Clock controller drivers
 #
 menuconfig CLOCK_CONTROL
-	bool
-	prompt "Hardware clock controller support"
-	default n
+	bool "Hardware clock controller support"
 	help
 	  Enable support for hardware clock controller. Such hardware can
 	  provide clock for other subsystem, and thus can be also used for
@@ -21,27 +19,11 @@ menuconfig CLOCK_CONTROL
 
 if CLOCK_CONTROL
 
-config SYS_LOG_CLOCK_CONTROL_LEVEL
-	int
-	prompt "Hardware clock controller drivers log level"
-	depends on SYS_LOG
-	default 0
-	help
-	  Sets log level for clock controller drivers
+module = CLOCK_CONTROL
+module-str = clock control
+source "subsys/logging/Kconfig.template.log_config"
 
-	  Levels are:
-
-	  - 0 OFF, do not write
-
-	  - 1 ERROR, only write SYS_LOG_ERR
-
-	  - 2 WARNING, write SYS_LOG_WRN in addition to previous level
-
-	  - 3 INFO, write SYS_LOG_INF in addition to previous levels
-
-	  - 4 DEBUG, write SYS_LOG_DBG in addition to previous levels
-
-source "drivers/clock_control/Kconfig.nrf5"
+source "drivers/clock_control/Kconfig.nrf"
 
 source "drivers/clock_control/Kconfig.quark_se"
 
@@ -52,5 +34,7 @@ source "drivers/clock_control/Kconfig.beetle"
 source "drivers/clock_control/Kconfig.mcux_ccm"
 
 source "drivers/clock_control/Kconfig.mcux_sim"
+
+source "drivers/clock_control/Kconfig.rv32m1"
 
 endif # CLOCK_CONTROL

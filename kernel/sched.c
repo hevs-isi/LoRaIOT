@@ -11,29 +11,39 @@
 #include <kswap.h>
 #include <kernel_arch_func.h>
 #include <syscall_handler.h>
+#include <drivers/system_timer.h>
+#include <stdbool.h>
 
-#ifdef CONFIG_SCHED_DUMB
+#if defined(CONFIG_SCHED_DUMB)
 #define _priq_run_add		_priq_dumb_add
 #define _priq_run_remove	_priq_dumb_remove
-#define _priq_run_best		_priq_dumb_best
-#else
+# if defined(CONFIG_SCHED_CPU_MASK)
+#  define _priq_run_best	_priq_dumb_mask_best
+# else
+#  define _priq_run_best	_priq_dumb_best
+# endif
+#elif defined(CONFIG_SCHED_SCALABLE)
 #define _priq_run_add		_priq_rb_add
 #define _priq_run_remove	_priq_rb_remove
 #define _priq_run_best		_priq_rb_best
+#elif defined(CONFIG_SCHED_MULTIQ)
+#define _priq_run_add		_priq_mq_add
+#define _priq_run_remove	_priq_mq_remove
+#define _priq_run_best		_priq_mq_best
 #endif
 
-#ifdef CONFIG_WAITQ_FAST
+#if defined(CONFIG_WAITQ_SCALABLE)
 #define _priq_wait_add		_priq_rb_add
 #define _priq_wait_remove	_priq_rb_remove
 #define _priq_wait_best		_priq_rb_best
-#else
+#elif defined(CONFIG_WAITQ_DUMB)
 #define _priq_wait_add		_priq_dumb_add
 #define _priq_wait_remove	_priq_dumb_remove
 #define _priq_wait_best		_priq_dumb_best
 #endif
 
-/* the only struct _kernel instance */
-struct _kernel _kernel;
+/* the only struct z_kernel instance */
+struct z_kernel _kernel;
 
 static struct k_spinlock sched_lock;
 
@@ -52,32 +62,121 @@ static inline int _is_preempt(struct k_thread *thread)
 #endif
 }
 
+static inline int is_metairq(struct k_thread *thread)
+{
+#if CONFIG_NUM_METAIRQ_PRIORITIES > 0
+	return (thread->base.prio - K_HIGHEST_THREAD_PRIO)
+		< CONFIG_NUM_METAIRQ_PRIORITIES;
+#else
+	return 0;
+#endif
+}
+
+#if CONFIG_ASSERT
 static inline int _is_thread_dummy(struct k_thread *thread)
 {
 	return !!(thread->base.thread_state & _THREAD_DUMMY);
 }
+#endif
 
-static inline int _is_idle(struct k_thread *thread)
+static inline bool _is_idle(struct k_thread *thread)
 {
 #ifdef CONFIG_SMP
 	return thread->base.is_idle;
 #else
-	extern struct k_thread * const _idle_thread;
+	extern k_tid_t const _idle_thread;
 
 	return thread == _idle_thread;
 #endif
 }
 
-#ifdef _NON_OPTIMIZED_TICKS_PER_SEC
-s32_t _ms_to_ticks(s32_t ms)
+bool _is_t1_higher_prio_than_t2(struct k_thread *t1, struct k_thread *t2)
 {
-	s64_t ms_ticks_per_sec = (s64_t)ms * sys_clock_ticks_per_sec;
+	if (t1->base.prio < t2->base.prio) {
+		return true;
+	}
 
-	return (s32_t)ceiling_fraction(ms_ticks_per_sec, MSEC_PER_SEC);
+#ifdef CONFIG_SCHED_DEADLINE
+	/* Note that we don't care about wraparound conditions.  The
+	 * expectation is that the application will have arranged to
+	 * block the threads, change their priorities or reset their
+	 * deadlines when the job is complete.  Letting the deadlines
+	 * go negative is fine and in fact prevents aliasing bugs.
+	 */
+	if (t1->base.prio == t2->base.prio) {
+		int now = (int) k_cycle_get_32();
+		int dt1 = t1->base.prio_deadline - now;
+		int dt2 = t2->base.prio_deadline - now;
+
+		return dt1 < dt2;
+	}
+#endif
+
+	return false;
+}
+
+static ALWAYS_INLINE bool should_preempt(struct k_thread *th, int preempt_ok)
+{
+	/* Preemption is OK if it's being explicitly allowed by
+	 * software state (e.g. the thread called k_yield())
+	 */
+	if (preempt_ok != 0) {
+		return true;
+	}
+
+	__ASSERT(_current != NULL, "");
+
+	/* Or if we're pended/suspended/dummy (duh) */
+	if (_is_thread_prevented_from_running(_current)) {
+		return true;
+	}
+
+	/* Edge case on ARM where a thread can be pended out of an
+	 * interrupt handler before the "synchronous" swap starts
+	 * context switching.  Platforms with atomic swap can never
+	 * hit this.
+	 */
+	if (IS_ENABLED(CONFIG_SWAP_NONATOMIC)
+	    && _is_thread_timeout_active(th)) {
+		return true;
+	}
+
+	/* Otherwise we have to be running a preemptible thread or
+	 * switching to a metairq
+	 */
+	if (_is_preempt(_current) || is_metairq(th)) {
+		return true;
+	}
+
+	/* The idle threads can look "cooperative" if there are no
+	 * preemptible priorities (this is sort of an API glitch).
+	 * They must always be preemptible.
+	 */
+	if (!IS_ENABLED(CONFIG_PREEMPT_ENABLED) && _is_idle(_current)) {
+		return true;
+	}
+
+	return false;
+}
+
+#ifdef CONFIG_SCHED_CPU_MASK
+static ALWAYS_INLINE struct k_thread *_priq_dumb_mask_best(sys_dlist_t *pq)
+{
+	/* With masks enabled we need to be prepared to walk the list
+	 * looking for one we can run
+	 */
+	struct k_thread *t;
+
+	SYS_DLIST_FOR_EACH_CONTAINER(pq, t, base.qnode_dlist) {
+		if ((t->base.cpu_mask & BIT(_current_cpu->id)) != 0) {
+			return t;
+		}
+	}
+	return NULL;
 }
 #endif
 
-static struct k_thread *next_up(void)
+static ALWAYS_INLINE struct k_thread *next_up(void)
 {
 #ifndef CONFIG_SMP
 	/* In uniprocessor mode, we can leave the current thread in
@@ -90,46 +189,142 @@ static struct k_thread *next_up(void)
 
 	return th ? th : _current_cpu->idle_thread;
 #else
+
 	/* Under SMP, the "cache" mechanism for selecting the next
 	 * thread doesn't work, so we have more work to do to test
 	 * _current against the best choice from the queue.
+	 *
+	 * Subtle note on "queued": in SMP mode, _current does not
+	 * live in the queue, so this isn't exactly the same thing as
+	 * "ready", it means "is _current already added back to the
+	 * queue such that we don't want to re-add it".
 	 */
-	int active = !_is_thread_prevented_from_running(_current);
 	int queued = _is_thread_queued(_current);
+	int active = !_is_thread_prevented_from_running(_current);
 
+	/* Choose the best thread that is not current */
 	struct k_thread *th = _priq_run_best(&_kernel.ready_q.runq);
-
-	/* Idle thread if nothing else */
-	if (!th) {
+	if (th == NULL) {
 		th = _current_cpu->idle_thread;
 	}
 
-	/* Stay with current unless it's already been put back in the
-	 * queue and something better is available (c.f. timeslicing,
-	 * yield)
-	 */
-	if (active && !queued && !_is_t1_higher_prio_than_t2(th, _current)) {
-		th = _current;
+	if (active) {
+		if (!queued &&
+		    !_is_t1_higher_prio_than_t2(th, _current)) {
+			th = _current;
+		}
+
+		if (!should_preempt(th, _current_cpu->swap_ok)) {
+			th = _current;
+		}
 	}
 
-	/* Put _current back into the queue if necessary */
-	if (th != _current && !queued) {
+	/* Put _current back into the queue */
+	if (th != _current && active && !_is_idle(_current) && !queued) {
 		_priq_run_add(&_kernel.ready_q.runq, _current);
+		_mark_thread_as_queued(_current);
 	}
 
-	/* Remove the thread we're about to run from the queue (which
-	 * potentially might not be there, but that's OK)
-	 */
-	_priq_run_remove(&_kernel.ready_q.runq, th);
+	/* Take the new _current out of the queue */
+	if (_is_thread_queued(th)) {
+		_priq_run_remove(&_kernel.ready_q.runq, th);
+	}
+	_mark_thread_as_not_queued(th);
 
 	return th;
 #endif
 }
 
-static void update_cache(void)
+#ifdef CONFIG_TIMESLICING
+
+static int slice_time;
+static int slice_max_prio;
+
+#ifdef CONFIG_SWAP_NONATOMIC
+/* If _Swap() isn't atomic, then it's possible for a timer interrupt
+ * to try to timeslice away _current after it has already pended
+ * itself but before the corresponding context switch.  Treat that as
+ * a noop condition in z_time_slice().
+ */
+static struct k_thread *pending_current;
+#endif
+
+static void reset_time_slice(void)
+{
+	/* Add the elapsed time since the last announced tick to the
+	 * slice count, as we'll see those "expired" ticks arrive in a
+	 * FUTURE z_time_slice() call.
+	 */
+	_current_cpu->slice_ticks = slice_time + z_clock_elapsed();
+
+	z_set_timeout_expiry(slice_time, false);
+}
+
+void k_sched_time_slice_set(s32_t slice, int prio)
+{
+	LOCKED(&sched_lock) {
+		_current_cpu->slice_ticks = 0;
+		slice_time = _ms_to_ticks(slice);
+		slice_max_prio = prio;
+		reset_time_slice();
+	}
+}
+
+static inline int sliceable(struct k_thread *t)
+{
+	return _is_preempt(t)
+		&& !_is_prio_higher(t->base.prio, slice_max_prio)
+		&& !_is_idle(t)
+		&& !_is_thread_timeout_active(t);
+}
+
+/* Called out of each timer interrupt */
+void z_time_slice(int ticks)
+{
+#ifdef CONFIG_SWAP_NONATOMIC
+	if (pending_current == _current) {
+		pending_current = NULL;
+		reset_time_slice();
+		return;
+	}
+	pending_current = NULL;
+#endif
+
+	if (slice_time && sliceable(_current)) {
+		if (ticks >= _current_cpu->slice_ticks) {
+			_move_thread_to_end_of_prio_q(_current);
+			reset_time_slice();
+		} else {
+			_current_cpu->slice_ticks -= ticks;
+		}
+	}
+}
+#else
+static void reset_time_slice(void) { /* !CONFIG_TIMESLICING */ }
+#endif
+
+static void update_cache(int preempt_ok)
 {
 #ifndef CONFIG_SMP
-	_kernel.ready_q.cache = next_up();
+	struct k_thread *th = next_up();
+
+	if (should_preempt(th, preempt_ok)) {
+		if (th != _current) {
+			reset_time_slice();
+		}
+		_kernel.ready_q.cache = th;
+	} else {
+		_kernel.ready_q.cache = _current;
+	}
+
+#else
+	/* The way this works is that the CPU record keeps its
+	 * "cooperative swapping is OK" flag until the next reschedule
+	 * call or context switch.  It doesn't need to be tracked per
+	 * thread because if the thread gets preempted for whatever
+	 * reason the scheduler will make the same decision anyway.
+	 */
+	_current_cpu->swap_ok = preempt_ok;
 #endif
 }
 
@@ -138,7 +333,7 @@ void _add_thread_to_ready_q(struct k_thread *thread)
 	LOCKED(&sched_lock) {
 		_priq_run_add(&_kernel.ready_q.runq, thread);
 		_mark_thread_as_queued(thread);
-		update_cache();
+		update_cache(0);
 	}
 }
 
@@ -148,7 +343,7 @@ void _move_thread_to_end_of_prio_q(struct k_thread *thread)
 		_priq_run_remove(&_kernel.ready_q.runq, thread);
 		_priq_run_add(&_kernel.ready_q.runq, thread);
 		_mark_thread_as_queued(thread);
-		update_cache();
+		update_cache(thread == _current);
 	}
 }
 
@@ -158,7 +353,7 @@ void _remove_thread_from_ready_q(struct k_thread *thread)
 		if (_is_thread_queued(thread)) {
 			_priq_run_remove(&_kernel.ready_q.runq, thread);
 			_mark_thread_as_not_queued(thread);
-			update_cache();
+			update_cache(thread == _current);
 		}
 	}
 }
@@ -168,28 +363,18 @@ static void pend(struct k_thread *thread, _wait_q_t *wait_q, s32_t timeout)
 	_remove_thread_from_ready_q(thread);
 	_mark_thread_as_pending(thread);
 
-	/* The timeout handling is currently synchronized external to
-	 * the scheduler using the legacy global lock.  Should fix
-	 * that.
-	 */
-	if (timeout != K_FOREVER) {
-		s32_t ticks = _TICK_ALIGN + _ms_to_ticks(timeout);
-		int key = irq_lock();
-
-		_add_thread_timeout(thread, wait_q, ticks);
-		irq_unlock(key);
-	}
-
-	if (wait_q) {
-#ifdef CONFIG_WAITQ_FAST
+	if (wait_q != NULL) {
 		thread->base.pended_on = wait_q;
-#endif
 		_priq_wait_add(&wait_q->waitq, thread);
 	}
 
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_THREAD
-	_sys_k_event_logger_thread_pend(thread);
-#endif
+	if (timeout != K_FOREVER) {
+		s32_t ticks = _TICK_ALIGN + _ms_to_ticks(timeout);
+
+		_add_thread_timeout(thread, ticks);
+	}
+
+	sys_trace_thread_pend(thread);
 }
 
 void _pend_thread(struct k_thread *thread, _wait_q_t *wait_q, s32_t timeout)
@@ -200,18 +385,13 @@ void _pend_thread(struct k_thread *thread, _wait_q_t *wait_q, s32_t timeout)
 
 static _wait_q_t *pended_on(struct k_thread *thread)
 {
-#ifdef CONFIG_WAITQ_FAST
 	__ASSERT_NO_MSG(thread->base.pended_on);
 
 	return thread->base.pended_on;
-#else
-	ARG_UNUSED(thread);
-	return NULL;
-#endif
 }
 
-struct k_thread *_find_first_thread_to_unpend(_wait_q_t *wait_q,
-					      struct k_thread *from)
+ALWAYS_INLINE struct k_thread *_find_first_thread_to_unpend(_wait_q_t *wait_q,
+						     struct k_thread *from)
 {
 	ARG_UNUSED(from);
 
@@ -224,30 +404,55 @@ struct k_thread *_find_first_thread_to_unpend(_wait_q_t *wait_q,
 	return ret;
 }
 
-void _unpend_thread_no_timeout(struct k_thread *thread)
+ALWAYS_INLINE void _unpend_thread_no_timeout(struct k_thread *thread)
 {
 	LOCKED(&sched_lock) {
 		_priq_wait_remove(&pended_on(thread)->waitq, thread);
 		_mark_thread_as_not_pending(thread);
 	}
 
-#if defined(CONFIG_ASSERT) && defined(CONFIG_WAITQ_FAST)
 	thread->base.pended_on = NULL;
-#endif
 }
 
-int _pend_current_thread(int key, _wait_q_t *wait_q, s32_t timeout)
+#ifdef CONFIG_SYS_CLOCK_EXISTS
+/* Timeout handler for *_thread_timeout() APIs */
+void z_thread_timeout(struct _timeout *to)
 {
+	struct k_thread *th = CONTAINER_OF(to, struct k_thread, base.timeout);
+
+	if (th->base.pended_on != NULL) {
+		_unpend_thread_no_timeout(th);
+	}
+	_mark_thread_as_started(th);
+	_ready_thread(th);
+}
+#endif
+
+int _pend_curr_irqlock(u32_t key, _wait_q_t *wait_q, s32_t timeout)
+{
+#if defined(CONFIG_TIMESLICING) && defined(CONFIG_SWAP_NONATOMIC)
+	pending_current = _current;
+#endif
 	pend(_current, wait_q, timeout);
-	return _Swap(key);
+	return _Swap_irqlock(key);
+}
+
+int _pend_curr(struct k_spinlock *lock, k_spinlock_key_t key,
+	       _wait_q_t *wait_q, s32_t timeout)
+{
+#if defined(CONFIG_TIMESLICING) && defined(CONFIG_SWAP_NONATOMIC)
+	pending_current = _current;
+#endif
+	pend(_current, wait_q, timeout);
+	return _Swap(lock, key);
 }
 
 struct k_thread *_unpend_first_thread(_wait_q_t *wait_q)
 {
 	struct k_thread *t = _unpend1_no_timeout(wait_q);
 
-	if (t) {
-		_abort_thread_timeout(t);
+	if (t != NULL) {
+		(void)_abort_thread_timeout(t);
 	}
 
 	return t;
@@ -256,7 +461,7 @@ struct k_thread *_unpend_first_thread(_wait_q_t *wait_q)
 void _unpend_thread(struct k_thread *thread)
 {
 	_unpend_thread_no_timeout(thread);
-	_abort_thread_timeout(thread);
+	(void)_abort_thread_timeout(thread);
 }
 
 /* FIXME: this API is glitchy when used in SMP.  If the thread is
@@ -268,7 +473,7 @@ void _unpend_thread(struct k_thread *thread)
  */
 void _thread_priority_set(struct k_thread *thread, int prio)
 {
-	int need_sched = 0;
+	bool need_sched = 0;
 
 	LOCKED(&sched_lock) {
 		need_sched = _is_thread_ready(thread);
@@ -277,32 +482,53 @@ void _thread_priority_set(struct k_thread *thread, int prio)
 			_priq_run_remove(&_kernel.ready_q.runq, thread);
 			thread->base.prio = prio;
 			_priq_run_add(&_kernel.ready_q.runq, thread);
-			update_cache();
+			update_cache(1);
 		} else {
 			thread->base.prio = prio;
 		}
 	}
+	sys_trace_thread_priority_set(thread);
 
-	if (need_sched) {
-		_reschedule(irq_lock());
+	if (need_sched && _current->base.sched_locked == 0) {
+		_reschedule_unlocked();
 	}
 }
 
-int _reschedule(int key)
+static inline int resched(void)
 {
-	if (!_is_in_isr() &&
-	    _is_preempt(_current) &&
-	    _get_next_ready_thread() != _current) {
-		return _Swap(key);
+#ifdef CONFIG_SMP
+	if (!_current_cpu->swap_ok) {
+		return 0;
 	}
+	_current_cpu->swap_ok = 0;
+#endif
 
-	irq_unlock(key);
-	return 0;
+	return !_is_in_isr();
+}
+
+void _reschedule(struct k_spinlock *lock, k_spinlock_key_t key)
+{
+	if (resched()) {
+		_Swap(lock, key);
+	} else {
+		k_spin_unlock(lock, key);
+	}
+}
+
+void _reschedule_irqlock(u32_t key)
+{
+	if (resched()) {
+		_Swap_irqlock(key);
+	} else {
+		irq_unlock(key);
+	}
 }
 
 void k_sched_lock(void)
 {
-	_sched_lock();
+	LOCKED(&sched_lock) {
+		_sched_lock();
+	}
 }
 
 void k_sched_unlock(void)
@@ -311,16 +537,15 @@ void k_sched_unlock(void)
 	__ASSERT(_current->base.sched_locked != 0, "");
 	__ASSERT(!_is_in_isr(), "");
 
-	int key = irq_lock();
-
-	/* compiler_barrier() not needed, comes from irq_lock() */
-
-	++_current->base.sched_locked;
+	LOCKED(&sched_lock) {
+		++_current->base.sched_locked;
+		update_cache(1);
+	}
 
 	K_DEBUG("scheduler unlocked (%p:%d)\n",
 		_current, _current->base.sched_locked);
 
-	_reschedule(key);
+	_reschedule_unlocked();
 #endif
 }
 
@@ -340,20 +565,34 @@ struct k_thread *_get_next_ready_thread(void)
 #ifdef CONFIG_USE_SWITCH
 void *_get_next_switch_handle(void *interrupted)
 {
-	if (!_is_preempt(_current) &&
-	    !(_current->base.thread_state & _THREAD_DEAD)) {
-		return interrupted;
-	}
-
 	_current->switch_handle = interrupted;
 
+#ifdef CONFIG_SMP
 	LOCKED(&sched_lock) {
-		struct k_thread *next = next_up();
+		struct k_thread *th = next_up();
 
-		if (next != _current) {
-			_current = next;
+		if (_current != th) {
+			reset_time_slice();
+			_current_cpu->swap_ok = 0;
+#ifdef CONFIG_TRACING
+			sys_trace_thread_switched_out();
+#endif
+			_current = th;
+#ifdef CONFIG_TRACING
+			sys_trace_thread_switched_in();
+#endif
 		}
 	}
+
+#else
+#ifdef CONFIG_TRACING
+	sys_trace_thread_switched_out();
+#endif
+	_current = _get_next_ready_thread();
+#ifdef CONFIG_TRACING
+	sys_trace_thread_switched_in();
+#endif
+#endif
 
 	_check_stack_sentinel();
 
@@ -361,7 +600,7 @@ void *_get_next_switch_handle(void *interrupted)
 }
 #endif
 
-void _priq_dumb_add(sys_dlist_t *pq, struct k_thread *thread)
+ALWAYS_INLINE void _priq_dumb_add(sys_dlist_t *pq, struct k_thread *thread)
 {
 	struct k_thread *t;
 
@@ -369,8 +608,8 @@ void _priq_dumb_add(sys_dlist_t *pq, struct k_thread *thread)
 
 	SYS_DLIST_FOR_EACH_CONTAINER(pq, t, base.qnode_dlist) {
 		if (_is_t1_higher_prio_than_t2(thread, t)) {
-			sys_dlist_insert_before(pq, &t->base.qnode_dlist,
-						&thread->base.qnode_dlist);
+			sys_dlist_insert(&t->base.qnode_dlist,
+					 &thread->base.qnode_dlist);
 			return;
 		}
 	}
@@ -387,11 +626,16 @@ void _priq_dumb_remove(sys_dlist_t *pq, struct k_thread *thread)
 
 struct k_thread *_priq_dumb_best(sys_dlist_t *pq)
 {
-	return CONTAINER_OF(sys_dlist_peek_head(pq),
-			    struct k_thread, base.qnode_dlist);
+	struct k_thread *t = NULL;
+	sys_dnode_t *n = sys_dlist_peek_head(pq);
+
+	if (n != NULL) {
+		t = CONTAINER_OF(n, struct k_thread, base.qnode_dlist);
+	}
+	return t;
 }
 
-int _priq_rb_lessthan(struct rbnode *a, struct rbnode *b)
+bool _priq_rb_lessthan(struct rbnode *a, struct rbnode *b)
 {
 	struct k_thread *ta, *tb;
 
@@ -399,9 +643,9 @@ int _priq_rb_lessthan(struct rbnode *a, struct rbnode *b)
 	tb = CONTAINER_OF(b, struct k_thread, base.qnode_rb);
 
 	if (_is_t1_higher_prio_than_t2(ta, tb)) {
-		return 1;
+		return true;
 	} else if (_is_t1_higher_prio_than_t2(tb, ta)) {
-		return 0;
+		return false;
 	} else {
 		return ta->base.order_key < tb->base.order_key ? 1 : 0;
 	}
@@ -443,84 +687,61 @@ void _priq_rb_remove(struct _priq_rb *pq, struct k_thread *thread)
 
 struct k_thread *_priq_rb_best(struct _priq_rb *pq)
 {
+	struct k_thread *t = NULL;
 	struct rbnode *n = rb_get_min(&pq->tree);
 
-	return CONTAINER_OF(n, struct k_thread, base.qnode_rb);
+	if (n != NULL) {
+		t = CONTAINER_OF(n, struct k_thread, base.qnode_rb);
+	}
+	return t;
 }
 
-#ifdef CONFIG_TIMESLICING
-extern s32_t _time_slice_duration;    /* Measured in ms */
-extern s32_t _time_slice_elapsed;     /* Measured in ms */
-extern int _time_slice_prio_ceiling;
-
-void k_sched_time_slice_set(s32_t duration_in_ms, int prio)
-{
-	__ASSERT(duration_in_ms >= 0, "");
-	__ASSERT((prio >= 0) && (prio < CONFIG_NUM_PREEMPT_PRIORITIES), "");
-
-	_time_slice_duration = duration_in_ms;
-	_time_slice_elapsed = 0;
-	_time_slice_prio_ceiling = prio;
-}
-
-int _is_thread_time_slicing(struct k_thread *thread)
-{
-	int ret = 0;
-
-	/* Should fix API.  Doesn't make sense for non-running threads
-	 * to call this
-	 */
-	__ASSERT_NO_MSG(thread == _current);
-
-	if (_time_slice_duration <= 0 || !_is_preempt(thread) ||
-	    _is_prio_higher(thread->base.prio, _time_slice_prio_ceiling)) {
-		return 0;
-	}
-
-
-	LOCKED(&sched_lock) {
-		struct k_thread *next = _priq_run_best(&_kernel.ready_q.runq);
-
-		if (next) {
-			ret = thread->base.prio == next->base.prio;
-		}
-	}
-
-	return ret;
-}
-
-/* Must be called with interrupts locked */
-/* Should be called only immediately before a thread switch */
-void _update_time_slice_before_swap(void)
-{
-#ifdef CONFIG_TICKLESS_KERNEL
-	if (!_is_thread_time_slicing(_get_next_ready_thread())) {
-		return;
-	}
-
-	u32_t remaining = _get_remaining_program_time();
-
-	if (!remaining || (_time_slice_duration < remaining)) {
-		_set_time(_time_slice_duration);
-	} else {
-		/* Account previous elapsed time and reprogram
-		 * timer with remaining time
-		 */
-		_set_time(remaining);
-	}
-
+#ifdef CONFIG_SCHED_MULTIQ
+# if (K_LOWEST_THREAD_PRIO - K_HIGHEST_THREAD_PRIO) > 31
+# error Too many priorities for multiqueue scheduler (max 32)
+# endif
 #endif
-	/* Restart time slice count at new thread switch */
-	_time_slice_elapsed = 0;
-}
-#endif /* CONFIG_TIMESLICING */
 
-int _unpend_all(_wait_q_t *waitq)
+ALWAYS_INLINE void _priq_mq_add(struct _priq_mq *pq, struct k_thread *thread)
+{
+	int priority_bit = thread->base.prio - K_HIGHEST_THREAD_PRIO;
+
+	sys_dlist_append(&pq->queues[priority_bit], &thread->base.qnode_dlist);
+	pq->bitmask |= (1 << priority_bit);
+}
+
+ALWAYS_INLINE void _priq_mq_remove(struct _priq_mq *pq, struct k_thread *thread)
+{
+	int priority_bit = thread->base.prio - K_HIGHEST_THREAD_PRIO;
+
+	sys_dlist_remove(&thread->base.qnode_dlist);
+	if (sys_dlist_is_empty(&pq->queues[priority_bit])) {
+		pq->bitmask &= ~(1 << priority_bit);
+	}
+}
+
+struct k_thread *_priq_mq_best(struct _priq_mq *pq)
+{
+	if (!pq->bitmask) {
+		return NULL;
+	}
+
+	struct k_thread *t = NULL;
+	sys_dlist_t *l = &pq->queues[__builtin_ctz(pq->bitmask)];
+	sys_dnode_t *n = sys_dlist_peek_head(l);
+
+	if (n != NULL) {
+		t = CONTAINER_OF(n, struct k_thread, base.qnode_dlist);
+	}
+	return t;
+}
+
+int _unpend_all(_wait_q_t *wait_q)
 {
 	int need_sched = 0;
 	struct k_thread *th;
 
-	while ((th = _waitq_head(waitq))) {
+	while ((th = _waitq_head(wait_q)) != NULL) {
 		_unpend_thread(th);
 		_ready_thread(th);
 		need_sched = 1;
@@ -533,12 +754,25 @@ void _sched_init(void)
 {
 #ifdef CONFIG_SCHED_DUMB
 	sys_dlist_init(&_kernel.ready_q.runq);
-#else
+#endif
+
+#ifdef CONFIG_SCHED_SCALABLE
 	_kernel.ready_q.runq = (struct _priq_rb) {
 		.tree = {
 			.lessthan_fn = _priq_rb_lessthan,
 		}
 	};
+#endif
+
+#ifdef CONFIG_SCHED_MULTIQ
+	for (int i = 0; i < ARRAY_SIZE(_kernel.ready_q.runq.queues); i++) {
+		sys_dlist_init(&_kernel.ready_q.runq.queues[i]);
+	}
+#endif
+
+#ifdef CONFIG_TIMESLICING
+	k_sched_time_slice_set(CONFIG_TIMESLICE_SIZE,
+		CONFIG_TIMESLICE_PRIORITY);
 #endif
 }
 
@@ -583,31 +817,60 @@ Z_SYSCALL_HANDLER(k_thread_priority_set, thread_p, prio)
 }
 #endif
 
+#ifdef CONFIG_SCHED_DEADLINE
+void _impl_k_thread_deadline_set(k_tid_t tid, int deadline)
+{
+	struct k_thread *th = tid;
+
+	LOCKED(&sched_lock) {
+		th->base.prio_deadline = k_cycle_get_32() + deadline;
+		if (_is_thread_queued(th)) {
+			_priq_run_remove(&_kernel.ready_q.runq, th);
+			_priq_run_add(&_kernel.ready_q.runq, th);
+		}
+	}
+}
+
+#ifdef CONFIG_USERSPACE
+Z_SYSCALL_HANDLER(k_thread_deadline_set, thread_p, deadline)
+{
+	struct k_thread *thread = (struct k_thread *)thread_p;
+
+	Z_OOPS(Z_SYSCALL_OBJ(thread, K_OBJ_THREAD));
+	Z_OOPS(Z_SYSCALL_VERIFY_MSG(deadline > 0,
+				    "invalid thread deadline %d",
+				    (int)deadline));
+
+	_impl_k_thread_deadline_set((k_tid_t)thread, deadline);
+	return 0;
+}
+#endif
+#endif
+
 void _impl_k_yield(void)
 {
 	__ASSERT(!_is_in_isr(), "");
 
 	if (!_is_idle(_current)) {
-		_move_thread_to_end_of_prio_q(_current);
+		LOCKED(&sched_lock) {
+			_priq_run_remove(&_kernel.ready_q.runq, _current);
+			_priq_run_add(&_kernel.ready_q.runq, _current);
+			update_cache(1);
+		}
 	}
 
-	if (_get_next_ready_thread() != _current) {
-		_Swap(irq_lock());
-	}
+	_Swap_unlocked();
 }
 
 #ifdef CONFIG_USERSPACE
 Z_SYSCALL_HANDLER0_SIMPLE_VOID(k_yield);
 #endif
 
-void _impl_k_sleep(s32_t duration)
+s32_t _impl_k_sleep(s32_t duration)
 {
 #ifdef CONFIG_MULTITHREADING
-	/* volatile to guarantee that irq_lock() is executed after ticks is
-	 * populated
-	 */
-	volatile s32_t ticks;
-	unsigned int key;
+	u32_t expected_wakeup_time;
+	s32_t ticks;
 
 	__ASSERT(!_is_in_isr(), "");
 	__ASSERT(duration != K_FOREVER, "");
@@ -617,17 +880,31 @@ void _impl_k_sleep(s32_t duration)
 	/* wait of 0 ms is treated as a 'yield' */
 	if (duration == 0) {
 		k_yield();
-		return;
+		return 0;
 	}
 
 	ticks = _TICK_ALIGN + _ms_to_ticks(duration);
-	key = irq_lock();
+	expected_wakeup_time = ticks + z_tick_get_32();
+
+	/* Spinlock purely for local interrupt locking to prevent us
+	 * from being interrupted while _current is in an intermediate
+	 * state.  Should unify this implementation with pend().
+	 */
+	struct k_spinlock local_lock = {};
+	k_spinlock_key_t key = k_spin_lock(&local_lock);
 
 	_remove_thread_from_ready_q(_current);
-	_add_thread_timeout(_current, NULL, ticks);
+	_add_thread_timeout(_current, ticks);
 
-	_Swap(key);
+	(void)_Swap(&local_lock, key);
+
+	ticks = expected_wakeup_time - z_tick_get_32();
+	if (ticks > 0) {
+		return __ticks_to_ms(ticks);
+	}
 #endif
+
+	return 0;
 }
 
 #ifdef CONFIG_USERSPACE
@@ -638,33 +915,25 @@ Z_SYSCALL_HANDLER(k_sleep, duration)
 	 */
 	Z_OOPS(Z_SYSCALL_VERIFY_MSG(duration != K_FOREVER,
 				    "sleeping forever not allowed"));
-	_impl_k_sleep(duration);
 
-	return 0;
+	return _impl_k_sleep(duration);
 }
 #endif
 
 void _impl_k_wakeup(k_tid_t thread)
 {
-	int key = irq_lock();
-
-	/* verify first if thread is not waiting on an object */
 	if (_is_thread_pending(thread)) {
-		irq_unlock(key);
 		return;
 	}
 
-	if (_abort_thread_timeout(thread) == _INACTIVE) {
-		irq_unlock(key);
+	if (_abort_thread_timeout(thread) < 0) {
 		return;
 	}
 
 	_ready_thread(thread);
 
-	if (_is_in_isr()) {
-		irq_unlock(key);
-	} else {
-		_reschedule(key);
+	if (!_is_in_isr()) {
+		_reschedule_unlocked();
 	}
 }
 
@@ -689,3 +958,47 @@ int _impl_k_is_preempt_thread(void)
 #ifdef CONFIG_USERSPACE
 Z_SYSCALL_HANDLER0_SIMPLE(k_is_preempt_thread);
 #endif
+
+#ifdef CONFIG_SCHED_CPU_MASK
+# ifdef CONFIG_SMP
+/* Right now we use a single byte for this mask */
+BUILD_ASSERT_MSG(CONFIG_MP_NUM_CPUS <= 8, "Too many CPUs for mask word");
+# endif
+
+
+static int cpu_mask_mod(k_tid_t t, u32_t enable_mask, u32_t disable_mask)
+{
+	int ret = 0;
+
+	LOCKED(&sched_lock) {
+		if (_is_thread_prevented_from_running(t)) {
+			t->base.cpu_mask |= enable_mask;
+			t->base.cpu_mask  &= ~disable_mask;
+		} else {
+			ret = -EINVAL;
+		}
+	}
+	return ret;
+}
+
+int k_thread_cpu_mask_clear(k_tid_t thread)
+{
+	return cpu_mask_mod(thread, 0, 0xffffffff);
+}
+
+int k_thread_cpu_mask_enable_all(k_tid_t thread)
+{
+	return cpu_mask_mod(thread, 0xffffffff, 0);
+}
+
+int k_thread_cpu_mask_enable(k_tid_t thread, int cpu)
+{
+	return cpu_mask_mod(thread, BIT(cpu), 0);
+}
+
+int k_thread_cpu_mask_disable(k_tid_t thread, int cpu)
+{
+	return cpu_mask_mod(thread, 0, BIT(cpu));
+}
+
+#endif /* CONFIG_SCHED_CPU_MASK */

@@ -7,7 +7,7 @@
 #include <errno.h>
 
 #include <gpio.h>
-#include <board.h>
+#include <soc.h>
 #include <misc/util.h>
 
 #include "qm_ss_gpio.h"
@@ -112,7 +112,7 @@ static const struct ss_gpio_qmsi_config ss_gpio_0_config = {
 
 static struct ss_gpio_qmsi_runtime ss_gpio_0_runtime;
 
-DEVICE_DEFINE(ss_gpio_0, CONFIG_GPIO_QMSI_SS_0_NAME, &ss_gpio_qmsi_init,
+DEVICE_DEFINE(ss_gpio_0, DT_GPIO_QMSI_SS_0_NAME, &ss_gpio_qmsi_init,
 	    ss_gpio_qmsi_device_ctrl, &ss_gpio_0_runtime, &ss_gpio_0_config,
 	    POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, NULL);
 
@@ -126,13 +126,13 @@ static const struct ss_gpio_qmsi_config ss_gpio_1_config = {
 
 static struct ss_gpio_qmsi_runtime gpio_1_runtime;
 
-DEVICE_DEFINE(ss_gpio_1, CONFIG_GPIO_QMSI_SS_1_NAME, &ss_gpio_qmsi_init,
+DEVICE_DEFINE(ss_gpio_1, DT_GPIO_QMSI_SS_1_NAME, &ss_gpio_qmsi_init,
 	    ss_gpio_qmsi_device_ctrl, &gpio_1_runtime, &ss_gpio_1_config,
 	    POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, NULL);
 
 #endif /* CONFIG_GPIO_QMSI_SS_1 */
 
-static void ss_gpio_qmsi_callback(void *data, u32_t status)
+static void ss_gpio_qmsi_callback(void *data, uint32_t status)
 {
 	struct device *port = data;
 	struct ss_gpio_qmsi_runtime *context = port->driver_data;
@@ -152,7 +152,7 @@ static void ss_qmsi_write_bit(u32_t *target, u8_t bit, u8_t value)
 	}
 }
 
-static inline void ss_qmsi_pin_config(struct device *port, u32_t pin,
+static inline void ss_qmsi_pin_config(struct device *port, u8_t pin,
 				      int flags)
 {
 	const struct ss_gpio_qmsi_config *gpio_config =
@@ -186,17 +186,17 @@ static inline void ss_qmsi_pin_config(struct device *port, u32_t pin,
 	cfg.callback = ss_gpio_qmsi_callback;
 	cfg.callback_data = port;
 
-	ss_qmsi_write_bit(&cfg.direction, pin, (flags & GPIO_DIR_MASK));
+	ss_qmsi_write_bit((u32_t *)&cfg.direction, pin, (flags & GPIO_DIR_MASK));
 
 	if (flags & GPIO_INT) {
-		ss_qmsi_write_bit(&cfg.int_type, pin, (flags & GPIO_INT_EDGE));
-		ss_qmsi_write_bit(&cfg.int_polarity, pin,
+		ss_qmsi_write_bit((u32_t *)&cfg.int_type, pin, (flags & GPIO_INT_EDGE));
+		ss_qmsi_write_bit((u32_t *)&cfg.int_polarity, pin,
 			       (flags & GPIO_INT_ACTIVE_HIGH));
-		ss_qmsi_write_bit(&cfg.int_debounce, pin,
+		ss_qmsi_write_bit((u32_t *)&cfg.int_debounce, pin,
 			       (flags & GPIO_INT_DEBOUNCE));
-		ss_qmsi_write_bit(&cfg.int_en, pin, 1);
+		ss_qmsi_write_bit((u32_t *)&cfg.int_en, pin, 1);
 	} else {
-		ss_qmsi_write_bit(&cfg.int_en, pin, 0);
+		ss_qmsi_write_bit((u32_t *)&cfg.int_en, pin, 0);
 	}
 
 	if (IS_ENABLED(CONFIG_GPIO_QMSI_API_REENTRANCY)) {
@@ -278,7 +278,7 @@ static inline int ss_gpio_qmsi_read(struct device *port, int access_op,
 		qm_ss_gpio_read_pin(gpio, pin, &state);
 		*value = state;
 	} else {
-		qm_ss_gpio_read_port(gpio, value);
+		qm_ss_gpio_read_port(gpio, (uint32_t *)value);
 	}
 
 	return 0;
@@ -290,9 +290,7 @@ static inline int ss_gpio_qmsi_manage_callback(struct device *port,
 {
 	struct ss_gpio_qmsi_runtime *context = port->driver_data;
 
-	_gpio_manage_callback(&context->callbacks, callback, set);
-
-	return 0;
+	return _gpio_manage_callback(&context->callbacks, callback, set);
 }
 
 static inline int ss_gpio_qmsi_enable_callback(struct device *port,
@@ -329,7 +327,7 @@ static inline int ss_gpio_qmsi_disable_callback(struct device *port,
 	if (access_op == GPIO_ACCESS_BY_PIN) {
 		context->pin_callbacks &= ~BIT(pin);
 	} else {
-		context->pin_callbacks = 0;
+		context->pin_callbacks = 0U;
 	}
 
 	if (IS_ENABLED(CONFIG_GPIO_QMSI_API_REENTRANCY)) {
@@ -374,8 +372,8 @@ static int ss_gpio_qmsi_init(struct device *port)
 	switch (gpio_config->gpio) {
 #ifdef CONFIG_GPIO_QMSI_SS_0
 	case QM_SS_GPIO_0:
-		IRQ_CONNECT(CONFIG_GPIO_QMSI_SS_0_IRQ,
-			    CONFIG_GPIO_QMSI_SS_0_IRQ_PRI, ss_gpio_isr,
+		IRQ_CONNECT(DT_GPIO_QMSI_SS_0_IRQ,
+			    DT_GPIO_QMSI_SS_0_IRQ_PRI, ss_gpio_isr,
 			    DEVICE_GET(ss_gpio_0), 0);
 		irq_enable(IRQ_GPIO0_INTR);
 
@@ -388,8 +386,8 @@ static int ss_gpio_qmsi_init(struct device *port)
 #endif /* CONFIG_GPIO_QMSI_SS_0 */
 #ifdef CONFIG_GPIO_QMSI_SS_1
 	case QM_SS_GPIO_1:
-		IRQ_CONNECT(CONFIG_GPIO_QMSI_SS_1_IRQ,
-			    CONFIG_GPIO_QMSI_SS_1_IRQ_PRI, ss_gpio_isr,
+		IRQ_CONNECT(DT_GPIO_QMSI_SS_1_IRQ,
+			    DT_GPIO_QMSI_SS_1_IRQ_PRI, ss_gpio_isr,
 			    DEVICE_GET(ss_gpio_1), 0);
 		irq_enable(IRQ_GPIO1_INTR);
 

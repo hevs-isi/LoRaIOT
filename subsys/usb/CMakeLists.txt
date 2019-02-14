@@ -7,9 +7,15 @@ if(CONFIG_USB_DEVICE_STACK)
   add_subdirectory(class)
 endif()
 
-if(CONFIG_USB_COMPOSITE_DEVICE)
+if(CONFIG_USB_DEVICE_BOS)
   zephyr_sources(
-    composite.c
+    bos.c
+    )
+endif()
+
+if(CONFIG_USB_DEVICE_OS_DESC)
+  zephyr_sources(
+    os_desc.c
     )
 endif()
 

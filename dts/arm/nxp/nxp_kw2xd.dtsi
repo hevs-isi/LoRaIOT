@@ -54,7 +54,7 @@
 			clk-divider-flash = <2>;
 
 			clock-controller;
-			#clocks-cells = <3>;
+			#clock-cells = <3>;
 		};
 
 		flash-controller@40020000 {
@@ -253,7 +253,6 @@
 			label = "SPI_1";
 			clocks = <&sim KINETIS_SIM_BUS_CLK 0x103C 13>;
 
-			cs-gpios = <&gpiob 10 0>;
 			pinctrl-0 = <&spi1_default>;
 			pinctrl-names = "default";
 			#address-cells = <1>;
@@ -287,8 +286,8 @@
 			reg = <0x40038000 0x98>;
 			interrupts = <42 0>;
 			label = "PWM_0";
-			/* channel information needed - fixme */
 			status = "disabled";
+			#pwm-cells = <2>;
 		};
 
 		pwm1: pwm@40039000{
@@ -296,8 +295,8 @@
 			reg = <0x40039000 0x98>;
 			interrupts = <43 0>;
 			label = "PWM_1";
-			/* channel information needed - fixme */
 			status = "disabled";
+			#pwm-cells = <2>;
 		};
 
 		pwm2: pwm@4003a000{
@@ -305,8 +304,8 @@
 			reg = <0x4003a000 0x98>;
 			interrupts = <44 0>;
 			label = "PWM_2";
-			/* channel information needed - fixme */
 			status = "disabled";
+			#pwm-cells = <2>;
 		};
 
 		adc0: adc@4003b000{
@@ -317,7 +316,7 @@
 			status = "disabled";
 		};
 
-		usbd: usbd@40027000 {
+		usbd: usbd@40072000 {
 			compatible = "nxp,kinetis-usbd";
 			reg = <0x40072000 0x1000>;
 			interrupts = <53 1>;
@@ -325,6 +324,14 @@
 			num-bidir-endpoints = <16>;
 			status = "disabled";
 			label = "USBD";
+		};
+
+		rnga: random@40029000 {
+			compatible = "nxp,kinetis-rnga";
+			reg = <0x40029000 0x1000>;
+			status = "ok";
+			interrupts = <23 0>;
+			label = "RNGA";
 		};
 	};
 };

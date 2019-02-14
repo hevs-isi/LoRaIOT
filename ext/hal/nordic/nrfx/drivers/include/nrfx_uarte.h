@@ -1,21 +1,21 @@
-/**
+/*
  * Copyright (c) 2015 - 2018, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -61,6 +61,12 @@ enum {
 #endif
 #if NRFX_CHECK(NRFX_UARTE1_ENABLED)
     NRFX_UARTE1_INST_IDX,
+#endif
+#if NRFX_CHECK(NRFX_UARTE2_ENABLED)
+    NRFX_UARTE2_INST_IDX,
+#endif
+#if NRFX_CHECK(NRFX_UARTE3_ENABLED)
+    NRFX_UARTE3_INST_IDX,
 #endif
     NRFX_UARTE_ENABLED_COUNT
 };
@@ -122,7 +128,7 @@ typedef struct
 typedef struct
 {
     uint8_t * p_data; ///< Pointer to memory used for transfer.
-    uint8_t   bytes;  ///< Number of bytes transfered.
+    size_t    bytes;  ///< Number of bytes transfered.
 } nrfx_uarte_xfer_evt_t;
 
 /**
@@ -344,6 +350,8 @@ __STATIC_INLINE uint32_t nrfx_uarte_event_address_get(nrfx_uarte_t const * p_ins
 
 void nrfx_uarte_0_irq_handler(void);
 void nrfx_uarte_1_irq_handler(void);
+void nrfx_uarte_2_irq_handler(void);
+void nrfx_uarte_3_irq_handler(void);
 
 /** @} */
 

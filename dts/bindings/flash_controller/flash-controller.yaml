@@ -1,12 +1,17 @@
 ---
 title: flash controller Base Structure
-id: soc-nv-flash-controller
 version: 0.1
 
 description: >
     This binding gives the base structures for all flash controller devices
 
 properties:
+    compatible:
+      type: string
+      category: required
+      description: compatible strings
+      generation: define
+
     label:
       type: string
       category: required

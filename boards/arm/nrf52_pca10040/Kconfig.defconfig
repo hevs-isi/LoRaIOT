@@ -7,29 +7,37 @@
 if BOARD_NRF52_PCA10040
 
 config BOARD
-	default nrf52_pca10040
+	default "nrf52_pca10040"
 
-if GPIO_NRF5
+if ADC
 
-config GPIO_NRF5_P0
+config ADC_0
 	default y
 
-endif # GPIO_NRF5
+endif # ADC
 
-if UART_NRF5
+if I2C
 
-config UART_NRF5_GPIO_TX_PIN
-	default 6
+config I2C_0
+	default y
 
-config UART_NRF5_GPIO_RX_PIN
-	default 8
+endif # I2C
 
-config UART_NRF5_GPIO_RTS_PIN
-	default 5
+if PWM
 
-config UART_NRF5_GPIO_CTS_PIN
-	default 7
+config PWM_0
+	default y
 
-endif # UART_NRF5
+endif # PWM
+
+if SPI
+
+config SPI_1
+	default y
+
+endif # SPI
+
+config BT_CTLR
+	default BT
 
 endif # BOARD_NRF52_PCA10040

@@ -11,8 +11,8 @@
  * ARM-specific kernel miscellaneous interface. Included by arm/arch.h.
  */
 
-#ifndef _ARCH_ARM_CORTEXM_MISC_H_
-#define _ARCH_ARM_CORTEXM_MISC_H_
+#ifndef ZEPHYR_INCLUDE_ARCH_ARM_CORTEX_M_MISC_H_
+#define ZEPHYR_INCLUDE_ARCH_ARM_CORTEX_M_MISC_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,10 +23,19 @@ extern void k_cpu_idle(void);
 
 extern u32_t _timer_cycle_get_32(void);
 #define _arch_k_cycle_get_32()	_timer_cycle_get_32()
+
+/**
+ * @brief Explicitly nop operation.
+ */
+static ALWAYS_INLINE void arch_nop(void)
+{
+	__asm__ volatile("nop");
+}
+
 #endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _ARCH_ARM_CORTEXM_MISC_H_ */
+#endif /* ZEPHYR_INCLUDE_ARCH_ARM_CORTEX_M_MISC_H_ */

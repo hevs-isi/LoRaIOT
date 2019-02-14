@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _DMA_CAVS_H_
-#define _DMA_CAVS_H_
+#ifndef ZEPHYR_DRIVERS_DMA_DMA_CAVS_H_
+#define ZEPHYR_DRIVERS_DMA_DMA_CAVS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,23 +28,15 @@ extern "C" {
 #define DW_CTLL_LLP_D_EN	(1 << 27)
 #define DW_CTLL_LLP_S_EN	(1 << 28)
 
-/* DMA descriptor used by HW version 2 */
-struct dw_lli2 {
-	u32_t sar;
-	u32_t dar;
-	u32_t llp;
-	u32_t ctrl_lo;
-	u32_t ctrl_hi;
-	u32_t sstat;
-	u32_t dstat;
-} __packed;
-
 /* data for each DMA channel */
 struct dma_chan_data {
 	u32_t direction;
-	struct dw_lli2 *lli;
-	u32_t cfg_lo;
-	u32_t cfg_hi;
+	void *blkcallback_arg;
+	void (*dma_blkcallback)(void *arg, u32_t channel,
+		int error_code);
+	void *tfrcallback_arg;
+	void (*dma_tfrcallback)(void *arg, u32_t channel,
+		int error_code);
 };
 
 #define DW_MAX_CHAN		8
@@ -111,10 +103,6 @@ struct dw_drv_plat_data {
 
 /* Device run time data */
 struct dw_dma_dev_data {
-	void (*dma_blkcallback)(struct device *dev, u32_t channel,
-		int error_code);
-	void (*dma_tfrcallback)(struct device *dev, u32_t channel,
-		int error_code);
 	struct dw_drv_plat_data *channel_data;
 	struct dma_chan_data chan[DW_MAX_CHAN];
 };
@@ -130,4 +118,4 @@ struct dw_dma_dev_cfg {
 }
 #endif
 
-#endif /* _DMA_CAVS_H_ */
+#endif /* ZEPHYR_DRIVERS_DMA_DMA_CAVS_H_ */

@@ -8,14 +8,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __SENSOR_LSM6DSL_H__
-#define __SENSOR_LSM6DSL_H__
+#ifndef ZEPHYR_DRIVERS_SENSOR_LSM6DSL_LSM6DSL_H_
+#define ZEPHYR_DRIVERS_SENSOR_LSM6DSL_LSM6DSL_H_
 
 #include <sensor.h>
 #include <zephyr/types.h>
 #include <gpio.h>
 #include <misc/util.h>
-
 
 #define LSM6DSL_REG_FUNC_CFG_ACCESS			0x01
 #define LSM6DSL_MASK_FUNC_CFG_EN			BIT(7)
@@ -684,7 +683,4 @@ int lsm6dsl_trigger_set(struct device *dev,
 int lsm6dsl_init_interrupt(struct device *dev);
 #endif
 
-#define SYS_LOG_DOMAIN "LSM6DSL"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
-#endif /* __SENSOR_LSM6DSL_H__ */
+#endif /* ZEPHYR_DRIVERS_SENSOR_LSM6DSL_LSM6DSL_H_ */

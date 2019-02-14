@@ -15,12 +15,12 @@
  */
 extern struct k_sem sem1;
 
-static __kernel struct k_sem semarray[SEM_ARRAY_SIZE];
+static struct k_sem semarray[SEM_ARRAY_SIZE];
 static struct k_sem *dyn_sem[SEM_ARRAY_SIZE];
 
 K_SEM_DEFINE(sem1, 0, 1);
-static __kernel struct k_sem sem2;
-static __kernel char bad_sem[sizeof(struct k_sem)];
+static struct k_sem sem2;
+static char bad_sem[sizeof(struct k_sem)];
 static struct k_sem sem3;
 
 static int test_object(struct k_sem *sem, int retval)
@@ -67,6 +67,13 @@ void object_permission_checks(struct k_sem *sem, bool skip_init)
 
 extern const k_tid_t _main_thread;
 
+/**
+ * @brief Tests to verify object permission
+ *
+ * @ingroup kernel_memprotect_tests
+ *
+ * @see k_object_alloc(), k_object_access_grant()
+ */
 void test_generic_object(void)
 {
 	struct k_sem stack_sem;
@@ -75,18 +82,14 @@ void test_generic_object(void)
 	zassert_false(test_object(&stack_sem, -EBADF), NULL);
 	zassert_false(test_object((struct k_sem *)&bad_sem, -EBADF), NULL);
 	zassert_false(test_object((struct k_sem *)0xFFFFFFFF, -EBADF), NULL);
-#ifdef CONFIG_APPLICATION_MEMORY
-	zassert_false(test_object(&sem3, -EBADF), NULL);
-#else
 	object_permission_checks(&sem3, false);
-#endif
 	object_permission_checks(&sem1, true);
 	object_permission_checks(&sem2, false);
 
 	for (int i = 0; i < SEM_ARRAY_SIZE; i++) {
 		object_permission_checks(&semarray[i], false);
 		dyn_sem[i] = k_object_alloc(K_OBJ_SEM);
-		zassert_not_null(dyn_sem[i], "couldn't allocate semaphore\n");
+		zassert_not_null(dyn_sem[i], "couldn't allocate semaphore");
 		/* Give an extra reference to another thread so the object
 		 * doesn't disappear if we revoke our own
 		 */

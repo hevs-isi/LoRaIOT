@@ -11,8 +11,8 @@
  * Module declares routines of PCI bus initialization and query
  */
 
-#ifndef _PCI_H_
-#define _PCI_H_
+#ifndef ZEPHYR_INCLUDE_DRIVERS_PCI_PCI_H_
+#define ZEPHYR_INCLUDE_DRIVERS_PCI_PCI_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,7 +65,7 @@ void pci_legacy_bridge_configure(struct pci_dev_info *dev_info,
 				 int pci_interrupt_pin,
 				 int irq_number);
 
-#ifdef CONFIG_PCI_DEBUG
+#ifdef CONFIG_PCI_LOG_LEVEL_DBG
 extern void pci_show(struct pci_dev_info *dev_info);
 #else
 #define pci_show(__unused__) { ; }
@@ -75,4 +75,4 @@ extern void pci_show(struct pci_dev_info *dev_info);
 }
 #endif
 
-#endif /* _PCI_H_ */
+#endif /* ZEPHYR_INCLUDE_DRIVERS_PCI_PCI_H_ */

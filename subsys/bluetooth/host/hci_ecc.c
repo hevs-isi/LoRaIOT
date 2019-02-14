@@ -24,6 +24,7 @@
 #include <bluetooth/hci_driver.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_CORE)
+#define LOG_MODULE_NAME bt_hci_ecc
 #include "common/log.h"
 
 #include "hci_ecc.h"
@@ -35,7 +36,7 @@
 #endif
 
 static struct k_thread ecc_thread_data;
-static BT_STACK_NOINIT(ecc_thread_stack, 1024);
+static K_THREAD_STACK_DEFINE(ecc_thread_stack, 1100);
 
 /* based on Core Specification 4.2 Vol 3. Part H 2.3.5.6.1 */
 static const u32_t debug_private_key[8] = {
@@ -113,8 +114,9 @@ static u8_t generate_keys(void)
 	/* make sure generated key isn't debug key */
 	} while (memcmp(ecc.private_key, debug_private_key, 32) == 0);
 #else
-	memcpy(&ecc.pk, debug_public_key, 64);
-	memcpy(ecc.private_key, debug_private_key, 32);
+	sys_memcpy_swap(&ecc.pk, debug_public_key, 32);
+	sys_memcpy_swap(&ecc.pk[32], &debug_public_key[32], 32);
+	sys_memcpy_swap(ecc.private_key, debug_private_key, 32);
 #endif
 	return 0;
 }
@@ -144,7 +146,7 @@ static void emulate_le_p256_public_key_cmd(void)
 	evt->status = status;
 
 	if (status) {
-		memset(evt->key, 0, sizeof(evt->key));
+		(void)memset(evt->key, 0, sizeof(evt->key));
 	} else {
 		/* Convert X and Y coordinates from big-endian (provided
 		 * by crypto API) to little endian HCI.
@@ -188,7 +190,7 @@ static void emulate_le_generate_dhkey(void)
 
 	if (ret == TC_CRYPTO_FAIL) {
 		evt->status = BT_HCI_ERR_UNSPECIFIED;
-		memset(evt->dhkey, 0, sizeof(evt->dhkey));
+		(void)memset(evt->dhkey, 0, sizeof(evt->dhkey));
 	} else {
 		evt->status = 0;
 		/* Convert from big-endian (provided by crypto API) to
@@ -223,7 +225,7 @@ static void clear_ecc_events(struct net_buf *buf)
 {
 	struct bt_hci_cp_le_set_event_mask *cmd;
 
-	cmd = (void *)buf->data  + sizeof(struct bt_hci_cmd_hdr);
+	cmd = (void *)(buf->data + sizeof(struct bt_hci_cmd_hdr));
 
 	/*
 	 * don't enable controller ECC events as those will be generated from
@@ -320,4 +322,5 @@ void bt_hci_ecc_init(void)
 	k_thread_create(&ecc_thread_data, ecc_thread_stack,
 			K_THREAD_STACK_SIZEOF(ecc_thread_stack), ecc_thread,
 			NULL, NULL, NULL, K_PRIO_PREEMPT(10), 0, K_NO_WAIT);
+	k_thread_name_set(&ecc_thread_data, "BT ECC");
 }

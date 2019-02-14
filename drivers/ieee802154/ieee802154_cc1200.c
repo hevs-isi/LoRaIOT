@@ -6,16 +6,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_IEEE802154_DRIVER_LEVEL
-#define SYS_LOG_DOMAIN "dev/cc1200"
-#include <logging/sys_log.h>
+#define LOG_MODULE_NAME ieee802154_cc1200
+#define LOG_LEVEL CONFIG_IEEE802154_DRIVER_LOG_LEVEL
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <errno.h>
 
 #include <kernel.h>
 #include <arch/cpu.h>
 
-#include <board.h>
 #include <device.h>
 #include <init.h>
 #include <net/net_if.h>
@@ -49,30 +50,26 @@ static struct spi_cs_control cs_ctrl;
 /***********************
  * Debugging functions *
  **********************/
-#if CONFIG_SYS_LOG_IEEE802154_DRIVER_LEVEL == 4
 static void _cc1200_print_status(u8_t status)
 {
 	if (status == CC1200_STATUS_IDLE) {
-		SYS_LOG_DBG("Idling");
+		LOG_DBG("Idling");
 	} else if (status == CC1200_STATUS_RX) {
-		SYS_LOG_DBG("Receiving");
+		LOG_DBG("Receiving");
 	} else if (status == CC1200_STATUS_TX) {
-		SYS_LOG_DBG("Transmitting");
+		LOG_DBG("Transmitting");
 	} else if (status == CC1200_STATUS_FSTXON) {
-		SYS_LOG_DBG("FS TX on");
+		LOG_DBG("FS TX on");
 	} else if (status == CC1200_STATUS_CALIBRATE) {
-		SYS_LOG_DBG("Calibrating");
+		LOG_DBG("Calibrating");
 	} else if (status == CC1200_STATUS_SETTLING) {
-		SYS_LOG_DBG("Settling");
+		LOG_DBG("Settling");
 	} else if (status == CC1200_STATUS_RX_FIFO_ERROR) {
-		SYS_LOG_DBG("RX FIFO error!");
+		LOG_DBG("RX FIFO error!");
 	} else if (status == CC1200_STATUS_TX_FIFO_ERROR) {
-		SYS_LOG_DBG("TX FIFO error!");
+		LOG_DBG("TX FIFO error!");
 	}
 }
-#else
-#define _cc1200_print_status(...)
-#endif /* CONFIG_SYS_LOG_IEEE802154_DRIVER_LEVEL */
 
 /*********************
  * Generic functions *
@@ -96,13 +93,13 @@ bool _cc1200_access_reg(struct cc1200_context *ctx, bool read, u8_t addr,
 	struct spi_buf_set tx = { .buffers = buf };
 
 	/*
-	SYS_LOG_DBG("%s: addr 0x%02x - Data %p Length %u - %s, %s",
+	LOG_DBG("%s: addr 0x%02x - Data %p Length %u - %s, %s",
 		    read ? "Read" : "Write", addr, data, length,
 		    extended ? "extended" : "normal",
 		    burst ? "burst" : "single");
 	*/
 
-	cmd_buf[0] = 0;
+	cmd_buf[0] = 0U;
 
 	if (burst) {
 		cmd_buf[0] |= CC1200_ACCESS_BURST;
@@ -279,16 +276,16 @@ static bool write_reg_freq(struct cc1200_context *ctx, u32_t freq)
 static u32_t rf_evaluate_freq_setting(struct cc1200_context *ctx, u32_t chan)
 {
 	u32_t xtal = CONFIG_IEEE802154_CC1200_XOSC;
-	u32_t mult_10 = 100000;
-	u32_t factor = 1;
-	u32_t freq = 0;
+	u32_t mult_10 = 100000U;
+	u32_t factor = 1U;
+	u32_t freq = 0U;
 	u32_t rf, lo_div;
 
 	rf = ctx->rf_settings->chan_center_freq0 +
 		((chan * (u32_t)ctx->rf_settings->channel_spacing) / 10);
 	lo_div = get_lo_divider(ctx);
 
-	SYS_LOG_DBG("Calculating freq for %u KHz RF (%u)", rf, lo_div);
+	LOG_DBG("Calculating freq for %u KHz RF (%u)", rf, lo_div);
 
 	while (rf > 0) {
 		u32_t hz, freq_tmp, rst;
@@ -321,7 +318,7 @@ static u32_t rf_evaluate_freq_setting(struct cc1200_context *ctx, u32_t chan)
 		rf -= hz;
 	}
 
-	SYS_LOG_DBG("FREQ is 0x%06X", freq);
+	LOG_DBG("FREQ is 0x%06X", freq);
 
 	return freq;
 }
@@ -340,7 +337,7 @@ rf_install_settings(struct device *dev,
 				CC1200_RF_NON_EXT_SPACE_REGS,
 				CC1200_RF_EXT_SPACE_REGS, true, true) ||
 	    !write_reg_pkt_len(cc1200, 0xFF)) {
-		SYS_LOG_ERR("Could not install RF settings");
+		LOG_ERR("Could not install RF settings");
 		return false;
 	}
 
@@ -352,7 +349,7 @@ rf_install_settings(struct device *dev,
 static int rf_calibrate(struct cc1200_context *ctx)
 {
 	if (!instruct_scal(ctx)) {
-		SYS_LOG_ERR("Could not calibrate RF");
+		LOG_ERR("Could not calibrate RF");
 		return -EIO;
 	}
 
@@ -362,7 +359,7 @@ static int rf_calibrate(struct cc1200_context *ctx)
 	if (!instruct_sidle(ctx) ||
 	    !instruct_sfrx(ctx) ||
 	    !instruct_srx(ctx)) {
-		SYS_LOG_ERR("Could not switch to RX");
+		LOG_ERR("Could not switch to RX");
 		return -EIO;
 	}
 
@@ -466,49 +463,49 @@ static void cc1200_rx(struct device *dev)
 		k_sem_take(&cc1200->rx_lock, K_FOREVER);
 
 		if (get_status(cc1200) == CC1200_STATUS_RX_FIFO_ERROR) {
-			SYS_LOG_ERR("Fifo error");
+			LOG_ERR("Fifo error");
 			goto flush;
 		}
 
 		pkt_len = get_packet_length(cc1200);
 		if (!verify_rxfifo_validity(cc1200, pkt_len)) {
-			SYS_LOG_ERR("Invalid frame");
+			LOG_ERR("Invalid frame");
 			goto flush;
 		}
 
-		pkt = net_pkt_get_reserve_rx(0, K_NO_WAIT);
+		pkt = net_pkt_get_reserve_rx(K_NO_WAIT);
 		if (!pkt) {
-			SYS_LOG_ERR("No free pkt available");
+			LOG_ERR("No free pkt available");
 			goto flush;
 		}
 
 		pkt_frag = net_pkt_get_frag(pkt, K_NO_WAIT);
 		if (!pkt_frag) {
-			SYS_LOG_ERR("No free frag available");
+			LOG_ERR("No free frag available");
 			goto flush;
 		}
 
 		net_pkt_frag_insert(pkt, pkt_frag);
 
 		if (!read_rxfifo_content(cc1200, pkt_frag, pkt_len)) {
-			SYS_LOG_ERR("No content read");
+			LOG_ERR("No content read");
 			goto flush;
 		}
 
 		if (!verify_crc(cc1200, pkt)) {
-			SYS_LOG_ERR("Bad packet CRC");
+			LOG_ERR("Bad packet CRC");
 			goto out;
 		}
 
 		if (ieee802154_radio_handle_ack(cc1200->iface, pkt) == NET_OK) {
-			SYS_LOG_DBG("ACK packet handled");
+			LOG_DBG("ACK packet handled");
 			goto out;
 		}
 
-		SYS_LOG_DBG("Caught a packet (%u)", pkt_len);
+		LOG_DBG("Caught a packet (%u)", pkt_len);
 
 		if (net_recv_data(cc1200->iface, pkt) < 0) {
-			SYS_LOG_DBG("Packet dropped by NET stack");
+			LOG_DBG("Packet dropped by NET stack");
 			goto out;
 		}
 
@@ -517,7 +514,7 @@ static void cc1200_rx(struct device *dev)
 				  K_THREAD_STACK_SIZEOF(cc1200->rx_stack));
 		continue;
 flush:
-		SYS_LOG_DBG("Flushing RX");
+		LOG_DBG("Flushing RX");
 		instruct_sidle(cc1200);
 		instruct_sfrx(cc1200);
 		instruct_srx(cc1200);
@@ -551,7 +548,7 @@ static int cc1200_cca(struct device *dev)
 		}
 	}
 
-	SYS_LOG_WRN("Busy");
+	LOG_WRN("Busy");
 
 	return -EBUSY;
 }
@@ -573,7 +570,7 @@ static int cc1200_set_channel(struct device *dev, u16_t channel)
 
 		if (!write_reg_freq(cc1200, freq) ||
 		    rf_calibrate(cc1200)) {
-			SYS_LOG_ERR("Could not set channel %u", channel);
+			LOG_ERR("Could not set channel %u", channel);
 			return -EIO;
 		}
 	}
@@ -586,12 +583,12 @@ static int cc1200_set_txpower(struct device *dev, s16_t dbm)
 	struct cc1200_context *cc1200 = dev->driver_data;
 	u8_t pa_power_ramp;
 
-	SYS_LOG_DBG("%d dbm", dbm);
+	LOG_DBG("%d dbm", dbm);
 
 	/* See Section 7.1 */
 	dbm = ((dbm + 18) * 2) - 1;
 	if ((dbm <= 3) || (dbm >= 64)) {
-		SYS_LOG_ERR("Unhandled value");
+		LOG_ERR("Unhandled value");
 		return -EINVAL;
 	}
 
@@ -599,7 +596,7 @@ static int cc1200_set_txpower(struct device *dev, s16_t dbm)
 	pa_power_ramp |= ((u8_t) dbm) & PA_POWER_RAMP_MASK;
 
 	if (!write_reg_pa_cfg1(cc1200, pa_power_ramp)) {
-		SYS_LOG_ERR("Could not proceed");
+		LOG_ERR("Could not proceed");
 		return -EIO;
 	}
 
@@ -611,11 +608,11 @@ static int cc1200_tx(struct device *dev,
 		     struct net_buf *frag)
 {
 	struct cc1200_context *cc1200 = dev->driver_data;
-	u8_t *frame = frag->data - net_pkt_ll_reserve(pkt);
-	u8_t len = net_pkt_ll_reserve(pkt) + frag->len;
+	u8_t *frame = frag->data;
+	u8_t len = frag->len;
 	bool status = false;
 
-	SYS_LOG_DBG("%p (%u)", frag, len);
+	LOG_DBG("%p (%u)", frag, len);
 
 	/* ToDo:
 	 * Supporting 802.15.4g will require to loop in pkt's frags
@@ -626,14 +623,14 @@ static int cc1200_tx(struct device *dev,
 	    !instruct_sfrx(cc1200) ||
 	    !instruct_sftx(cc1200) ||
 	    !instruct_sfstxon(cc1200)) {
-		SYS_LOG_ERR("Cannot switch to TX mode");
+		LOG_ERR("Cannot switch to TX mode");
 		goto out;
 	}
 
 	if (!write_txfifo(cc1200, &len, CC1200_PHY_HDR_LEN) ||
 	    !write_txfifo(cc1200, frame, len) ||
 	    read_reg_num_txbytes(cc1200) != (len + CC1200_PHY_HDR_LEN)) {
-		SYS_LOG_ERR("Cannot fill-in TX fifo");
+		LOG_ERR("Cannot fill-in TX fifo");
 		goto out;
 	}
 
@@ -641,7 +638,7 @@ static int cc1200_tx(struct device *dev,
 	atomic_set(&cc1200->tx_start, 0);
 
 	if (!instruct_stx(cc1200)) {
-		SYS_LOG_ERR("Cannot start transmission");
+		LOG_ERR("Cannot start transmission");
 		goto out;
 	}
 
@@ -657,7 +654,7 @@ out:
 
 	if (atomic_get(&cc1200->tx) == 1 &&
 	    read_reg_num_txbytes(cc1200) != 0) {
-		SYS_LOG_ERR("TX Failed");
+		LOG_ERR("TX Failed");
 
 		atomic_set(&cc1200->tx_start, 0);
 		instruct_sftx(cc1200);
@@ -682,7 +679,7 @@ static int cc1200_start(struct device *dev)
 	    !instruct_sftx(cc1200) ||
 	    !instruct_sfrx(cc1200) ||
 	    rf_calibrate(cc1200)) {
-		SYS_LOG_ERR("Could not proceed");
+		LOG_ERR("Could not proceed");
 		return -EIO;
 	}
 
@@ -700,7 +697,7 @@ static int cc1200_stop(struct device *dev)
 	enable_gpio0_interrupt(cc1200, false);
 
 	if (!instruct_spwd(cc1200)) {
-		SYS_LOG_ERR("Could not proceed");
+		LOG_ERR("Could not proceed");
 		return -EIO;
 	}
 
@@ -723,7 +720,7 @@ static int power_on_and_setup(struct device *dev)
 	struct cc1200_context *cc1200 = dev->driver_data;
 
 	if (!instruct_sres(cc1200)) {
-		SYS_LOG_ERR("Cannot reset");
+		LOG_ERR("Cannot reset");
 		return -EIO;
 	}
 
@@ -734,7 +731,7 @@ static int power_on_and_setup(struct device *dev)
 	if (!write_reg_iocfg3(cc1200, CC1200_IOCFG3) ||
 	    !write_reg_iocfg2(cc1200, CC1200_IOCFG2) ||
 	    !write_reg_iocfg0(cc1200, CC1200_IOCFG0)) {
-		SYS_LOG_ERR("Cannot configure GPIOs");
+		LOG_ERR("Cannot configure GPIOs");
 		return -EIO;
 	}
 
@@ -747,34 +744,33 @@ static int configure_spi(struct device *dev)
 {
 	struct cc1200_context *cc1200 = dev->driver_data;
 
-	cc1200->spi = device_get_binding(
-			CONFIG_IEEE802154_CC1200_SPI_DRV_NAME);
+	cc1200->spi = device_get_binding(DT_IEEE802154_CC1200_SPI_DRV_NAME);
 	if (!cc1200->spi) {
-		SYS_LOG_ERR("Unable to get SPI device");
+		LOG_ERR("Unable to get SPI device");
 		return -ENODEV;
 	}
 
 	if (IS_ENABLED(CONFIG_IEEE802154_CC1200_GPIO_SPI_CS)) {
 		cs_ctrl.gpio_dev = device_get_binding(
-			CONFIG_IEEE802154_CC1200_GPIO_SPI_CS_DRV_NAME);
+			DT_IEEE802154_CC1200_GPIO_SPI_CS_DRV_NAME);
 		if (!cs_ctrl.gpio_dev) {
-			SYS_LOG_ERR("Unable to get GPIO SPI CS device");
+			LOG_ERR("Unable to get GPIO SPI CS device");
 			return -ENODEV;
 		}
 
-		cs_ctrl.gpio_pin = CONFIG_IEEE802154_CC1200_GPIO_SPI_CS_PIN;
+		cs_ctrl.gpio_pin = DT_IEEE802154_CC1200_GPIO_SPI_CS_PIN;
 		cs_ctrl.delay = 0;
 
 		cc1200->spi_cfg.cs = &cs_ctrl;
 
-		SYS_LOG_DBG("SPI GPIO CS configured on %s:%u",
-			    CONFIG_IEEE802154_CC1200_GPIO_SPI_CS_DRV_NAME,
-			    CONFIG_IEEE802154_CC1200_GPIO_SPI_CS_PIN);
+		LOG_DBG("SPI GPIO CS configured on %s:%u",
+			    DT_IEEE802154_CC1200_GPIO_SPI_CS_DRV_NAME,
+			    DT_IEEE802154_CC1200_GPIO_SPI_CS_PIN);
 	}
 
 	cc1200->spi_cfg.operation = SPI_WORD_SET(8);
-	cc1200->spi_cfg.frequency = CONFIG_IEEE802154_CC1200_SPI_FREQ;
-	cc1200->spi_cfg.slave = CONFIG_IEEE802154_CC1200_SPI_SLAVE;
+	cc1200->spi_cfg.frequency = DT_IEEE802154_CC1200_SPI_FREQ;
+	cc1200->spi_cfg.slave = DT_IEEE802154_CC1200_SPI_SLAVE;
 
 	return 0;
 }
@@ -791,19 +787,19 @@ static int cc1200_init(struct device *dev)
 
 	cc1200->gpios = cc1200_configure_gpios();
 	if (!cc1200->gpios) {
-		SYS_LOG_ERR("Configuring GPIOS failed");
+		LOG_ERR("Configuring GPIOS failed");
 		return -EIO;
 	}
 
 	if (configure_spi(dev) != 0) {
-		SYS_LOG_ERR("Configuring SPI failed");
+		LOG_ERR("Configuring SPI failed");
 		return -EIO;
 	}
 
-	SYS_LOG_DBG("GPIO and SPI configured");
+	LOG_DBG("GPIO and SPI configured");
 
 	if (power_on_and_setup(dev) != 0) {
-		SYS_LOG_ERR("Configuring CC1200 failed");
+		LOG_ERR("Configuring CC1200 failed");
 		return -EIO;
 	}
 
@@ -812,7 +808,7 @@ static int cc1200_init(struct device *dev)
 			(k_thread_entry_t)cc1200_rx,
 			dev, NULL, NULL, K_PRIO_COOP(2), 0, 0);
 
-	SYS_LOG_INF("CC1200 initialized");
+	LOG_INF("CC1200 initialized");
 
 	return 0;
 }
@@ -823,7 +819,7 @@ static void cc1200_iface_init(struct net_if *iface)
 	struct cc1200_context *cc1200 = dev->driver_data;
 	u8_t *mac = get_mac(dev);
 
-	SYS_LOG_DBG("");
+	LOG_DBG("");
 
 	net_if_set_link_addr(iface, mac, 8, NET_LINK_IEEE802154);
 
@@ -836,7 +832,6 @@ static struct cc1200_context cc1200_context_data;
 
 static struct ieee802154_radio_api cc1200_radio_api = {
 	.iface_api.init	= cc1200_iface_init,
-	.iface_api.send	= ieee802154_radio_send,
 
 	.get_capabilities	= cc1200_get_capabilities,
 	.cca			= cc1200_cca,

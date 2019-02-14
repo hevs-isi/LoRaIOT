@@ -9,8 +9,8 @@
  * @brief Public API for network L2 interface
  */
 
-#ifndef __NET_L2_H__
-#define __NET_L2_H__
+#ifndef ZEPHYR_INCLUDE_NET_NET_L2_H_
+#define ZEPHYR_INCLUDE_NET_NET_L2_H_
 
 #include <net/buf.h>
 
@@ -27,6 +27,17 @@ extern "C" {
 
 struct net_if;
 
+enum net_l2_flags {
+	/** IP multicast supported */
+	NET_L2_MULTICAST			= BIT(0),
+
+	/** Do not joint solicited node multicast group */
+	NET_L2_MULTICAST_SKIP_JOIN_SOLICIT_NODE	= BIT(1),
+
+	/** Is promiscuous mode supported */
+	NET_L2_PROMISC_MODE			= BIT(2),
+} __packed;
+
 struct net_l2 {
 	/**
 	 * This function is used by net core to get iface's L2 layer parsing
@@ -38,21 +49,20 @@ struct net_l2 {
 	 * This function is used by net core to push a packet to lower layer
 	 * (interface's L2), which in turn might work on the packet relevantly.
 	 * (adding proper header etc...)
+	 * Returns a negative error code, or the number of bytes sent otherwise.
 	 */
-	enum net_verdict (*send)(struct net_if *iface, struct net_pkt *pkt);
-
-	/**
-	 * This function is used to get the amount of bytes the net core should
-	 * reserve as headroom in a net packet. Such space is relevant to L2
-	 * layer only.
-	 */
-	u16_t (*reserve)(struct net_if *iface, void *data);
+	int (*send)(struct net_if *iface, struct net_pkt *pkt);
 
 	/**
 	 * This function is used to enable/disable traffic over a network
-	 * interface.
+	 * interface. The function returns <0 if error and >=0 if no error.
 	 */
 	int (*enable)(struct net_if *iface, bool state);
+
+	/**
+	 * Return L2 flags for the network interface.
+	 */
+	enum net_l2_flags (*get_flags)(struct net_if *iface);
 };
 
 #define NET_L2_GET_NAME(_name) (__net_l2_##_name)
@@ -87,13 +97,19 @@ NET_L2_DECLARE_PUBLIC(BLUETOOTH_L2);
 NET_L2_DECLARE_PUBLIC(OPENTHREAD_L2);
 #endif /* CONFIG_NET_L2_OPENTHREAD */
 
-#define NET_L2_INIT(_name, _recv_fn, _send_fn, _reserve_fn, _enable_fn)	\
+#ifdef CONFIG_NET_L2_CANBUS
+#define CANBUS_L2		CANBUS
+#define CANBUS_L2_CTX_TYPE	void*
+NET_L2_DECLARE_PUBLIC(CANBUS_L2);
+#endif /* CONFIG_NET_L2_CANBUS */
+
+#define NET_L2_INIT(_name, _recv_fn, _send_fn, _enable_fn, _get_flags_fn) \
 	const struct net_l2 (NET_L2_GET_NAME(_name)) __used		\
 	__attribute__((__section__(".net_l2.init"))) = {		\
 		.recv = (_recv_fn),					\
 		.send = (_send_fn),					\
-		.reserve = (_reserve_fn),				\
 		.enable = (_enable_fn),					\
+		.get_flags = (_get_flags_fn),				\
 	}
 
 #define NET_L2_GET_DATA(name, sfx) (__net_l2_data_##name##sfx)
@@ -110,4 +126,4 @@ NET_L2_DECLARE_PUBLIC(OPENTHREAD_L2);
 }
 #endif
 
-#endif /* __NET_L2_H__ */
+#endif /* ZEPHYR_INCLUDE_NET_NET_L2_H_ */

@@ -1,21 +1,21 @@
-/**
+/*
  * Copyright (c) 2015 - 2018, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -70,6 +70,12 @@ enum {
 #endif
 #if NRFX_CHECK(NRFX_TWIM1_ENABLED)
     NRFX_TWIM1_INST_IDX,
+#endif
+#if NRFX_CHECK(NRFX_TWIM2_ENABLED)
+    NRFX_TWIM2_INST_IDX,
+#endif
+#if NRFX_CHECK(NRFX_TWIM3_ENABLED)
+    NRFX_TWIM3_INST_IDX,
 #endif
     NRFX_TWIM_ENABLED_COUNT
 };
@@ -388,6 +394,8 @@ uint32_t nrfx_twim_stopped_event_get(nrfx_twim_t const * p_instance);
 
 void nrfx_twim_0_irq_handler(void);
 void nrfx_twim_1_irq_handler(void);
+void nrfx_twim_2_irq_handler(void);
+void nrfx_twim_3_irq_handler(void);
 
 
 /** @} */

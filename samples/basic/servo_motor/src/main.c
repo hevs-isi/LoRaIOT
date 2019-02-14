@@ -17,6 +17,8 @@
 
 #if defined(CONFIG_SOC_QUARK_SE_C1000) || defined(CONFIG_SOC_QUARK_D2000)
 #define PWM_DEV CONFIG_PWM_QMSI_DEV_NAME
+#elif defined(CONFIG_PWM_NRF5_SW)
+#define PWM_DEV CONFIG_PWM_NRF5_SW_0_DEV_NAME
 #else
 #error "Choose supported board or add new board for the application"
 #endif
@@ -36,7 +38,7 @@ void main(void)
 {
 	struct device *pwm_dev;
 	u32_t pulse_width = MINPULSEWIDTH;
-	u8_t dir = 0;
+	u8_t dir = 0U;
 
 	printk("PWM demo app-servo control\n");
 
@@ -54,7 +56,7 @@ void main(void)
 
 		if (dir) {
 			if (pulse_width <= MINPULSEWIDTH) {
-				dir = 0;
+				dir = 0U;
 				pulse_width = MINPULSEWIDTH;
 			} else {
 				pulse_width -= STEPSIZE;
@@ -63,7 +65,7 @@ void main(void)
 			pulse_width += STEPSIZE;
 
 			if (pulse_width >= MAXPULSEWIDTH) {
-				dir = 1;
+				dir = 1U;
 				pulse_width = MAXPULSEWIDTH;
 			}
 		}

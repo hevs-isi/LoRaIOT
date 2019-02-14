@@ -8,8 +8,8 @@
  * @brief Atmel SAM MCU family Direct Memory Access (XDMAC) driver.
  */
 
-#ifndef _DMA_SAM_XDMAC_H_
-#define _DMA_SAM_XDMAC_H_
+#ifndef ZEPHYR_DRIVERS_DMA_DMA_SAM_XDMAC_H_
+#define ZEPHYR_DRIVERS_DMA_DMA_SAM_XDMAC_H_
 
 #include <stdint.h>
 
@@ -18,7 +18,7 @@ extern "C" {
 #endif
 
 /** DMA transfer callback */
-typedef void (*dma_callback)(struct device *dev, u32_t channel, int error_code);
+typedef void (*dma_callback)(void *arg, u32_t channel, int error_code);
 
 /* XDMA_MBR_UBC */
 #define XDMA_UBC_NDE (0x1u << 24)
@@ -129,4 +129,4 @@ struct sam_xdmac_linked_list_desc_view3 {
 }
 #endif
 
-#endif /* _DMA_SAM_XDMAC_H_ */
+#endif /* ZEPHYR_DRIVERS_DMA_DMA_SAM_XDMAC_H_ */

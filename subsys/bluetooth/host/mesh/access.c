@@ -16,6 +16,7 @@
 #include <bluetooth/mesh.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_ACCESS)
+#define LOG_MODULE_NAME bt_mesh_access
 #include "common/log.h"
 
 #include "mesh.h"
@@ -280,7 +281,6 @@ static void mod_init(struct bt_mesh_model *mod, struct bt_mesh_elem *elem,
 		mod->keys[i] = BT_MESH_KEY_UNUSED;
 	}
 
-	mod->flags = 0;
 	mod->elem_idx = elem - dev_comp->elem;
 	if (vnd) {
 		mod->mod_idx = mod - elem->vnd_models;
@@ -425,16 +425,23 @@ static bool model_has_key(struct bt_mesh_model *mod, u16_t key)
 }
 
 static const struct bt_mesh_model_op *find_op(struct bt_mesh_model *models,
-					      u8_t model_count,
+					      u8_t model_count, u16_t dst,
 					      u16_t app_idx, u32_t opcode,
 					      struct bt_mesh_model **model)
 {
 	u8_t i;
 
-	for (i = 0; i < model_count; i++) {
+	for (i = 0U; i < model_count; i++) {
 		const struct bt_mesh_model_op *op;
 
 		*model = &models[i];
+
+		if (BT_MESH_ADDR_IS_GROUP(dst) ||
+		    BT_MESH_ADDR_IS_VIRTUAL(dst)) {
+			if (!bt_mesh_model_find_group(*model, dst)) {
+				continue;
+			}
+		}
 
 		if (!model_has_key(*model, app_idx)) {
 			continue;
@@ -531,9 +538,7 @@ void bt_mesh_model_recv(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 			}
 		} else if (BT_MESH_ADDR_IS_GROUP(rx->ctx.recv_dst) ||
 			   BT_MESH_ADDR_IS_VIRTUAL(rx->ctx.recv_dst)) {
-			if (!bt_mesh_elem_find_group(elem, rx->ctx.recv_dst)) {
-				continue;
-			}
+			/* find_op() will do proper model/group matching */
 		} else if (i != 0 ||
 			   !bt_mesh_fixed_group_match(rx->ctx.recv_dst)) {
 			continue;
@@ -551,7 +556,8 @@ void bt_mesh_model_recv(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 			count = elem->vnd_model_count;
 		}
 
-		op = find_op(models, count, rx->ctx.app_idx, opcode, &model);
+		op = find_op(models, count, rx->ctx.recv_dst, rx->ctx.app_idx,
+			     opcode, &model);
 		if (op) {
 			struct net_buf_simple_state state;
 
@@ -700,7 +706,10 @@ int bt_mesh_model_publish(struct bt_mesh_model *model)
 
 	err = model_send(model, &tx, true, &sdu, &pub_sent_cb, model);
 	if (err) {
+		/* Don't try retransmissions for this publish attempt */
 		pub->count = 0;
+		/* Make sure the publish timer gets reset */
+		publish_sent(err, model);
 		return err;
 	}
 
@@ -712,7 +721,7 @@ struct bt_mesh_model *bt_mesh_model_find_vnd(struct bt_mesh_elem *elem,
 {
 	u8_t i;
 
-	for (i = 0; i < elem->vnd_model_count; i++) {
+	for (i = 0U; i < elem->vnd_model_count; i++) {
 		if (elem->vnd_models[i].vnd.company == company &&
 		    elem->vnd_models[i].vnd.id == id) {
 			return &elem->vnd_models[i];
@@ -727,7 +736,7 @@ struct bt_mesh_model *bt_mesh_model_find(struct bt_mesh_elem *elem,
 {
 	u8_t i;
 
-	for (i = 0; i < elem->model_count; i++) {
+	for (i = 0U; i < elem->model_count; i++) {
 		if (elem->models[i].id == id) {
 			return &elem->models[i];
 		}

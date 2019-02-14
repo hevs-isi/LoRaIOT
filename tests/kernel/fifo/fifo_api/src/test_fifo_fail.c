@@ -9,12 +9,15 @@
 #define TIMEOUT 100
 
 /**
- * @addtogroup kernel_fifo
+ * @addtogroup kernel_fifo_tests
  * @{
- * @brief Verify zephyr fifo_get when no data
- * - API coverage
- *   -# k_fifo_init
- *   -# k_fifo_get
+ */
+
+/**
+ * @brief Test FIFO get fail
+ * @details test zephyr fifo_get when no data to read,
+ * it should returns NULL.
+ * @see k_fifo_init(), k_fifo_get()
  */
 void test_fifo_get_fail(void *p1, void *p2, void *p3)
 {

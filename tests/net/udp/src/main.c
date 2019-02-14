@@ -6,6 +6,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define NET_LOG_LEVEL CONFIG_NET_UDP_LOG_LEVEL
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(net_test, NET_LOG_LEVEL);
+
 #include <zephyr.h>
 #include <linker/sections.h>
 
@@ -22,11 +27,12 @@
 #include <net/net_pkt.h>
 #include <net/net_ip.h>
 #include <net/ethernet.h>
+#include <net/dummy.h>
 #include <net/udp.h>
 
 #include <ztest.h>
 
-#if defined(CONFIG_NET_DEBUG_UDP)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 #define DBG(fmt, ...) printk(fmt, ##__VA_ARGS__)
 #else
 #define DBG(fmt, ...)
@@ -34,10 +40,11 @@
 
 #include "udp_internal.h"
 
-#if defined(CONFIG_NET_DEBUG_UDP)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 #define NET_LOG_ENABLED 1
 #endif
 #include "net_private.h"
+#include "ipv4.h"
 
 static bool test_failed;
 static bool fail = true;
@@ -84,7 +91,7 @@ static void net_udp_iface_init(struct net_if *iface)
 
 static int send_status = -EINVAL;
 
-static int tester_send(struct net_if *iface, struct net_pkt *pkt)
+static int tester_send(struct device *dev, struct net_pkt *pkt)
 {
 	if (!pkt->frags) {
 		DBG("No data to send!\n");
@@ -92,8 +99,6 @@ static int tester_send(struct net_if *iface, struct net_pkt *pkt)
 	}
 
 	DBG("Data was sent successfully\n");
-
-	net_pkt_unref(pkt);
 
 	send_status = 0;
 
@@ -120,8 +125,8 @@ static inline struct in_addr *if_get_addr(struct net_if *iface)
 
 struct net_udp_context net_udp_context_data;
 
-static struct net_if_api net_udp_if_api = {
-	.init = net_udp_iface_init,
+static struct dummy_api net_udp_if_api = {
+	.iface_api.init = net_udp_iface_init,
 	.send = tester_send,
 };
 
@@ -146,6 +151,8 @@ static struct ud *returned_ud;
 
 static enum net_verdict test_ok(struct net_conn *conn,
 				struct net_pkt *pkt,
+				union net_ip_header *ip_hdr,
+				union net_proto_header *proto_hdr,
 				void *user_data)
 {
 	struct ud *ud = (struct ud *)user_data;
@@ -171,6 +178,8 @@ static enum net_verdict test_ok(struct net_conn *conn,
 
 static enum net_verdict test_fail(struct net_conn *conn,
 				  struct net_pkt *pkt,
+				  union net_ip_header *ip_hdr,
+				  union net_proto_header *proto_hdr,
 				  void *user_data)
 {
 	/* This function should never be called as there should not
@@ -181,7 +190,7 @@ static enum net_verdict test_fail(struct net_conn *conn,
 	return NET_DROP;
 }
 
-#define NET_UDP_HDR(pkt)  ((struct net_udp_hdr *)(net_pkt_udp_data(pkt)))
+#define NET_UDP_HDR(pkt)  ((struct net_udp_hdr *)(net_udp_get_hdr(pkt, NULL)))
 
 static void setup_ipv6_udp(struct net_pkt *pkt,
 			   struct in6_addr *remote_addr,
@@ -192,8 +201,7 @@ static void setup_ipv6_udp(struct net_pkt *pkt,
 	NET_IPV6_HDR(pkt)->vtc = 0x60;
 	NET_IPV6_HDR(pkt)->tcflow = 0;
 	NET_IPV6_HDR(pkt)->flow = 0;
-	NET_IPV6_HDR(pkt)->len[0] = 0;
-	NET_IPV6_HDR(pkt)->len[1] = NET_UDPH_LEN + strlen(payload);
+	NET_IPV6_HDR(pkt)->len = htons(NET_UDPH_LEN + strlen(payload));
 
 	NET_IPV6_HDR(pkt)->nexthdr = IPPROTO_UDP;
 	NET_IPV6_HDR(pkt)->hop_limit = 255;
@@ -253,12 +261,13 @@ static void setup_ipv6_udp_long(struct net_pkt *pkt,
 	struct net_udp_hdr hdr, *udp_hdr;
 	struct net_ipv6_hdr ipv6;
 
+	net_pkt_set_family(pkt, AF_INET6);
+
 	ipv6.vtc = 0x60;
 	ipv6.tcflow = 0;
 	ipv6.flow = 0;
-	ipv6.len[0] = 0;
-	ipv6.len[1] = NET_UDPH_LEN + strlen(payload) +
-		sizeof(ipv6_hop_by_hop_ext_hdr);
+	ipv6.len = htons(NET_UDPH_LEN + strlen(payload) +
+				sizeof(ipv6_hop_by_hop_ext_hdr));
 
 	ipv6.nexthdr = 0; /* HBHO */
 	ipv6.hop_limit = 255;
@@ -282,18 +291,13 @@ static void setup_ipv6_udp_long(struct net_pkt *pkt,
 	udp_hdr = net_udp_get_hdr(pkt, &hdr);
 
 	/**TESTPOINT: Check if pointer is valid*/
-	zassert_equal_ptr(udp_hdr, &hdr, "Invalid UDP header pointer");
+	zassert_not_null(udp_hdr, "Invalid UDP header pointer");
+
 
 	udp_hdr->src_port = htons(remote_port);
 	udp_hdr->dst_port = htons(local_port);
 
 	net_udp_set_hdr(pkt, &hdr);
-
-	udp_hdr = net_udp_get_hdr(pkt, &hdr);
-	if (udp_hdr != &hdr) {
-		TC_ERROR("Invalid UDP header pointer %p\n", udp_hdr);
-		zassert_true(0, "exiting");
-	}
 
 	if (udp_hdr->src_port != htons(remote_port)) {
 		TC_ERROR("Invalid remote port, should have been %d was %d\n",
@@ -307,7 +311,7 @@ static void setup_ipv6_udp_long(struct net_pkt *pkt,
 		zassert_true(0, "exiting");
 	}
 
-	net_hexdump_frags("frag", pkt, false);
+	net_pkt_hexdump(pkt, "buffer");
 }
 
 static void setup_ipv4_udp(struct net_pkt *pkt,
@@ -316,13 +320,19 @@ static void setup_ipv4_udp(struct net_pkt *pkt,
 			   u16_t remote_port,
 			   u16_t local_port)
 {
+	net_pkt_set_family(pkt, AF_INET);
+
 	NET_IPV4_HDR(pkt)->vhl = 0x45;
 	NET_IPV4_HDR(pkt)->tos = 0;
-	NET_IPV4_HDR(pkt)->len[0] = 0;
-	NET_IPV4_HDR(pkt)->len[1] = NET_UDPH_LEN +
-		sizeof(struct net_ipv4_hdr) + strlen(payload);
+	NET_IPV4_HDR(pkt)->len = htons(NET_UDPH_LEN +
+					sizeof(struct net_ipv4_hdr) +
+					strlen(payload));
 
 	NET_IPV4_HDR(pkt)->proto = IPPROTO_UDP;
+	NET_IPV4_HDR(pkt)->chksum = 0;
+
+	NET_IPV4_HDR(pkt)->offset[0] = NET_IPV4_HDR(pkt)->offset[1] = 0;
+	NET_IPV4_HDR(pkt)->id[0] = NET_IPV4_HDR(pkt)->id[1] = 0;
 
 	net_ipaddr_copy(&NET_IPV4_HDR(pkt)->src, remote_addr);
 	net_ipaddr_copy(&NET_IPV4_HDR(pkt)->dst, local_addr);
@@ -335,8 +345,12 @@ static void setup_ipv4_udp(struct net_pkt *pkt,
 
 	NET_UDP_HDR(pkt)->src_port = htons(remote_port);
 	NET_UDP_HDR(pkt)->dst_port = htons(local_port);
+	NET_UDP_HDR(pkt)->chksum = 0;
 
 	net_buf_add_mem(pkt->frags, payload, strlen(payload));
+
+	net_pkt_cursor_init(pkt);
+	net_ipv4_finalize(pkt, IPPROTO_UDP);
 }
 
 #define TIMEOUT 200
@@ -353,12 +367,15 @@ static bool send_ipv6_udp_msg(struct net_if *iface,
 	struct net_buf *frag;
 	int ret;
 
-	pkt = net_pkt_get_reserve_tx(0, K_FOREVER);
-	frag = net_pkt_get_frag(pkt, K_FOREVER);
+	pkt = net_pkt_get_reserve_tx(K_SECONDS(1));
+	zassert_not_null(pkt, "Out of mem");
+
+	frag = net_pkt_get_frag(pkt, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 
 	net_pkt_set_iface(pkt, iface);
-	net_pkt_set_ll_reserve(pkt, net_buf_headroom(frag));
 
 	setup_ipv6_udp(pkt, src, dst, src_port, dst_port);
 
@@ -399,12 +416,15 @@ static bool send_ipv6_udp_long_msg(struct net_if *iface,
 	struct net_buf *frag;
 	int ret;
 
-	pkt = net_pkt_get_reserve_tx(0, K_FOREVER);
-	frag = net_pkt_get_frag(pkt, K_FOREVER);
+	pkt = net_pkt_get_reserve_tx(K_SECONDS(1));
+	zassert_not_null(pkt, "Out of mem");
+
+	frag = net_pkt_get_frag(pkt, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 
 	net_pkt_set_iface(pkt, iface);
-	net_pkt_set_ll_reserve(pkt, net_buf_headroom(frag));
 
 	setup_ipv6_udp_long(pkt, src, dst, src_port, dst_port);
 
@@ -445,12 +465,15 @@ static bool send_ipv4_udp_msg(struct net_if *iface,
 	struct net_buf *frag;
 	int ret;
 
-	pkt = net_pkt_get_reserve_tx(0, K_FOREVER);
-	frag = net_pkt_get_frag(pkt, K_FOREVER);
+	pkt = net_pkt_get_reserve_tx(K_SECONDS(1));
+	zassert_not_null(pkt, "Out of mem");
+
+	frag = net_pkt_get_frag(pkt, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 
 	net_pkt_set_iface(pkt, iface);
-	net_pkt_set_ll_reserve(pkt, net_buf_headroom(frag));
 
 	setup_ipv4_udp(pkt, src, dst, src_port, dst_port);
 
@@ -585,7 +608,8 @@ void test_udp(void)
 		set_port(family, (struct sockaddr *)raddr,		\
 			 (struct sockaddr *)laddr, rport, lport);	\
 									\
-		ret = net_udp_register((struct sockaddr *)raddr,	\
+		ret = net_udp_register(family,				\
+				       (struct sockaddr *)raddr,	\
 				       (struct sockaddr *)laddr,	\
 				       rport, lport,			\
 				       test_ok, &user_data,		\
@@ -600,7 +624,8 @@ void test_udp(void)
 	})
 
 #define REGISTER_FAIL(raddr, laddr, rport, lport)			\
-	ret = net_udp_register((struct sockaddr *)raddr,		\
+	ret = net_udp_register(AF_INET,					\
+			       (struct sockaddr *)raddr,		\
 			       (struct sockaddr *)laddr,		\
 			       rport, lport,				\
 			       test_fail, INT_TO_POINTER(0), NULL);	\

@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _SWAP_MACROS__H_
-#define _SWAP_MACROS__H_
+#ifndef ZEPHYR_ARCH_ARC_INCLUDE_SWAP_MACROS_H_
+#define ZEPHYR_ARCH_ARC_INCLUDE_SWAP_MACROS_H_
 
 #include <kernel_structs.h>
 #include <offsets_short.h>
@@ -76,13 +76,13 @@ extern "C" {
 
 #endif
 
-	/* save stack pointer in struct tcs */
+	/* save stack pointer in struct k_thread */
 	st sp, [r2, _thread_offset_to_sp]
 .endm
 
 /* entering this macro, current is in r2 */
 .macro _load_callee_saved_regs
-	/* restore stack pointer from struct tcs */
+	/* restore stack pointer from struct k_thread */
 	ld sp, [r2, _thread_offset_to_sp]
 
 #ifdef CONFIG_FP_SHARING
@@ -242,10 +242,40 @@ extern "C" {
 
 .endm
 
+/*
+ * To use this macor, r2 should have the value of thread struct pointer to
+ * _kernel.current. r3 is a scratch reg.
+ */
+.macro _load_stack_check_regs
+#ifdef CONFIG_ARC_HAS_SECURE
+	ld r3, [r2, _thread_offset_to_k_stack_base]
+	sr r3, [_ARC_V2_S_KSTACK_BASE]
+	ld r3, [r2, _thread_offset_to_k_stack_top]
+	sr r3, [_ARC_V2_S_KSTACK_TOP]
+#ifdef CONFIG_USERSPACE
+	ld r3, [r2, _thread_offset_to_u_stack_base]
+	sr r3, [_ARC_V2_S_USTACK_BASE]
+	ld r3, [r2, _thread_offset_to_u_stack_top]
+	sr r3, [_ARC_V2_S_USTACK_TOP]
+#endif
+#else /* CONFIG_ARC_HAS_SECURE */
+	ld r3, [r2, _thread_offset_to_k_stack_base]
+	sr r3, [_ARC_V2_KSTACK_BASE]
+	ld r3, [r2, _thread_offset_to_k_stack_top]
+	sr r3, [_ARC_V2_KSTACK_TOP]
+#ifdef CONFIG_USERSPACE
+	ld r3, [r2, _thread_offset_to_u_stack_base]
+	sr r3, [_ARC_V2_USTACK_BASE]
+	ld r3, [r2, _thread_offset_to_u_stack_top]
+	sr r3, [_ARC_V2_USTACK_TOP]
+#endif
+#endif /* CONFIG_ARC_HAS_SECURE */
+.endm
+
 #endif /* _ASMLANGUAGE */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /*  _SWAP_MACROS__H_ */
+#endif /*  ZEPHYR_ARCH_ARC_INCLUDE_SWAP_MACROS_H_ */

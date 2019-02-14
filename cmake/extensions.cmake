@@ -1,6 +1,3 @@
-include(CheckCCompilerFlag)
-include(CheckCXXCompilerFlag)
-
 ########################################################
 # Table of contents
 ########################################################
@@ -27,7 +24,7 @@ include(CheckCXXCompilerFlag)
 # 1.1. zephyr_*
 #
 # The following methods are for modifying the CMake library[0] called
-# "zephyr". zephyr is a catchall CMake library for source files that
+# "zephyr". zephyr is a catch-all CMake library for source files that
 # can be built purely with the include paths, defines, and other
 # compiler flags that all zephyr source files use.
 # [0] https://cmake.org/cmake/help/latest/manual/cmake-buildsystem.7.html
@@ -36,13 +33,13 @@ include(CheckCXXCompilerFlag)
 # zephyr_sources(
 #   random_esp32.c
 #   utils.c
-#   )
+# )
 #
 # Is short for:
 # target_sources(zephyr PRIVATE
 #   ${CMAKE_CURRENT_SOURCE_DIR}/random_esp32.c
 #   ${CMAKE_CURRENT_SOURCE_DIR}/utils.c
-#  )
+# )
 
 # https://cmake.org/cmake/help/latest/command/target_sources.html
 function(zephyr_sources)
@@ -304,73 +301,6 @@ macro(get_property_and_add_prefix result target property prefix)
   endforeach()
 endmacro()
 
-# 1.3 generate_inc_*
-
-# These functions are useful if there is a need to generate a file
-# that can be included into the application at build time. The file
-# can also be compressed automatically when embedding it.
-#
-# See tests/application_development/gen_inc_file for an example of
-# usage.
-function(generate_inc_file
-    source_file    # The source file to be converted to hex
-    generated_file # The generated file
-    )
-  add_custom_command(
-    OUTPUT ${generated_file}
-    COMMAND
-    ${PYTHON_EXECUTABLE}
-    ${ZEPHYR_BASE}/scripts/file2hex.py
-    ${ARGN} # Extra arguments are passed to file2hex.py
-    --file ${source_file}
-    > ${generated_file} # Does pipe redirection work on Windows?
-    DEPENDS ${source_file}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-endfunction()
-
-function(generate_inc_file_for_gen_target
-    target          # The cmake target that depends on the generated file
-    source_file     # The source file to be converted to hex
-    generated_file  # The generated file
-    gen_target      # The generated file target we depend on
-                    # Any additional arguments are passed on to file2hex.py
-    )
-  generate_inc_file(${source_file} ${generated_file} ${ARGN})
-
-  # Ensure 'generated_file' is generated before 'target' by creating a
-  # dependency between the two targets
-
-  add_dependencies(${target} ${gen_target})
-endfunction()
-
-function(generate_inc_file_for_target
-    target          # The cmake target that depends on the generated file
-    source_file     # The source file to be converted to hex
-    generated_file  # The generated file
-                    # Any additional arguments are passed on to file2hex.py
-    )
-  # Ensure 'generated_file' is generated before 'target' by creating a
-  # 'custom_target' for it and setting up a dependency between the two
-  # targets
-
-  # But first create a unique name for the custom target
-  string(
-    RANDOM
-    LENGTH 8
-    random_chars
-    )
-
-  get_filename_component(basename ${generated_file} NAME)
-  string(REPLACE "." "_" basename ${basename})
-  string(REPLACE "@" "_" basename ${basename})
-
-  set(generated_target_name "gen_${basename}_${random_chars}")
-
-  add_custom_target(${generated_target_name} DEPENDS ${generated_file})
-  generate_inc_file_for_gen_target(${target} ${source_file} ${generated_file} ${generated_target_name} ${ARGN})
-endfunction()
-
 # 1.2 zephyr_library_*
 #
 # Zephyr libraries use CMake's library concept and a set of
@@ -428,7 +358,7 @@ macro(zephyr_library_named name)
 
   zephyr_append_cmake_library(${name})
 
-  target_link_libraries(${name} zephyr_interface)
+  target_link_libraries(${name} PUBLIC zephyr_interface)
 endmacro()
 
 
@@ -448,7 +378,7 @@ function(zephyr_library_include_directories)
 endfunction()
 
 function(zephyr_library_link_libraries item)
-  target_link_libraries(${ZEPHYR_CURRENT_LIBRARY} ${item} ${ARGN})
+  target_link_libraries(${ZEPHYR_CURRENT_LIBRARY} PUBLIC ${item} ${ARGN})
 endfunction()
 
 function(zephyr_library_compile_definitions item)
@@ -473,7 +403,7 @@ function(zephyr_library_compile_options item)
   add_library(           ${lib_name} INTERFACE)
   target_compile_options(${lib_name} INTERFACE ${item} ${ARGN})
 
-  target_link_libraries(${ZEPHYR_CURRENT_LIBRARY} ${lib_name})
+  target_link_libraries(${ZEPHYR_CURRENT_LIBRARY} PRIVATE ${lib_name})
 endfunction()
 
 function(zephyr_library_cc_option)
@@ -525,6 +455,63 @@ macro(zephyr_interface_library_named name)
   add_library(${name} INTERFACE)
   set_property(GLOBAL APPEND PROPERTY ZEPHYR_INTERFACE_LIBS ${name})
 endmacro()
+
+# 1.3 generate_inc_*
+
+# These functions are useful if there is a need to generate a file
+# that can be included into the application at build time. The file
+# can also be compressed automatically when embedding it.
+#
+# See tests/application_development/gen_inc_file for an example of
+# usage.
+function(generate_inc_file
+    source_file    # The source file to be converted to hex
+    generated_file # The generated file
+    )
+  add_custom_command(
+    OUTPUT ${generated_file}
+    COMMAND
+    ${PYTHON_EXECUTABLE}
+    ${ZEPHYR_BASE}/scripts/file2hex.py
+    ${ARGN} # Extra arguments are passed to file2hex.py
+    --file ${source_file}
+    > ${generated_file} # Does pipe redirection work on Windows?
+    DEPENDS ${source_file}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+endfunction()
+
+function(generate_inc_file_for_gen_target
+    target          # The cmake target that depends on the generated file
+    source_file     # The source file to be converted to hex
+    generated_file  # The generated file
+    gen_target      # The generated file target we depend on
+                    # Any additional arguments are passed on to file2hex.py
+    )
+  generate_inc_file(${source_file} ${generated_file} ${ARGN})
+
+  # Ensure 'generated_file' is generated before 'target' by creating a
+  # dependency between the two targets
+
+  add_dependencies(${target} ${gen_target})
+endfunction()
+
+function(generate_inc_file_for_target
+    target          # The cmake target that depends on the generated file
+    source_file     # The source file to be converted to hex
+    generated_file  # The generated file
+                    # Any additional arguments are passed on to file2hex.py
+    )
+  # Ensure 'generated_file' is generated before 'target' by creating a
+  # 'custom_target' for it and setting up a dependency between the two
+  # targets
+
+  # But first create a unique name for the custom target
+  generate_unique_target_name_from_filename(${generated_file} generated_target_name)
+
+  add_custom_target(${generated_target_name} DEPENDS ${generated_file})
+  generate_inc_file_for_gen_target(${target} ${source_file} ${generated_file} ${generated_target_name} ${ARGN})
+endfunction()
 
 # 1.4. board_*
 #
@@ -628,37 +615,53 @@ endfunction()
 # caching comes in addition to the caching that CMake does in the
 # build folder's CMakeCache.txt)
 function(zephyr_check_compiler_flag lang option check)
-  # Locate the cache
+  # Locate the cache directory
   set_ifndef(
-    ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE
-    ${USER_CACHE_DIR}/ToolchainCapabilityDatabase.cmake
+    ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE_DIR
+    ${USER_CACHE_DIR}/ToolchainCapabilityDatabase
     )
+  if(DEFINED ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE)
+    assert(0
+      "The deprecated ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE is now a directory"
+      "and is named ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE_DIR"
+      )
+    # Remove this deprecation warning in version 1.14.
+  endif()
 
-  # Read the cache
-  include(${ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE} OPTIONAL)
+  # The toolchain capability database/cache is maintained as a
+  # directory of files. The filenames in the directory are keys, and
+  # the file contents are the values in this key-value store.
 
   # We need to create a unique key wrt. testing the toolchain
-  # capability. This key must be a valid C identifier that includes
-  # everything that can affect the toolchain test.
+  # capability. This key must include everything that can affect the
+  # toolchain test.
+  #
+  # Also, to fit the key into a filename we calculate the MD5 sum of
+  # the key.
 
   # The 'cacheformat' must be bumped if a bug in the caching mechanism
   # is detected and all old keys must be invalidated.
-  set(cacheformat 2)
+  set(cacheformat 3)
 
   set(key_string "")
-  set(key_string "${key_string}ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE_")
-  set(key_string "${key_string}cacheformat_")
   set(key_string "${key_string}${cacheformat}_")
   set(key_string "${key_string}${TOOLCHAIN_SIGNATURE}_")
   set(key_string "${key_string}${lang}_")
   set(key_string "${key_string}${option}_")
   set(key_string "${key_string}${CMAKE_REQUIRED_FLAGS}_")
 
-  string(MAKE_C_IDENTIFIER ${key_string} key)
+  string(MD5 key ${key_string})
 
   # Check the cache
-  if(DEFINED ${key})
-    set(${check} ${${key}} PARENT_SCOPE)
+  set(key_path ${ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE_DIR}/${key})
+  if(EXISTS ${key_path})
+    file(READ
+    ${key_path}   # File to be read
+    key_value     # Output variable
+    LIMIT 1       # Read at most 1 byte ('0' or '1')
+    )
+
+    set(${check} ${key_value} PARENT_SCOPE)
     return()
   endif()
 
@@ -668,11 +671,52 @@ function(zephyr_check_compiler_flag lang option check)
   set(${check} ${inner_check} PARENT_SCOPE)
 
   # Populate the cache
-  file(
-    APPEND
-    ${ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE}
-    "set(${key} ${inner_check})\n"
-    )
+  if(NOT (EXISTS ${key_path}))
+    file(
+      WRITE
+      ${key_path}
+      ${inner_check}
+      )
+
+    # Populate a metadata file (only intended for trouble shooting)
+    # with information about the hash, the toolchain capability
+    # result, and the toolchain test.
+    file(
+      APPEND
+      ${ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE_DIR}/log.txt
+      "${inner_check} ${key} ${key_string}\n"
+      )
+  endif()
+endfunction()
+
+# Helper function for CONFIG_CODE_DATA_RELOCATION
+# Call this function with 2 arguments file and then memory location
+function(zephyr_code_relocate file location)
+  set_property(TARGET code_data_relocation_target
+    APPEND PROPERTY COMPILE_DEFINITIONS
+    "${location}:${CMAKE_CURRENT_SOURCE_DIR}/${file}")
+endfunction()
+
+# Usage:
+#   check_dtc_flag("-Wtest" DTC_WARN_TEST)
+#
+# Writes 1 to the output variable 'ok' if
+# the flag is supported, otherwise writes 0.
+#
+# using
+function(check_dtc_flag flag ok)
+  execute_process(
+    COMMAND
+    ${DTC} ${flag} -v
+    ERROR_QUIET
+    OUTPUT_QUIET
+    RESULT_VARIABLE dtc_check_ret
+  )
+  if (dtc_check_ret EQUAL 0)
+    set(${ok} 1 PARENT_SCOPE)
+  else()
+    set(${ok} 0 PARENT_SCOPE)
+  endif()
 endfunction()
 
 ########################################################
@@ -719,20 +763,21 @@ endfunction()
 
 # 2.2 Misc
 #
-# Parse a KConfig formatted file (typically named *.config) and
-# introduce all the CONF_ variables into the CMake namespace
-function(import_kconfig config_file)
-  # Parse the lines prefixed with CONFIG_ in ${config_file}
+# Parse a KConfig fragment (typically with extension .config) and
+# introduce all the symbols that are prefixed with 'prefix' into the
+# CMake namespace
+function(import_kconfig prefix kconfig_fragment)
+  # Parse the lines prefixed with 'prefix' in ${kconfig_fragment}
   file(
     STRINGS
-    ${config_file}
+    ${kconfig_fragment}
     DOT_CONFIG_LIST
-    REGEX "^CONFIG_"
+    REGEX "^${prefix}"
     ENCODING "UTF-8"
   )
 
   foreach (CONFIG ${DOT_CONFIG_LIST})
-    # CONFIG looks like: CONFIG_NET_BUF=y
+    # CONFIG could look like: CONFIG_NET_BUF=y
 
     # Match the first part, the variable name
     string(REGEX MATCH "[^=]+" CONF_VARIABLE_NAME ${CONFIG})
@@ -923,18 +968,6 @@ macro(list_append_ifdef feature_toggle list)
   endif()
 endmacro()
 
-# Checks if a feature is enabled and then does the same operation as
-# zephyr_library. If it finds that the feature is not set it will not
-# create a new library and will stop processing the rest of
-# the CMakeFile.txt
-macro(zephyr_library_ifdef feature_toggle)
-    if(${${feature_toggle}})
-      zephyr_library()
-      else()
-      return()
-    endif()
-  endmacro()
-
 # 3.2. *_ifndef
 # See 3.1 *_ifdef
 function(set_ifndef variable value)
@@ -1094,24 +1127,18 @@ macro(assert_exists var)
   endif()
 endmacro()
 
-# Usage:
-#   assert_with_usage(BOARD_DIR "No board named '${BOARD}' found")
-#
-# will print an error message, show usage, and then end executioon
-# with a FATAL_ERROR if the test fails.
-macro(assert_with_usage test comment)
-  if(NOT ${test})
-    message(${comment})
-    message("see usage:")
-    execute_process(
-      COMMAND
-      ${CMAKE_COMMAND}
-      -DBOARD_ROOT=${BOARD_ROOT}
-      -P ${ZEPHYR_BASE}/cmake/usage/usage.cmake
-      )
-    message(FATAL_ERROR "Invalid usage")
-  endif()
-endmacro()
+function(print_usage)
+  message("see usage:")
+  string(REPLACE ";" " " BOARD_ROOT_SPACE_SEPARATED "${BOARD_ROOT}")
+  string(REPLACE ";" " " SHIELD_LIST_SPACE_SEPARATED "${SHIELD_LIST}")
+  execute_process(
+    COMMAND
+    ${CMAKE_COMMAND}
+    -DBOARD_ROOT_SPACE_SEPARATED=${BOARD_ROOT_SPACE_SEPARATED}
+    -DSHIELD_LIST_SPACE_SEPARATED=${SHIELD_LIST_SPACE_SEPARATED}
+    -P ${ZEPHYR_BASE}/cmake/usage/usage.cmake
+    )
+endfunction()
 
 # 3.5. File system management
 function(check_if_directory_is_writeable dir ok)
@@ -1185,4 +1212,14 @@ function(find_appropriate_cache_directory dir)
   endif()
 
   set(${dir} ${local_dir} PARENT_SCOPE)
+endfunction()
+
+function(generate_unique_target_name_from_filename filename target_name)
+  get_filename_component(basename ${filename} NAME)
+  string(REPLACE "." "_" x ${basename})
+  string(REPLACE "@" "_" x ${x})
+
+  string(RANDOM LENGTH 8 random_chars)
+
+  set(${target_name} gen_${x}_${random_chars} PARENT_SCOPE)
 endfunction()

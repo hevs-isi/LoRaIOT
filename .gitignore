@@ -7,8 +7,7 @@
 *.swp
 *.swo
 *~
-build
-build-*
+build*/
 cscope.*
 .dir
 
@@ -30,16 +29,23 @@ doc/boards
 doc/samples
 doc/latex
 doc/themes/zephyr-docs-theme
-sanity-out/
+sanity-out*
+bsim_bt_out
 scripts/grub
-doc/reference/kconfig/CONFIG_*
-doc/reference/kconfig/index.rst
+doc/reference/kconfig/*.rst
 doc/doc.warnings
 tags
-.project
-.cproject
-.xxproject
+.*project
+.settings
 .envrc
 .vscode
+hide-defaults-note
+
+# Tag files
+GPATH
+GRTAGS
+GTAGS
+
+.idea
 .settings/
 /core

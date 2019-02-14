@@ -92,14 +92,13 @@ _EXCEPTION_CONNECT_NOCODE(exc_divide_error_handler, IV_DIVIDE_ERROR);
 extern void *_EXCEPTION_STUB_NAME(exc_divide_error_handler, IV_DIVIDE_ERROR);
 
 /**
- * @brief Check the IDT.
+ * @ingroup kernel_interrupt_tests
+ * @brief Test the position of interrupt stubs in IDT
  *
- * This test examines the IDT and verifies that the static interrupt and
- * exception stubs are installed at the correct place.
+ * @details This test examines the IDT and verifies that the static interrupt
+ * and exception stubs are installed at the correct place.
  *
- * @return TC_PASS on success, TC_FAIL on failure
  */
-
 void test_idt_stub(void)
 {
 	struct segment_descriptor *p_idt_entry;
@@ -129,12 +128,6 @@ void test_idt_stub(void)
 	 */
 }
 
-/**
- * @brief Task to test spurious handlers
- *
- * @return 0
- */
-
 void idt_spur_task(void *arg1, void *arg2, void *arg3)
 {
 	TC_PRINT("- Expect to see unhandled interrupt/exception message\n");
@@ -147,13 +140,12 @@ void idt_spur_task(void *arg1, void *arg2, void *arg3)
 }
 
 /**
- * @brief Entry point to static IDT tests
- *
- * This is the entry point to the static IDT tests.
- *
- * @return N/A
+ * @ingroup kernel_interrupt_tests
+ * @brief Test entry point to static IDT
+ * @details this test is to generate the interrupt, exception,
+ * and spurious interrupt using various method, the registered handler
+ * should get called
  */
-
 void test_static_idt(void)
 {
 	volatile int error;     /* used to create a divide by zero error */
@@ -163,7 +155,7 @@ void test_static_idt(void)
 	_trigger_isr_handler();
 
 	zassert_not_equal(int_handler_executed, 0,
-			  "Interrupt handler did not execute\n");
+			  "Interrupt handler did not execute");
 	zassert_equal(int_handler_executed, 1,
 		      "Interrupt handler executed more than once! (%d)\n",
 		      int_handler_executed);
@@ -178,7 +170,7 @@ void test_static_idt(void)
 	error = error / exc_handler_executed;
 
 	zassert_not_equal(exc_handler_executed, 0,
-			  "Exception handler did not execute\n");
+			  "Exception handler did not execute");
 	zassert_equal(exc_handler_executed, 1,
 		      "Exception handler executed more than once! (%d)\n",
 		      exc_handler_executed);
@@ -195,7 +187,7 @@ void test_static_idt(void)
 	 * generated. Therefore spur_handler_aborted_thread should remain at 1.
 	 */
 	zassert_not_equal(spur_handler_aborted_thread, 0,
-			  "Spurious handler did not execute as expected\n");
+			  "Spurious handler did not execute as expected");
 }
 
 void test_main(void)

@@ -17,7 +17,6 @@
 #include <device.h>
 #include <uart.h>
 #include <zephyr.h>
-#include <stdio.h>
 
 static const char *banner1 = "Send characters to the UART device\r\n";
 static const char *banner2 = "Characters read:\r\n";
@@ -76,10 +75,10 @@ static void read_and_echo_data(struct device *dev, int *bytes_read)
 void main(void)
 {
 	struct device *dev;
-	u32_t baudrate, bytes_read, dtr = 0;
+	u32_t baudrate, bytes_read, dtr = 0U;
 	int ret;
 
-	dev = device_get_binding(CONFIG_CDC_ACM_PORT_NAME);
+	dev = device_get_binding(CONFIG_CDC_ACM_PORT_NAME_0);
 	if (!dev) {
 		printf("CDC ACM device not found\n");
 		return;

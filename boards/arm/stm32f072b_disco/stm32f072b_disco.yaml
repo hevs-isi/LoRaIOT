@@ -6,11 +6,14 @@ ram: 16
 flash: 128
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
 supported:
   - gpio
   - i2c
   - spi
+  - can
+  - watchdog
 testing:
   ignore_tags:
     - net

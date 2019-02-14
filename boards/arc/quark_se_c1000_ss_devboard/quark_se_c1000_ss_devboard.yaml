@@ -6,12 +6,13 @@ ram: 24
 flash: 152
 toolchain:
   - zephyr
+  - xtools
 supported:
   - adc
   - i2c
   - spi
   - gpio
-  - rtc
+  - counter
   - watchdog
 testing:
   ignore_tags:

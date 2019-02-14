@@ -8,17 +8,22 @@
 
 
 menuconfig PCI
-	bool
-	prompt "PCI Settings"
+	bool "PCI Settings"
 	depends on X86
 	help
 	  This options enables support of PCI bus for device drivers.
 
 if PCI
+
+config PCI_SHELL
+	bool "Enable PCI Shell"
+	depends on SHELL
+	select PCI_ENUMERATION
+	help
+	  Enable commands for debugging PCI using the built-in shell.
+
 config PCI_ENUMERATION
-	bool
-	prompt "Enable PCI device enumeration"
-	default n
+	bool "Enable PCI device enumeration"
 	help
 	  This option enables the PCI enumeration for device drivers.
 	  This might be useful along with PCI_DEBUG to find out which
@@ -27,9 +32,7 @@ config PCI_ENUMERATION
 	  might be wise to disable this option to remove useless code.
 
 config PCI_LEGACY_BRIDGE
-	bool
-	prompt "PCI legacy bridge device support"
-	default n
+	bool "PCI legacy bridge device support"
 	help
 	  This option adds support for PCI legacy bridge device, that
 	  allows direct setup of the PCI interrupt pin to IRQ number
@@ -55,12 +58,8 @@ config PCI_LEGACY_BRIDGE_DEVICE_ID
 	depends on PCI_LEGACY_BRIDGE
 	default 0
 
-config PCI_DEBUG
-	bool
-	prompt "Enable PCI debugging"
-	default n
-	help
-	  This options enables PCI debugging functions
+module = PCI
+module-str = PCI
+source "subsys/logging/Kconfig.template.log_config"
 
-endif
-
+endif # PCI

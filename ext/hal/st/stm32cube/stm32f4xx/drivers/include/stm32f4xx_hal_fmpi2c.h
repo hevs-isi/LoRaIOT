@@ -42,7 +42,7 @@ extern "C" {
 #endif
 
 #if defined(STM32F410Tx) || defined(STM32F410Cx) || defined(STM32F410Rx) || defined(STM32F446xx) || defined(STM32F412Zx) ||\
-    defined(STM32F412Vx) || defined(STM32F412Rx) || defined(STM32F412Cx) || defined(STM32F413xx) || defined(STM32F423xx) 
+    defined(STM32F412Vx) || defined(STM32F412Rx) || defined(STM32F412Cx) || defined(STM32F413xx) || defined(STM32F423xx)
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal_def.h"
@@ -251,6 +251,7 @@ typedef struct __FMPI2C_HandleTypeDef
 #define FMPI2C_NEXT_FRAME                  ((uint32_t)(FMPI2C_RELOAD_MODE | FMPI2C_SOFTEND_MODE))
 #define FMPI2C_FIRST_AND_LAST_FRAME        ((uint32_t)FMPI2C_AUTOEND_MODE)
 #define FMPI2C_LAST_FRAME                  ((uint32_t)FMPI2C_AUTOEND_MODE)
+#define FMPI2C_LAST_FRAME_NO_STOP          ((uint32_t)FMPI2C_SOFTEND_MODE)
 /**
   * @}
   */
@@ -662,7 +663,8 @@ uint32_t             HAL_FMPI2C_GetError(FMPI2C_HandleTypeDef *hfmpi2c);
                                                       ((REQUEST) == FMPI2C_FIRST_AND_NEXT_FRAME) || \
                                                       ((REQUEST) == FMPI2C_NEXT_FRAME)           || \
                                                       ((REQUEST) == FMPI2C_FIRST_AND_LAST_FRAME) || \
-                                                      ((REQUEST) == FMPI2C_LAST_FRAME))
+                                                      ((REQUEST) == FMPI2C_LAST_FRAME)           || \
+                                                      ((REQUEST) == FMPI2C_LAST_FRAME_NO_STOP))
 
 #define FMPI2C_RESET_CR2(__HANDLE__)                 ((__HANDLE__)->Instance->CR2 &= (uint32_t)~((uint32_t)(FMPI2C_CR2_SADD | FMPI2C_CR2_HEAD10R | FMPI2C_CR2_NBYTES | FMPI2C_CR2_RELOAD | FMPI2C_CR2_RD_WRN)))
 
@@ -700,7 +702,7 @@ uint32_t             HAL_FMPI2C_GetError(FMPI2C_HandleTypeDef *hfmpi2c);
 /**
   * @}
   */
-#endif /* STM32F410xx || STM32F446xx || STM32F412Zx || STM32F412Vx || STM32F412Rx || STM32F412Cx || STM32F413xx || STM32F423xx */ 
+#endif /* STM32F410xx || STM32F446xx || STM32F412Zx || STM32F412Vx || STM32F412Rx || STM32F412Cx || STM32F413xx || STM32F423xx */
 #ifdef __cplusplus
 }
 #endif

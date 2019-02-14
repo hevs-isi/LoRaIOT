@@ -3,9 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <xtensa/tie/xt_core.h>
-#include <xtensa/tie/xt_interrupt.h>
-#include <logging/kernel_event_logger.h>
+#include <tracing.h>
 
 /*
  * @brief Put the CPU in low-power mode
@@ -16,9 +14,7 @@
  */
 void k_cpu_idle(void)
 {
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_SLEEP
-	_sys_k_event_logger_enter_sleep();
-#endif
+	z_sys_trace_idle();
 	__asm__ volatile ("waiti 0");
 }
 /*
@@ -30,9 +26,7 @@ void k_cpu_idle(void)
  */
 void k_cpu_atomic_idle(unsigned int key)
 {
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_SLEEP
-	_sys_k_event_logger_enter_sleep();
-#endif
+	z_sys_trace_idle();
 	__asm__ volatile ("waiti 0\n\t"
 			  "wsr.ps %0\n\t"
 			  "rsync" :: "a"(key));

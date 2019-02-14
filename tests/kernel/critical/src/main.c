@@ -9,11 +9,15 @@
  *
  * @brief Offload to the Kernel offload workqueue
  *
+ * @defgroup kernel_critical_tests Critical Tests
+ *
+ * @ingroup all_tests
+ *
  * This test verifies that the kernel offload workqueue operates as
  * expected.
  *
- * This test has two tasks that increment a counter.  The routine that
- * increments the counter is invoked from workqueue due to the two tasks
+ * This test has two threads that increment a counter.  The routine that
+ * increments the counter is invoked from workqueue due to the two threads
  * calling using it.  The final result of the counter is expected
  * to be the the number of times work item was called to increment
  * the counter.
@@ -21,6 +25,8 @@
  * This is done with time slicing both disabled and enabled to ensure that the
  * result always matches the number of times the workqueue is called.
  *
+ * @{
+ * @}
  */
 #include <zephyr.h>
 #include <linker/sections.h>
@@ -30,7 +36,7 @@
 #define TEST_TIMEOUT            20000
 
 static u32_t critical_var;
-static u32_t alt_task_iterations;
+static u32_t alt_thread_iterations;
 
 static struct k_work_q offload_work_q;
 static K_THREAD_STACK_DEFINE(offload_work_q_stack,
@@ -73,7 +79,7 @@ void critical_rtn(struct k_work *unused)
  *
  * @param count number of critical section calls made thus far
  *
- * @return number of critical section calls made by task
+ * @return number of critical section calls made by a thread
  */
 
 u32_t critical_loop(u32_t count)
@@ -102,14 +108,14 @@ u32_t critical_loop(u32_t count)
 
 /**
  *
- * @brief Alternate task
+ * @brief Alternate thread
  *
  * This routine invokes the workqueue many times.
  *
  * @return N/A
  */
 
-void alternate_task(void *arg1, void *arg2, void *arg3)
+void alternate_thread(void *arg1, void *arg2, void *arg3)
 {
 	ARG_UNUSED(arg1);
 	ARG_UNUSED(arg2);
@@ -117,20 +123,20 @@ void alternate_task(void *arg1, void *arg2, void *arg3)
 
 	k_sem_take(&ALT_SEM, K_FOREVER);        /* Wait to be activated */
 
-	alt_task_iterations = critical_loop(alt_task_iterations);
+	alt_thread_iterations = critical_loop(alt_thread_iterations);
 
 	k_sem_give(&REGRESS_SEM);
 
 	k_sem_take(&ALT_SEM, K_FOREVER);        /* Wait to be re-activated */
 
-	alt_task_iterations = critical_loop(alt_task_iterations);
+	alt_thread_iterations = critical_loop(alt_thread_iterations);
 
 	k_sem_give(&REGRESS_SEM);
 }
 
 /**
  *
- * @brief Regression task
+ * @brief Regression thread
  *
  * This routine calls invokes the workqueue many times. It also checks to
  * ensure that the number of times it is called matches the global variable
@@ -139,36 +145,36 @@ void alternate_task(void *arg1, void *arg2, void *arg3)
  * @return N/A
  */
 
-void regression_task(void *arg1, void *arg2, void *arg3)
+void regression_thread(void *arg1, void *arg2, void *arg3)
 {
-	u32_t ncalls = 0;
+	u32_t ncalls = 0U;
 
 	ARG_UNUSED(arg1);
 	ARG_UNUSED(arg2);
 	ARG_UNUSED(arg3);
 
-	k_sem_give(&ALT_SEM);   /* Activate AlternateTask() */
+	k_sem_give(&ALT_SEM);   /* Activate alternate_tast() */
 
 	ncalls = critical_loop(ncalls);
 
-	/* Wait for AlternateTask() to complete */
+	/* Wait for alternate_thread() to complete */
 	zassert_true(k_sem_take(&REGRESS_SEM, TEST_TIMEOUT) == 0,
 		     "Timed out waiting for REGRESS_SEM");
 
-	zassert_equal(critical_var, ncalls + alt_task_iterations,
+	zassert_equal(critical_var, ncalls + alt_thread_iterations,
 		      "Unexpected value for <critical_var>");
 
 	k_sched_time_slice_set(10, 10);
 
-	k_sem_give(&ALT_SEM);   /* Re-activate AlternateTask() */
+	k_sem_give(&ALT_SEM);   /* Re-activate alternate_thread() */
 
 	ncalls = critical_loop(ncalls);
 
-	/* Wait for AlternateTask() to finish */
+	/* Wait for alternate_thread() to finish */
 	zassert_true(k_sem_take(&REGRESS_SEM, TEST_TIMEOUT) == 0,
 		     "Timed out waiting for REGRESS_SEM");
 
-	zassert_equal(critical_var, ncalls + alt_task_iterations,
+	zassert_equal(critical_var, ncalls + alt_thread_iterations,
 		      "Unexpected value for <critical_var>");
 
 	k_sem_give(&TEST_SEM);
@@ -177,8 +183,8 @@ void regression_task(void *arg1, void *arg2, void *arg3)
 
 static void init_objects(void)
 {
-	critical_var = 0;
-	alt_task_iterations = 0;
+	critical_var = 0U;
+	alt_thread_iterations = 0U;
 	k_work_q_start(&offload_work_q,
 		       offload_work_q_stack,
 		       K_THREAD_STACK_SIZEOF(offload_work_q_stack),
@@ -188,18 +194,21 @@ static void init_objects(void)
 static void start_threads(void)
 {
 	k_thread_create(&thread1, stack1, STACK_SIZE,
-			alternate_task, NULL, NULL, NULL,
+			alternate_thread, NULL, NULL, NULL,
 			K_PRIO_PREEMPT(12), 0, 0);
 
 	k_thread_create(&thread2, stack2, STACK_SIZE,
-			regression_task, NULL, NULL, NULL,
+			regression_thread, NULL, NULL, NULL,
 			K_PRIO_PREEMPT(12), 0, 0);
 }
 
 /**
- * @brief  verify thread context
+ * @brief Verify thread context
  *
- * Check whether variable value per-thread and saved during  context switch
+ * @details Check whether variable value per-thread is saved
+ * during context switch
+ *
+ * @ingroup kernel_critical_tests
  */
 void test_critical(void)
 {

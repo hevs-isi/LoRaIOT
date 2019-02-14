@@ -191,13 +191,6 @@ _zxt_int_exit:
 	wsr a3, CPENABLE                /* disable all co-processors */
 #endif
 	l32i a3, a2, KERNEL_OFFSET(current) /*  _thread := _kernel.current */
-	/*
-	 * Non-preemptible thread ? Do not schedule (see explanation of
-	 * preempt field in kernel_struct.h).
-	 */
-	movi a4, _NON_PREEMPT_THRESHOLD
-	l16ui a5, a3, THREAD_OFFSET(preempt)
-	bgeu a5, a4, .noReschedule
 	/* _thread := _kernel.ready_q.cache */
 	l32i a3, a2, KERNEL_OFFSET(ready_q_cache)
 .noReschedule:
@@ -266,7 +259,7 @@ _zxt_timer_int:
 .L_xt_timer_int_catchup:
 #ifdef CONFIG_SYS_CLOCK_EXISTS
 
-#if CONFIG_XTENSA_INTERNAL_TIMER || (CONFIG_XTENSA_TIMER_IRQ < 0)
+#if USE_INTERNAL_TIMER || (EXTERNAL_TIMER_IRQ < 0)
 	/* Update the timer comparator for the next tick. */
 #ifdef XT_CLOCK_FREQ
 	movi a2, XT_TICK_DIVISOR  /* a2 = comparator increment          */
@@ -278,7 +271,7 @@ _zxt_timer_int:
 	add a4, a3, a2            /* a4 = new comparator value          */
 	wsr a4, XT_CCOMPARE       /* update comp. and clear interrupt   */
 	esync
-#endif /* CONFIG_XTENSA_INTERNAL_TIMER || (CONFIG_XTENSA_TIMER_IRQ < 0) */
+#endif /* USE_INTERNAL_TIMER || (EXTERNAL_TIMER_IRQ < 0) */
 
 
 #ifdef __XTENSA_CALL0_ABI__
@@ -299,13 +292,13 @@ _zxt_timer_int:
 	callx4   a7
 #endif
 
-#if CONFIG_XTENSA_INTERNAL_TIMER || (CONFIG_XTENSA_TIMER_IRQ < 0)
+#if USE_INTERNAL_TIMER || (EXTERNAL_TIMER_IRQ < 0)
 	/* Check if we need to process more ticks to catch up. */
 	esync          /* ensure comparator update complete  */
 	rsr a4, CCOUNT /* a4 = cycle count                   */
 	sub a4, a4, a3 /* diff = ccount - old comparator     */
 	blt a2, a4, .L_xt_timer_int_catchup  /* repeat while diff > divisor */
-#endif /* CONFIG_XTENSA_INTERNAL_TIMER || (CONFIG_XTENSA_TIMER_IRQ < 0) */
+#endif /* USE_INTERNAL_TIMER || (EXTERNAL_TIMER_IRQ < 0) */
 
 #endif
 
@@ -327,7 +320,7 @@ _zxt_tick_timer_init:
 
 	ENTRY(48)
 #ifdef CONFIG_SYS_CLOCK_EXISTS
-#if CONFIG_XTENSA_INTERNAL_TIMER || (CONFIG_XTENSA_TIMER_IRQ < 0)
+#if USE_INTERNAL_TIMER || (EXTERNAL_TIMER_IRQ < 0)
 
 	/* Set up the periodic tick timer (assume enough time to complete
 	 * init).
@@ -355,7 +348,7 @@ _zxt_tick_timer_init:
 #endif
 
 #endif
-#endif /* CONFIG_XTENSA_INTERNAL_TIMER || (CONFIG_XTENSA_TIMER_IRQ < 0) */
+#endif /* USE_INTERNAL_TIMER || (EXTERNAL_TIMER_IRQ < 0) */
 	RET(48)
 
 /*

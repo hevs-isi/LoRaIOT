@@ -12,8 +12,8 @@
  * Definitions for auxiliary registers.
  */
 
-#ifndef _ARC_V2_AUX_REGS__H_
-#define _ARC_V2_AUX_REGS__H_
+#ifndef ZEPHYR_INCLUDE_ARCH_ARC_V2_AUX_REGS_H_
+#define ZEPHYR_INCLUDE_ARCH_ARC_V2_AUX_REGS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,8 +76,14 @@ extern "C" {
 #define _ARC_V2_IRQ_PRIO_PEND 0x200
 #define _ARC_V2_AUX_IRQ_HINT 0x201
 #define _ARC_V2_IRQ_PRIORITY 0x206
+#define _ARC_V2_USTACK_TOP 0x260
+#define _ARC_V2_USTACK_BASE 0x261
+#define _ARC_V2_S_USTACK_TOP 0x262
+#define _ARC_V2_S_USTACK_BASE 0x263
 #define _ARC_V2_KSTACK_TOP 0x264
 #define _ARC_V2_KSTACK_BASE 0x265
+#define _ARC_V2_S_KSTACK_TOP 0x266
+#define _ARC_V2_S_KSTACK_BASE 0x267
 #define _ARC_V2_JLI_BASE 0x290
 #define _ARC_V2_LDI_BASE 0x291
 #define _ARC_V2_EI_BASE 0x292
@@ -122,6 +128,20 @@ extern "C" {
 #define _ARC_V2_STATUS32_US (1 << _ARC_V2_STATUS32_US_BIT)
 #define _ARC_V2_STATUS32_IE (1 << 31)
 
+/* SEC_STAT bits */
+#define _ARC_V2_SEC_STAT_SSC_BIT 0
+#define _ARC_V2_SEC_STAT_SSC (1 << _ARC_V2_SEC_STAT_SSC_BIT)
+#define _ARC_V2_SEC_STAT_NSRT_BIT 1
+#define _ARC_V2_SEC_STAT_NSRT (1 << _ARC_V2_SEC_STAT_NSRT_BIT)
+#define _ARC_V2_SEC_STAT_NSRU_BIT 2
+#define _ARC_V2_SEC_STAT_NSRU (1 << _ARC_V2_SEC_STAT_NSRU_BIT)
+#define _ARC_V2_SEC_STAT_IRM_BIT 3
+#define _ARC_V2_SEC_STAT_IRM (1 << _ARC_V2_SEC_STAT_IRM_BIT)
+#define _ARC_V2_SEC_STAT_SUE_BIT 4
+#define _ARC_V2_SEC_STAT_SUE (1 << _ARC_V2_SEC_STAT_SUE_BIT)
+#define _ARC_V2_SEC_STAT_NIC_BIT 5
+#define _ARC_V2_SEC_STAT_NIC (1 << _ARC_V2_SEC_STAT_NIC_BIT)
+
 /* interrupt related bits */
 #define _ARC_V2_IRQ_PRIORITY_SECURE 0x100
 
@@ -161,4 +181,4 @@ extern "C" {
 }
 #endif
 
-#endif /* _ARC_V2_AUX_REGS__H_ */
+#endif /* ZEPHYR_INCLUDE_ARCH_ARC_V2_AUX_REGS_H_ */

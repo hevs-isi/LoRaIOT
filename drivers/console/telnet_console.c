@@ -16,9 +16,10 @@
  * RFC 854 - https://tools.ietf.org/html/rfc854
  */
 
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_TELNET_CONSOLE_LEVEL
-#define SYS_LOG_DOMAIN "net/telnet"
-#include <logging/sys_log.h>
+#define LOG_LEVEL CONFIG_TELNET_CONSOLE_LOG_LEVEL
+#define LOG_DOMAIN net_telnet
+#include <logging/log.h>
+LOG_MODULE_REGISTER(LOG_DOMAIN);
 
 #include <zephyr.h>
 #include <init.h>
@@ -33,15 +34,15 @@
 #include "telnet_protocol.h"
 
 /* Various definitions mapping the telnet service configuration options */
-#define TELNET_PORT		CONFIG_TELNET_CONSOLE_PORT
-#define TELNET_STACK_SIZE	CONFIG_TELNET_CONSOLE_THREAD_STACK
-#define TELNET_PRIORITY		CONFIG_TELNET_CONSOLE_PRIO
-#define TELNET_LINES		CONFIG_TELNET_CONSOLE_LINE_BUF_NUMBERS
-#define TELNET_LINE_SIZE	CONFIG_TELNET_CONSOLE_LINE_BUF_SIZE
-#define TELNET_TIMEOUT		K_MSEC(CONFIG_TELNET_CONSOLE_SEND_TIMEOUT)
-#define TELNET_THRESHOLD	CONFIG_TELNET_CONSOLE_SEND_THRESHOLD
+#define TELNET_PORT             CONFIG_TELNET_CONSOLE_PORT
+#define TELNET_STACK_SIZE       CONFIG_TELNET_CONSOLE_THREAD_STACK
+#define TELNET_PRIORITY         CONFIG_TELNET_CONSOLE_PRIO
+#define TELNET_LINES            CONFIG_TELNET_CONSOLE_LINE_BUF_NUMBERS
+#define TELNET_LINE_SIZE        CONFIG_TELNET_CONSOLE_LINE_BUF_SIZE
+#define TELNET_TIMEOUT          K_MSEC(CONFIG_TELNET_CONSOLE_SEND_TIMEOUT)
+#define TELNET_THRESHOLD        CONFIG_TELNET_CONSOLE_SEND_THRESHOLD
 
-#define TELNET_MIN_MSG		2
+#define TELNET_MIN_MSG          2
 
 /* These 2 structures below are used to store the console output
  * before sending it to the client. This is done to keep some
@@ -99,11 +100,11 @@ static void telnet_rb_init(void)
 {
 	int i;
 
-	telnet_rb.line_in = 0;
-	telnet_rb.line_out = 0;
+	telnet_rb.line_in = 0U;
+	telnet_rb.line_out = 0U;
 
 	for (i = 0; i < TELNET_LINES; i++) {
-		telnet_rb.l_bufs[i].len = 0;
+		telnet_rb.l_bufs[i].len = 0U;
 	}
 }
 
@@ -140,10 +141,10 @@ static void telnet_rb_switch(void)
 	telnet_rb.line_in++;
 
 	if (telnet_rb.line_in == TELNET_LINES) {
-		telnet_rb.line_in = 0;
+		telnet_rb.line_in = 0U;
 	}
 
-	telnet_rb.l_bufs[telnet_rb.line_in].len = 0;
+	telnet_rb.l_bufs[telnet_rb.line_in].len = 0U;
 
 	/* Unfortunately, we don't have enough line buffer,
 	 * so we eat the next to be sent.
@@ -151,7 +152,7 @@ static void telnet_rb_switch(void)
 	if (telnet_rb.line_in == telnet_rb.line_out) {
 		telnet_rb.line_out++;
 		if (telnet_rb.line_out == TELNET_LINES) {
-			telnet_rb.line_out = 0;
+			telnet_rb.line_out = 0U;
 		}
 	}
 
@@ -165,7 +166,7 @@ static inline struct line_buf *telnet_rb_get_line_out(void)
 
 	telnet_rb.line_out++;
 	if (telnet_rb.line_out == TELNET_LINES) {
-		telnet_rb.line_out = 0;
+		telnet_rb.line_out = 0U;
 	}
 
 	if (!telnet_rb.l_bufs[out].len) {
@@ -183,14 +184,14 @@ static inline struct line_buf *telnet_rb_get_line_in(void)
 /* The actual printk hook */
 static int telnet_console_out(int c)
 {
-	int key = irq_lock();
+	unsigned int key = irq_lock();
 	struct line_buf *lb = telnet_rb_get_line_in();
 	bool yield = false;
 
 	lb->buf[lb->len++] = (char)c;
 
 	if (c == '\n' || lb->len == TELNET_LINE_SIZE - 1) {
-		lb->buf[lb->len-1] = NVT_CR;
+		lb->buf[lb->len - 1] = NVT_CR;
 		lb->buf[lb->len++] = NVT_LF;
 		telnet_rb_switch();
 		yield = true;
@@ -226,7 +227,7 @@ static void telnet_sent_cb(struct net_context *client,
 {
 	if (status) {
 		telnet_end_client_connection();
-		SYS_LOG_ERR("Could not sent last packet");
+		LOG_ERR("Could not sent last packet");
 	}
 }
 
@@ -239,7 +240,7 @@ static inline bool telnet_send(void)
 				   K_FOREVER);
 
 		/* We reinitialize the line buffer */
-		lb->len = 0;
+		lb->len = 0U;
 
 		if (net_context_send(out_pkt, telnet_sent_cb,
 				     K_NO_WAIT, NULL, NULL) ||
@@ -313,8 +314,7 @@ static inline void telnet_reply_command(void)
 		telnet_reply_do_command();
 		break;
 	default:
-		SYS_LOG_DBG("Operation %u not handled",
-			    telnet_cmd.op);
+		LOG_DBG("Operation %u not handled", telnet_cmd.op);
 		break;
 	}
 
@@ -340,7 +340,7 @@ static inline bool telnet_handle_command(struct net_pkt *pkt)
 #ifdef CONFIG_TELNET_CONSOLE_SUPPORT_COMMAND
 	cmd = (struct telnet_simple_command *)l_start;
 
-	SYS_LOG_DBG("Got a command %u/%u/%u", cmd->iac, cmd->op, cmd->opt);
+	LOG_DBG("Got a command %u/%u/%u", cmd->iac, cmd->op, cmd->opt);
 
 	if (!k_sem_take(&cmd_lock, K_NO_WAIT)) {
 		telnet_command_cpy(&telnet_cmd, cmd);
@@ -348,7 +348,7 @@ static inline bool telnet_handle_command(struct net_pkt *pkt)
 		k_sem_give(&cmd_lock);
 		k_sem_give(&send_lock);
 	}
-#endif /* CONFIG_TELNET_CONSOLE_SUPPORT_COMMAND */
+#endif  /* CONFIG_TELNET_CONSOLE_SUPPORT_COMMAND */
 
 	return true;
 }
@@ -380,13 +380,13 @@ static inline void telnet_handle_input(struct net_pkt *pkt)
 	net_frag_read(pkt->frags, offset, &pos, len, (u8_t *)input->line);
 
 	/* LF/CR will be removed if only the line is not NUL terminated */
-	if (input->line[len-1] != NVT_NUL) {
-		if (input->line[len-1] == NVT_LF) {
-			input->line[len-1] = NVT_NUL;
+	if (input->line[len - 1] != NVT_NUL) {
+		if (input->line[len - 1] == NVT_LF) {
+			input->line[len - 1] = NVT_NUL;
 		}
 
-		if (input->line[len-2] == NVT_CR) {
-			input->line[len-2] = NVT_NUL;
+		if (input->line[len - 2] == NVT_CR) {
+			input->line[len - 2] = NVT_NUL;
 		}
 	}
 
@@ -395,15 +395,17 @@ static inline void telnet_handle_input(struct net_pkt *pkt)
 
 static void telnet_recv(struct net_context *client,
 			struct net_pkt *pkt,
+			union net_ip_header *ip_hdr,
+			union net_proto_header *proto_hdr,
 			int status,
 			void *user_data)
 {
 	if (!pkt || status) {
 		telnet_end_client_connection();
 
-		SYS_LOG_DBG("Telnet client dropped (AF_INET%s) status %d",
-			    net_context_get_family(client) == AF_INET ?
-			    "" : "6", status);
+		LOG_DBG("Telnet client dropped (AF_INET%s) status %d",
+			net_context_get_family(client) == AF_INET ?
+			"" : "6", status);
 		return;
 	}
 
@@ -433,18 +435,18 @@ static void telnet_accept(struct net_context *client,
 			  void *user_data)
 {
 	if (error) {
-		SYS_LOG_ERR("Error %d", error);
+		LOG_ERR("Error %d", error);
 		goto error;
 	}
 
 	if (client_cnx) {
-		SYS_LOG_WRN("A telnet client is already in.");
+		LOG_WRN("A telnet client is already in.");
 		goto error;
 	}
 
 	if (net_context_recv(client, telnet_recv, 0, NULL)) {
-		SYS_LOG_ERR("Unable to setup reception (family %u)",
-			    net_context_get_family(client));
+		LOG_ERR("Unable to setup reception (family %u)",
+			net_context_get_family(client));
 		goto error;
 	}
 
@@ -452,8 +454,8 @@ static void telnet_accept(struct net_context *client,
 		goto error;
 	}
 
-	SYS_LOG_DBG("Telnet client connected (family AF_INET%s)",
-		    net_context_get_family(client) == AF_INET ? "" : "6");
+	LOG_DBG("Telnet client connected (family AF_INET%s)",
+		net_context_get_family(client) == AF_INET ? "" : "6");
 
 	orig_printk_hook = __printk_get_hook();
 	__printk_hook_install(telnet_console_out);
@@ -470,33 +472,33 @@ static void telnet_setup_server(struct net_context **ctx, sa_family_t family,
 				struct sockaddr *addr, socklen_t addrlen)
 {
 	if (net_context_get(family, SOCK_STREAM, IPPROTO_TCP, ctx)) {
-		SYS_LOG_ERR("No context available");
+		LOG_ERR("No context available");
 		goto error;
 	}
 
 	if (net_context_bind(*ctx, addr, addrlen)) {
-		SYS_LOG_ERR("Cannot bind on family AF_INET%s",
-			    family == AF_INET ? "" : "6");
+		LOG_ERR("Cannot bind on family AF_INET%s",
+			family == AF_INET ? "" : "6");
 		goto error;
 	}
 
 	if (net_context_listen(*ctx, 0)) {
-		SYS_LOG_ERR("Cannot listen on");
+		LOG_ERR("Cannot listen on");
 		goto error;
 	}
 
 	if (net_context_accept(*ctx, telnet_accept, K_NO_WAIT, NULL)) {
-		SYS_LOG_ERR("Cannot accept");
+		LOG_ERR("Cannot accept");
 		goto error;
 	}
 
-	SYS_LOG_DBG("Telnet console enabled on AF_INET%s",
-		    family == AF_INET ? "" : "6");
+	LOG_DBG("Telnet console enabled on AF_INET%s",
+		family == AF_INET ? "" : "6");
 
 	return;
 error:
-	SYS_LOG_ERR("Unable to start telnet on AF_INET%s",
-		    family == AF_INET ? "" : "6");
+	LOG_ERR("Unable to start telnet on AF_INET%s",
+		family == AF_INET ? "" : "6");
 
 	if (*ctx) {
 		net_context_put(*ctx);
@@ -549,7 +551,7 @@ static int telnet_console_init(struct device *arg)
 			NULL, NULL, NULL,
 			K_PRIO_COOP(TELNET_PRIORITY), 0, K_MSEC(10));
 
-	SYS_LOG_INF("Telnet console initialized");
+	LOG_INF("Telnet console initialized");
 
 	return 0;
 }

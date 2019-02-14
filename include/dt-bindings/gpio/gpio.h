@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef __DT_BINDINGS_GPIO_GPIO_H
-#define __DT_BINDINGS_GPIO_GPIO_H
+#ifndef ZEPHYR_INCLUDE_DT_BINDINGS_GPIO_GPIO_H_
+#define ZEPHYR_INCLUDE_DT_BINDINGS_GPIO_GPIO_H_
 
 
 /**
@@ -40,9 +40,6 @@
 /** GPIO pin trigger on level high or rising edge. */
 #define GPIO_INT_ACTIVE_HIGH	(1 << 2)
 
-/** GPIO pin trigger to be synchronized to clock pulses. */
-#define GPIO_INT_CLOCK_SYNC     (1 << 3)
-
 /** Enable GPIO pin debounce. */
 #define GPIO_INT_DEBOUNCE       (1 << 4)
 
@@ -52,7 +49,9 @@
 /** Do Edge trigger. */
 #define GPIO_INT_EDGE		(1 << 5)
 
-/** Interrupt triggers on both rising and falling edge. */
+/** Interrupt triggers on both rising and falling edge.
+ *  Must be combined with GPIO_INT_EDGE.
+ */
 #define GPIO_INT_DOUBLE_EDGE	(1 << 6)
 /** @} */
 
@@ -178,4 +177,4 @@
 
 
 
-#endif /* __DT_BINDINGS_GPIO_GPIO_H */
+#endif /* ZEPHYR_INCLUDE_DT_BINDINGS_GPIO_GPIO_H_ */

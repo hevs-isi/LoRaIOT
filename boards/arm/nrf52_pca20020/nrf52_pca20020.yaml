@@ -6,4 +6,8 @@ ram: 64
 flash: 512
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
+supported:
+  - i2c
+  - hts221

@@ -5,114 +5,53 @@
  */
 
 #include <zephyr.h>
-#include <uart.h>
-#include <misc/printk.h>
+#include <device.h>
 #include <console.h>
-#include <drivers/console/console.h>
-#include <drivers/console/uart_console.h>
+#include <tty.h>
 
-#if (CONFIG_CONSOLE_GETCHAR_BUFSIZE & (CONFIG_CONSOLE_GETCHAR_BUFSIZE - 1)) != 0
-#error CONFIG_CONSOLE_GETCHAR_BUFSIZE must be power of 2
-#endif
+static struct tty_serial console_serial;
 
-#if (CONFIG_CONSOLE_PUTCHAR_BUFSIZE & (CONFIG_CONSOLE_PUTCHAR_BUFSIZE - 1)) != 0
-#error CONFIG_CONSOLE_PUTCHAR_BUFSIZE must be power of 2
-#endif
+static u8_t console_rxbuf[CONFIG_CONSOLE_GETCHAR_BUFSIZE];
+static u8_t console_txbuf[CONFIG_CONSOLE_PUTCHAR_BUFSIZE];
 
-static K_SEM_DEFINE(uart_sem, 0, UINT_MAX);
-static u8_t uart_ringbuf[CONFIG_CONSOLE_GETCHAR_BUFSIZE];
-static u8_t i_get, i_put;
-
-static u8_t tx_ringbuf[CONFIG_CONSOLE_PUTCHAR_BUFSIZE];
-static u8_t tx_get, tx_put;
-
-static struct device *uart_dev;
-
-static int console_irq_input_hook(u8_t c);
-
-static void uart_isr(struct device *dev)
+ssize_t console_write(void *dummy, const void *buf, size_t size)
 {
-	uart_irq_update(dev);
+	ARG_UNUSED(dummy);
 
-	if (uart_irq_rx_ready(dev)) {
-		u8_t c;
-
-		while (1) {
-			if (uart_fifo_read(dev, &c, 1) == 0) {
-				break;
-			}
-			console_irq_input_hook(c);
-		}
-	}
-
-	if (uart_irq_tx_ready(dev)) {
-		if (tx_get == tx_put) {
-			/* Output buffer empty, don't bother
-			 * us with tx interrupts
-			 */
-			uart_irq_tx_disable(dev);
-		} else {
-			uart_fifo_fill(dev, &tx_ringbuf[tx_get++], 1);
-			tx_get &= CONFIG_CONSOLE_PUTCHAR_BUFSIZE - 1;
-		}
-	}
+	return tty_write(&console_serial, buf, size);
 }
 
-static int console_irq_input_hook(u8_t c)
+ssize_t console_read(void *dummy, void *buf, size_t size)
 {
-	int i_next = (i_put + 1) & (CONFIG_CONSOLE_GETCHAR_BUFSIZE - 1);
+	ARG_UNUSED(dummy);
 
-	if (i_next == i_get) {
-		/* Try to give a clue to user that some input was lost */
-		console_putchar('~');
-		console_putchar('\n');
-		return 1;
-	}
-
-	uart_ringbuf[i_put] = c;
-	i_put = i_next;
-	k_sem_give(&uart_sem);
-
-	return 1;
+	return tty_read(&console_serial, buf, size);
 }
 
 int console_putchar(char c)
 {
-	unsigned int key;
-	int tx_next;
-
-	key = irq_lock();
-	tx_next = (tx_put + 1) & (CONFIG_CONSOLE_PUTCHAR_BUFSIZE - 1);
-	if (tx_next == tx_get) {
-		irq_unlock(key);
-		return -1;
-	}
-
-	tx_ringbuf[tx_put] = (u8_t)c;
-	tx_put = tx_next;
-
-	irq_unlock(key);
-	uart_irq_tx_enable(uart_dev);
-	return 0;
+	return tty_write(&console_serial, &c, 1);
 }
 
-u8_t console_getchar(void)
+int console_getchar(void)
 {
-	unsigned int key;
 	u8_t c;
+	int res;
 
-	k_sem_take(&uart_sem, K_FOREVER);
-	key = irq_lock();
-	c = uart_ringbuf[i_get++];
-	i_get &= CONFIG_CONSOLE_GETCHAR_BUFSIZE - 1;
-	irq_unlock(key);
+	res = tty_read(&console_serial, &c, 1);
+	if (res < 0) {
+		return res;
+	}
 
 	return c;
 }
 
 void console_init(void)
 {
+	struct device *uart_dev;
+
 	uart_dev = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
-	uart_irq_callback_set(uart_dev, uart_isr);
-	uart_irq_rx_enable(uart_dev);
+	tty_init(&console_serial, uart_dev);
+	tty_set_tx_buf(&console_serial, console_txbuf, sizeof(console_txbuf));
+	tty_set_rx_buf(&console_serial, console_rxbuf, sizeof(console_rxbuf));
 }

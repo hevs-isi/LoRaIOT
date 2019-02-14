@@ -8,14 +8,16 @@
 
 /*
  * This tests the following random number routines:
+ * u32_t z_early_boot_rand32_get(void);
  * u32_t sys_rand32_get(void);
  */
 
 
 #include <ztest.h>
-#include <logging/sys_log.h>
+#include <kernel_internal.h>
 
 #define N_VALUES 10
+
 
 /**
  *
@@ -31,11 +33,16 @@ void test_rand32(void)
 	int rnd_cnt;
 	int equal_count = 0;
 
+	/* Test early boot random number generation function */
+	last_gen = z_early_boot_rand32_get();
+	zassert_true(last_gen != z_early_boot_rand32_get(),
+			"z_early_boot_rand32_get failed");
+
 	/*
 	 * Test subsequently calls sys_rand32_get(), checking
 	 * that two values are not equal.
 	 */
-	SYS_LOG_DBG("Generating random numbers");
+	printk("Generating random numbers\n");
 	last_gen = sys_rand32_get();
 	/*
 	 * Get several subsequent numbers as fast as possible.

@@ -5,18 +5,27 @@
 #
 
 menuconfig SETTINGS
-	bool
-	default n
-	prompt "Enable settings subsystem with non-volatile storage"
+	bool "Enable settings subsystem with non-volatile storage"
 	# Only NFFS is currently supported as FS.
 	# The reason in that FatFs doesn't implement the fs_rename() API
 	depends on (FILE_SYSTEM && FILE_SYSTEM_NFFS) || (FCB && FLASH_PAGE_LAYOUT)
-	select BASE64
 	help
 	  The settings subsystem allows its users to serialize and
 	  deserialize state in memory into and from non-volatile memory.
 	  It supports several back-ends to store and load serialized data from
 	  and it can do so atomically for all involved modules.
+
+# Hidden option to enable encoding length into settings entry
+config SETTINGS_ENCODE_LEN
+	depends on SETTINGS
+	bool
+
+config SETTINGS_USE_BASE64
+	bool "encoding value using base64"
+	depends on SETTINGS
+	select BASE64
+	help
+	  Enables values encoding using Base64.
 
 choice
 	prompt "Storage back-end"
@@ -34,56 +43,51 @@ config SETTINGS_FCB
 config SETTINGS_FS
 	bool "File System"
 	depends on FILE_SYSTEM
+	select SETTINGS_ENCODE_LEN
 	help
 	  Use a file system as a settings storage back-end.
 endchoice
 
 config SETTINGS_FCB_NUM_AREAS
-	int
+	int "Number of flash areas used by the settings subsystem"
 	default 8
 	depends on SETTINGS && SETTINGS_FCB
-	prompt "Number of flash areas used by the settings subsystem"
 	help
 	  Number of areas to allocate in the settings FCB. A smaller number is
 	  used if the flash hardware cannot support this value.
 
 config SETTINGS_FCB_MAGIC
-	hex
-	prompt "FCB magic for the settings subsystem"
+	hex "FCB magic for the settings subsystem"
 	default 0xc0ffeeee
 	depends on SETTINGS && SETTINGS_FCB
 	help
 	  Magic 32-bit word for to identify valid settings area
 
 config SETTINGS_FCB_FLASH_AREA
-	int
-	prompt "Flash area id used for settings"
-	default 4
+	int "Flash area id used for settings"
+	default $(dt_int_val,DT_FLASH_AREA_STORAGE_ID)
 	depends on SETTINGS && SETTINGS_FCB
 	help
 	  Id of the Flash area where FCB instance used for settings is
 	  expected to operate.
 
 config SETTINGS_FS_DIR
-	string
-	prompt "Serialization directory"
+	string "Serialization directory"
 	default "/settings"
 	depends on SETTINGS && SETTINGS_FS
 	help
 	  Directory where the settings data is stored
 
 config SETTINGS_FS_FILE
-	string
-	prompt "Default settings file"
+	string "Default settings file"
 	default "/settings/run"
 	depends on SETTINGS && SETTINGS_FS
 	help
 	  Full path to the default settings file.
 
 config SETTINGS_FS_MAX_LINES
-	int
-	prompt "Compression threshold"
+	int "Compression threshold"
 	default 32
 	depends on SETTINGS && SETTINGS_FS
 	help
-	  'Limit how many items stored in a file before compressing'
+	  Limit how many items stored in a file before compressing

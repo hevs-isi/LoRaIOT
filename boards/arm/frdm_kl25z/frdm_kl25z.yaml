@@ -6,7 +6,8 @@ ram: 16
 flash: 128
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
 testing:
   ignore_tags:
     - net
@@ -14,5 +15,5 @@ testing:
 supported:
   - adc
   - i2c
-  - spi
   - gpio
+  - usb_device

@@ -4,17 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __SENSOR_HMC5883L_H__
-#define __SENSOR_HMC5883L_H__
+#ifndef ZEPHYR_DRIVERS_SENSOR_HMC5883L_HMC5883L_H_
+#define ZEPHYR_DRIVERS_SENSOR_HMC5883L_HMC5883L_H_
 
 #include <device.h>
 #include <misc/util.h>
 #include <zephyr/types.h>
 #include <gpio.h>
-
-#define SYS_LOG_DOMAIN "HMC5883L"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
 
 #define HMC5883L_I2C_ADDR		0x1E
 

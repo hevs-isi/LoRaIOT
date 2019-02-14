@@ -7,38 +7,29 @@
 #
 
 menuconfig SENSOR
-	bool
-	prompt "Sensor Drivers"
-	default n
+	bool "Sensor Drivers"
 	help
 	  Include sensor drivers in system config
 
 if SENSOR
 
-config SYS_LOG_SENSOR_LEVEL
-	int "Sensor Log level"
-	depends on SYS_LOG
-	default 0
-	range 0 4
-	help
-	  Sets log level for Sensor Device Drivers.
-	  Levels are:
-	  0 OFF, do not write
-	  1 ERROR, only write SYS_LOG_ERR
-	  2 WARNING, write SYS_LOG_WRN in addition to previous level
-	  3 INFO, write SYS_LOG_INF in addition to previous levels
-	  4 DEBUG, write SYS_LOG_DBG in addition to previous levels
+module = SENSOR
+module-str = sensor
+source "subsys/logging/Kconfig.template.log_config"
 
 config SENSOR_INIT_PRIORITY
-	int
-	prompt "Sensor init priority"
+	int "Sensor init priority"
 	default 90
 	help
 	  Sensor initialization priority.
 
 comment "Device Drivers"
 
+source "drivers/sensor/adt7420/Kconfig"
+
 source "drivers/sensor/adxl362/Kconfig"
+
+source "drivers/sensor/adxl372/Kconfig"
 
 source "drivers/sensor/ak8975/Kconfig"
 
@@ -66,6 +57,8 @@ source "drivers/sensor/fxas21002/Kconfig"
 
 source "drivers/sensor/fxos8700/Kconfig"
 
+source "drivers/sensor/grove/Kconfig"
+
 source "drivers/sensor/hdc1008/Kconfig"
 
 source "drivers/sensor/hmc5883l/Kconfig"
@@ -78,13 +71,19 @@ source "drivers/sensor/isl29035/Kconfig"
 
 source "drivers/sensor/lis2dh/Kconfig"
 
-source "drivers/sensor/lis3dh/Kconfig"
+source "drivers/sensor/lis2ds12/Kconfig"
+
+source "drivers/sensor/lis2dw12/Kconfig"
+
+source "drivers/sensor/lis2mdl/Kconfig"
 
 source "drivers/sensor/lis3mdl/Kconfig"
 
 source "drivers/sensor/lps22hb/Kconfig"
 
 source "drivers/sensor/lps25hb/Kconfig"
+
+source "drivers/sensor/lsm303dlhc_magn/Kconfig"
 
 source "drivers/sensor/lsm6ds0/Kconfig"
 
@@ -102,9 +101,13 @@ source "drivers/sensor/mcp9808/Kconfig"
 
 source "drivers/sensor/mpu6050/Kconfig"
 
+source "drivers/sensor/ms5837/Kconfig"
+
 source "drivers/sensor/nrf5/Kconfig"
 
 source "drivers/sensor/pms7003/Kconfig"
+
+source "drivers/sensor/qdec_nrfx/Kconfig"
 
 source "drivers/sensor/sht3xd/Kconfig"
 

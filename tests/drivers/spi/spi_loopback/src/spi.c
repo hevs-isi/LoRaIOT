@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define SYS_LOG_LEVEL SYS_LOG_LEVEL_DEBUG
-#include <logging/sys_log.h>
+#define LOG_LEVEL CONFIG_LOG_DEFAULT_LEVEL
+#include <logging/log.h>
+LOG_MODULE_REGISTER(main);
 
 #include <zephyr.h>
 #include <misc/printk.h>
 #include <string.h>
 #include <stdio.h>
+#include <ztest.h>
 
 #include <spi.h>
 
@@ -31,6 +33,7 @@ struct spi_cs_control spi_cs = {
 #define CS_CTRL_GPIO_DRV_NAME ""
 #endif
 
+#define STACK_SIZE 512
 #define BUF_SIZE 17
 u8_t buffer_tx[] = "0123456789abcdef\0";
 u8_t buffer_rx[BUF_SIZE] = {};
@@ -72,7 +75,8 @@ static int cs_ctrl_gpio_config(void)
 {
 	spi_cs.gpio_dev = device_get_binding(CS_CTRL_GPIO_DRV_NAME);
 	if (!spi_cs.gpio_dev) {
-		SYS_LOG_ERR("Cannot find %s!", CS_CTRL_GPIO_DRV_NAME);
+		LOG_ERR("Cannot find %s!", CS_CTRL_GPIO_DRV_NAME);
+		zassert_not_null(spi_cs.gpio_dev, "Invalid gpio device");
 		return -1;
 	}
 
@@ -105,25 +109,27 @@ static int spi_complete_loop(struct device *dev, struct spi_config *spi_conf)
 
 	int ret;
 
-	SYS_LOG_INF("Start");
+	LOG_INF("Start");
 
 	ret = spi_transceive(dev, spi_conf, &tx, &rx);
 	if (ret) {
-		SYS_LOG_ERR("Code %d", ret);
+		LOG_ERR("Code %d", ret);
+		zassert_false(ret, "SPI transceive failed");
 		return ret;
 	}
 
 	if (memcmp(buffer_tx, buffer_rx, BUF_SIZE)) {
 		to_display_format(buffer_tx, BUF_SIZE, buffer_print_tx);
 		to_display_format(buffer_rx, BUF_SIZE, buffer_print_rx);
-		SYS_LOG_ERR("Buffer contents are different: %s",
+		LOG_ERR("Buffer contents are different: %s",
 			    buffer_print_tx);
-		SYS_LOG_ERR("                           vs: %s",
+		LOG_ERR("                           vs: %s",
 			    buffer_print_rx);
+		zassert_false(1, "Buffer contents are different");
 		return -1;
 	}
 
-	SYS_LOG_INF("Passed");
+	LOG_INF("Passed");
 
 	return 0;
 }
@@ -152,27 +158,29 @@ static int spi_rx_half_start(struct device *dev, struct spi_config *spi_conf)
 	};
 	int ret;
 
-	SYS_LOG_INF("Start");
+	LOG_INF("Start");
 
-	memset(buffer_rx, 0, BUF_SIZE);
+	(void)memset(buffer_rx, 0, BUF_SIZE);
 
 	ret = spi_transceive(dev, spi_conf, &tx, &rx);
 	if (ret) {
-		SYS_LOG_ERR("Code %d", ret);
+		LOG_ERR("Code %d", ret);
+		zassert_false(ret, "SPI transceive failed");
 		return -1;
 	}
 
 	if (memcmp(buffer_tx, buffer_rx, 8)) {
 		to_display_format(buffer_tx, 8, buffer_print_tx);
 		to_display_format(buffer_rx, 8, buffer_print_rx);
-		SYS_LOG_ERR("Buffer contents are different: %s",
+		LOG_ERR("Buffer contents are different: %s",
 			    buffer_print_tx);
-		SYS_LOG_ERR("                           vs: %s",
+		LOG_ERR("                           vs: %s",
 			    buffer_print_rx);
+		zassert_false(1, "Buffer contents are different");
 		return -1;
 	}
 
-	SYS_LOG_INF("Passed");
+	LOG_INF("Passed");
 
 	return 0;
 }
@@ -205,27 +213,29 @@ static int spi_rx_half_end(struct device *dev, struct spi_config *spi_conf)
 	};
 	int ret;
 
-	SYS_LOG_INF("Start");
+	LOG_INF("Start");
 
-	memset(buffer_rx, 0, BUF_SIZE);
+	(void)memset(buffer_rx, 0, BUF_SIZE);
 
 	ret = spi_transceive(dev, spi_conf, &tx, &rx);
 	if (ret) {
-		SYS_LOG_ERR("Code %d", ret);
+		LOG_ERR("Code %d", ret);
+		zassert_false(ret, "SPI transceive failed");
 		return -1;
 	}
 
 	if (memcmp(buffer_tx+8, buffer_rx, 8)) {
 		to_display_format(buffer_tx + 8, 8, buffer_print_tx);
 		to_display_format(buffer_rx, 8, buffer_print_rx);
-		SYS_LOG_ERR("Buffer contents are different: %s",
+		LOG_ERR("Buffer contents are different: %s",
 			    buffer_print_tx);
-		SYS_LOG_ERR("                           vs: %s",
+		LOG_ERR("                           vs: %s",
 			    buffer_print_rx);
+		zassert_false(1, "Buffer contents are different");
 		return -1;
 	}
 
-	SYS_LOG_INF("Passed");
+	LOG_INF("Passed");
 
 	return 0;
 }
@@ -266,35 +276,38 @@ static int spi_rx_every_4(struct device *dev, struct spi_config *spi_conf)
 	};
 	int ret;
 
-	SYS_LOG_INF("Start");
+	LOG_INF("Start");
 
-	memset(buffer_rx, 0, BUF_SIZE);
+	(void)memset(buffer_rx, 0, BUF_SIZE);
 
 	ret = spi_transceive(dev, spi_conf, &tx, &rx);
 	if (ret) {
-		SYS_LOG_ERR("Code %d", ret);
+		LOG_ERR("Code %d", ret);
+		zassert_false(ret, "SPI transceive failed");
 		return -1;
 	}
 
 	if (memcmp(buffer_tx + 4, buffer_rx, 4)) {
 		to_display_format(buffer_tx + 4, 4, buffer_print_tx);
 		to_display_format(buffer_rx, 4, buffer_print_rx);
-		SYS_LOG_ERR("Buffer contents are different: %s",
+		LOG_ERR("Buffer contents are different: %s",
 			    buffer_print_tx);
-		SYS_LOG_ERR("                           vs: %s",
+		LOG_ERR("                           vs: %s",
 			    buffer_print_rx);
+		zassert_false(1, "Buffer contents are different");
 		return -1;
 	} else if (memcmp(buffer_tx + 12, buffer_rx + 4, 4)) {
 		to_display_format(buffer_tx + 12, 4, buffer_print_tx);
 		to_display_format(buffer_rx + 4, 4, buffer_print_rx);
-		SYS_LOG_ERR("Buffer contents are different: %s",
+		LOG_ERR("Buffer contents are different: %s",
 			    buffer_print_tx);
-		SYS_LOG_ERR("                           vs: %s",
+		LOG_ERR("                           vs: %s",
 			    buffer_print_rx);
+		zassert_false(1, "Buffer contents are different");
 		return -1;
 	}
 
-	SYS_LOG_INF("Passed");
+	LOG_INF("Passed");
 
 	return 0;
 }
@@ -305,17 +318,20 @@ static struct k_poll_event async_evt =
 				 K_POLL_MODE_NOTIFY_ONLY,
 				 &async_sig);
 static K_SEM_DEFINE(caller, 0, 1);
-K_THREAD_STACK_DEFINE(spi_async_stack, 256);
+K_THREAD_STACK_DEFINE(spi_async_stack, STACK_SIZE);
 static int result = 1;
 
 static void spi_async_call_cb(struct k_poll_event *async_evt,
 			      struct k_sem *caller_sem,
 			      void *unused)
 {
-	SYS_LOG_DBG("Polling...");
+	int ret;
+
+	LOG_DBG("Polling...");
 
 	while (1) {
-		k_poll(async_evt, 1, K_MSEC(100));
+		ret = k_poll(async_evt, 1, K_MSEC(200));
+		zassert_false(ret, "one or more events are not ready");
 
 		result = async_evt->signal->result;
 		k_sem_give(caller_sem);
@@ -350,27 +366,29 @@ static int spi_async_call(struct device *dev, struct spi_config *spi_conf)
 	};
 	int ret;
 
-	SYS_LOG_INF("Start");
+	LOG_INF("Start");
 
 	ret = spi_transceive_async(dev, spi_conf, &tx, &rx, &async_sig);
 	if (ret == -ENOTSUP) {
-		SYS_LOG_DBG("Not supported");
+		LOG_DBG("Not supported");
 		return 0;
 	}
 
 	if (ret) {
-		SYS_LOG_ERR("Code %d", ret);
+		LOG_ERR("Code %d", ret);
+		zassert_false(ret, "SPI transceive failed");
 		return -1;
 	}
 
 	k_sem_take(&caller, K_FOREVER);
 
 	if (result)  {
-		SYS_LOG_ERR("Call code %d", ret);
+		LOG_ERR("Call code %d", ret);
+		zassert_false(result, "SPI transceive failed");
 		return -1;
 	}
 
-	SYS_LOG_INF("Passed");
+	LOG_INF("Passed");
 
 	return 0;
 }
@@ -387,7 +405,8 @@ static int spi_resource_lock_test(struct device *lock_dev,
 	}
 
 	if (spi_release(lock_dev, spi_conf_lock)) {
-		SYS_LOG_ERR("Deadlock now?");
+		LOG_ERR("Deadlock now?");
+		zassert_false(1, "SPI release failed");
 		return -1;
 	}
 
@@ -398,14 +417,14 @@ static int spi_resource_lock_test(struct device *lock_dev,
 	return 0;
 }
 
-void main(void)
+void testing_spi(void)
 {
 	struct k_thread async_thread;
 	k_tid_t async_thread_id;
 	struct device *spi_slow;
 	struct device *spi_fast;
 
-	SYS_LOG_INF("SPI test on buffers TX/RX %p/%p", buffer_tx, buffer_rx);
+	LOG_INF("SPI test on buffers TX/RX %p/%p", buffer_tx, buffer_rx);
 
 #if defined(CONFIG_SPI_LOOPBACK_CS_GPIO)
 	if (cs_ctrl_gpio_config()) {
@@ -415,13 +434,15 @@ void main(void)
 
 	spi_slow = device_get_binding(SPI_DRV_NAME);
 	if (!spi_slow) {
-		SYS_LOG_ERR("Cannot find %s!\n", SPI_DRV_NAME);
+		LOG_ERR("Cannot find %s!\n", SPI_DRV_NAME);
+		zassert_not_null(spi_slow, "Invalid SPI device");
 		return;
 	}
 
 	spi_fast = spi_slow;
 
-	async_thread_id = k_thread_create(&async_thread, spi_async_stack, 256,
+	async_thread_id = k_thread_create(&async_thread,
+					  spi_async_stack, STACK_SIZE,
 					  (k_thread_entry_t)spi_async_call_cb,
 					  &async_evt, &caller, NULL,
 					  K_PRIO_COOP(7), 0, 0);
@@ -447,7 +468,14 @@ void main(void)
 		goto end;
 	}
 
-	SYS_LOG_INF("All tx/rx passed");
+	LOG_INF("All tx/rx passed");
 end:
 	k_thread_abort(async_thread_id);
+}
+
+/*test case main entry*/
+void test_main(void)
+{
+	ztest_test_suite(test_spi, ztest_unit_test(testing_spi));
+	ztest_run_test_suite(test_spi);
 }

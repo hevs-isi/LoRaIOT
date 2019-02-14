@@ -11,11 +11,14 @@
 #
 menuconfig RTC
 	bool "Real-Time Clock"
-	default n
 	help
 	  Enable options for Real-Time Clock drivers.
 
 if RTC
+
+module = RTC
+module-str = rtc
+source "subsys/logging/Kconfig.template.log_config"
 
 config RTC_0_NAME
 	string "Driver instance name"
@@ -26,7 +29,7 @@ config RTC_0_NAME
 
 comment "RTC drivers"
 
-source "drivers/rtc/Kconfig.qmsi"
 source "drivers/rtc/Kconfig.mcux_rtc"
+source "drivers/rtc/Kconfig.stm32_rtc"
 
 endif # RTC

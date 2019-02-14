@@ -8,22 +8,29 @@
 #include <misc/mempool.h>
 
 
-#define BLK_SIZE_MIN	256
-#define BLK_SIZE_MAX	1024
-#define BLK_NUM_MAX	8
-#define	TOTAL_POOL_SIZE	(BLK_SIZE_MAX * BLK_NUM_MAX)
-#define TOTAL_MIN_BLKS	(TOTAL_POOL_SIZE / BLK_SIZE_MIN)
+#define BLK_SIZE_MIN    256
+#define BLK_SIZE_MAX    1024
+#define BLK_NUM_MAX     8
+#define TOTAL_POOL_SIZE (BLK_SIZE_MAX * BLK_NUM_MAX)
+#define TOTAL_MIN_BLKS  (TOTAL_POOL_SIZE / BLK_SIZE_MIN)
 
-#define DESC_SIZE	sizeof(struct sys_mem_pool_block)
+#define DESC_SIZE       sizeof(struct sys_mem_pool_block)
 
 #define BLK_SIZE_EXCLUDE_DESC (BLK_SIZE_MIN - 16)
 #define BLK_ALIGN BLK_SIZE_MIN
 
-
 K_MUTEX_DEFINE(pool_mutex);
-SYS_MEM_POOL_DEFINE(pool, &pool_mutex, BLK_SIZE_MIN, BLK_SIZE_MAX,
-		    BLK_NUM_MAX, BLK_ALIGN, .data);
 
+SYS_MEM_POOL_DEFINE(pool, &pool_mutex, BLK_SIZE_MIN, BLK_SIZE_MAX,
+		    BLK_NUM_MAX, BLK_ALIGN, ZTEST_SECTION);
+
+/**
+ * @brief Verify sys_mem_pool allocation and free
+ *
+ * @ingroup kernel_memory_pool_tests
+ *
+ * @see sys_mem_pool_alloc(), sys_mem_pool_free()
+ */
 void test_sys_mem_pool_alloc_free(void)
 {
 	void *block[BLK_NUM_MAX], *block_fail;
@@ -53,6 +60,13 @@ void test_sys_mem_pool_alloc_free(void)
 	sys_mem_pool_free(NULL);
 }
 
+/**
+ * @brief Verify sys_mem_pool aligned allocation.
+ *
+ * @see sys_mem_pool_alloc(), sys_mem_pool_free()
+ *
+ * @ingroup kernel_memory_pool_tests
+ */
 void test_sys_mem_pool_alloc_align4(void)
 {
 	void *block[BLK_NUM_MAX];
@@ -73,6 +87,14 @@ void test_sys_mem_pool_alloc_align4(void)
 	}
 }
 
+/**
+ * @brief Verify allocation of minimum block size which
+ * is 64 bytes
+ *
+ * @ingroup kernel_memory_pool_tests
+ *
+ * @see sys_mem_pool_alloc(), sys_mem_pool_free()
+ */
 void test_sys_mem_pool_min_block_size(void)
 {
 	void *block[TOTAL_MIN_BLKS], *block_fail;
@@ -104,7 +126,7 @@ void test_sys_mem_pool_min_block_size(void)
 /*test case main entry*/
 void test_main(void)
 {
-	k_thread_access_grant(k_current_get(), &pool_mutex, NULL);
+	k_thread_access_grant(k_current_get(), &pool_mutex);
 	sys_mem_pool_init(&pool);
 
 	ztest_test_suite(test_sys_mem_pool_api,

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _SENSOR_HDC1008
-#define _SENSOR_HDC1008
+#ifndef ZEPHYR_DRIVERS_SENSOR_HDC1008_HDC1008_H_
+#define ZEPHYR_DRIVERS_SENSOR_HDC1008_HDC1008_H_
 
 #include <kernel.h>
 
@@ -13,8 +13,11 @@
 
 #define HDC1008_REG_TEMP	0x0
 #define HDC1008_REG_HUMIDITY	0x1
-#define HDC1000_MANUFID         0xFE
-#define HDC1000_DEVICEID        0xFF
+#define HDC1008_REG_MANUFID	0xFE
+#define HDC1008_REG_DEVICEID	0xFF
+
+#define HDC1008_MANUFID		0x5449
+#define HDC1008_DEVICEID	0x1000
 
 struct hdc1008_data {
 	struct device *i2c;
@@ -25,7 +28,4 @@ struct hdc1008_data {
 	struct k_sem data_sem;
 };
 
-#define SYS_LOG_DOMAIN "HDC1008"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
 #endif

@@ -1,21 +1,21 @@
-/**
+/*
  * Copyright (c) 2015 - 2018, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -218,6 +218,44 @@ __STATIC_INLINE void nrf_gpiote_int_disable(uint32_t mask);
  */
 __STATIC_INLINE uint32_t nrf_gpiote_int_is_enabled(uint32_t mask);
 
+#if defined(DPPI_PRESENT) || defined(__NRFX_DOXYGEN__)
+/**
+ * @brief Function for setting the subscribe configuration for a given
+ *        GPIOTE task.
+ *
+ * @param[in] task    Task for which to set the configuration.
+ * @param[in] channel Channel through which to subscribe events.
+ */
+__STATIC_INLINE void nrf_gpiote_subscribe_set(nrf_gpiote_tasks_t task,
+                                              uint8_t            channel);
+
+/**
+ * @brief Function for clearing the subscribe configuration for a given
+ *        GPIOTE task.
+ *
+ * @param[in] task Task for which to clear the configuration.
+ */
+__STATIC_INLINE void nrf_gpiote_subscribe_clear(nrf_gpiote_tasks_t task);
+
+/**
+ * @brief Function for setting the publish configuration for a given
+ *        GPIOTE event.
+ *
+ * @param[in] event   Event for which to set the configuration.
+ * @param[in] channel Channel through which to publish the event.
+ */
+__STATIC_INLINE void nrf_gpiote_publish_set(nrf_gpiote_events_t event,
+                                            uint8_t             channel);
+
+/**
+ * @brief Function for clearing the publish configuration for a given
+ *        GPIOTE event.
+ *
+ * @param[in] event Event for which to clear the configuration.
+ */
+__STATIC_INLINE void nrf_gpiote_publish_clear(nrf_gpiote_events_t event);
+#endif // defined(DPPI_PRESENT) || defined(__NRFX_DOXYGEN__)
+
 /**@brief Function for enabling a GPIOTE event.
  *
  * @param[in]  idx        Task-Event index.
@@ -292,6 +330,15 @@ __STATIC_INLINE void nrf_gpiote_task_force(uint32_t idx, nrf_gpiote_outinit_t in
  */
 __STATIC_INLINE void nrf_gpiote_te_default(uint32_t idx);
 
+/**@brief Function for checking if particular Task-Event is enabled.
+ *
+ * @param[in]  idx        Task-Event index.
+ *
+ * @retval true  If the Task-Event mode is set to Task or Event.
+ * @retval false If the Task-Event mode is set to Disabled.
+ */
+__STATIC_INLINE bool nrf_gpiote_te_is_enabled(uint32_t idx);
+
 #ifndef SUPPRESS_INLINE_IMPLEMENTATION
 __STATIC_INLINE void nrf_gpiote_task_set(nrf_gpiote_tasks_t task)
 {
@@ -336,6 +383,32 @@ __STATIC_INLINE uint32_t nrf_gpiote_int_is_enabled(uint32_t mask)
 {
     return (NRF_GPIOTE->INTENSET & mask);
 }
+
+#if defined(DPPI_PRESENT)
+__STATIC_INLINE void nrf_gpiote_subscribe_set(nrf_gpiote_tasks_t task,
+                                              uint8_t            channel)
+{
+    *((volatile uint32_t *) ((uint8_t *) NRF_GPIOTE + (uint32_t) task + 0x80uL)) =
+            ((uint32_t)channel | GPIOTE_SUBSCRIBE_OUT_EN_Msk);
+}
+
+__STATIC_INLINE void nrf_gpiote_subscribe_clear(nrf_gpiote_tasks_t task)
+{
+    *((volatile uint32_t *) ((uint8_t *) NRF_GPIOTE + (uint32_t) task + 0x80uL)) = 0;
+}
+
+__STATIC_INLINE void nrf_gpiote_publish_set(nrf_gpiote_events_t event,
+                                            uint8_t             channel)
+{
+    *((volatile uint32_t *) ((uint8_t *) NRF_GPIOTE + (uint32_t) event + 0x80uL)) =
+            ((uint32_t)channel | GPIOTE_PUBLISH_IN_EN_Msk);
+}
+
+__STATIC_INLINE void nrf_gpiote_publish_clear(nrf_gpiote_events_t event)
+{
+    *((volatile uint32_t *) ((uint8_t *) NRF_GPIOTE + (uint32_t) event + 0x80uL)) = 0;
+}
+#endif // defined(DPPI_PRESENT)
 
 __STATIC_INLINE void nrf_gpiote_event_enable(uint32_t idx)
 {
@@ -407,6 +480,11 @@ __STATIC_INLINE void nrf_gpiote_task_force(uint32_t idx, nrf_gpiote_outinit_t in
 __STATIC_INLINE void nrf_gpiote_te_default(uint32_t idx)
 {
     NRF_GPIOTE->CONFIG[idx] = 0;
+}
+
+__STATIC_INLINE bool nrf_gpiote_te_is_enabled(uint32_t idx)
+{
+    return (NRF_GPIOTE->CONFIG[idx] & GPIOTE_CONFIG_MODE_Msk) != GPIOTE_CONFIG_MODE_Disabled;
 }
 #endif //SUPPRESS_INLINE_IMPLEMENTATION
 

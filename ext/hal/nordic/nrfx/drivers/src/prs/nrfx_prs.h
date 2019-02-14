@@ -1,21 +1,21 @@
-/**
+/*
  * Copyright (c) 2017 - 2018, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -78,6 +78,15 @@ extern "C" {
     #define NRFX_PRS_BOX_3_ADDR     NRF_COMP
     // UARTE0, UART0
     #define NRFX_PRS_BOX_4_ADDR     NRF_UARTE0
+#elif defined(NRF9160_XXAA)
+    // UARTE0, SPIM0, SPIS0, TWIM0, TWIS0
+    #define NRFX_PRS_BOX_0_ADDR     NRF_UARTE0
+    // UARTE1, SPIM1, SPIS1, TWIM1, TWIS1
+    #define NRFX_PRS_BOX_1_ADDR     NRF_UARTE1
+    // UARTE2, SPIM2, SPIS2, TWIM2, TWIS2
+    #define NRFX_PRS_BOX_2_ADDR     NRF_UARTE2
+    // UARTE3, SPIM3, SPIS3, TWIM3, TWIS3
+    #define NRFX_PRS_BOX_3_ADDR     NRF_UARTE3
 #else
     #error "Unknown device."
 #endif

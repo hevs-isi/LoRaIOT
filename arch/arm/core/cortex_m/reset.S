@@ -11,18 +11,14 @@
  * Reset handler that prepares the system for running C code.
  */
 
-#include <board.h>
 #include <toolchain.h>
 #include <linker/sections.h>
 #include <arch/cpu.h>
-#include <offsets_short.h>
 #include "vector_table.h"
 
 _ASM_FILE_PROLOGUE
 
 GTEXT(__reset)
-GTEXT(memset)
-GDATA(_interrupt_stack)
 #if defined(CONFIG_PLATFORM_SPECIFIC_INIT)
 GTEXT(_PlatformInit)
 #endif
@@ -65,92 +61,15 @@ SECTION_SUBSEC_FUNC(TEXT,_reset_section,__start)
 #endif
 
     /* lock interrupts: will get unlocked when switch to main task */
-#if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE)
-    cpsid i
-#elif defined(CONFIG_ARMV7_M_ARMV8_M_MAINLINE)
-    movs.n r0, #_EXC_IRQ_DEFAULT_PRIO
-    msr BASEPRI, r0
-#else
-#error Unknown ARM architecture
-#endif /* CONFIG_ARMV6_M_ARMV8_M_BASELINE */
-
+    bl	lock_interrupts
 #ifdef CONFIG_WDOG_INIT
     /* board-specific watchdog initialization is necessary */
     bl _WdogInit
 #endif
 
-#ifdef CONFIG_INIT_STACKS
-    ldr r0, =_interrupt_stack
-    ldr r1, =0xaa
-    ldr r2, =CONFIG_ISR_STACK_SIZE
-    bl memset
-#endif
-
     /*
-     * Set PSP and use it to boot without using MSP, so that it
-     * gets set to _interrupt_stack during initialisation.
+     * 'bl' jumps the furthest of the branch instructions that are
+     * supported on all platforms. So it is used when jumping to _PrepC
+     * (even though we do not intend to return).
      */
-    ldr r0, =_interrupt_stack
-    ldr r1, =CONFIG_ISR_STACK_SIZE
-    adds r0, r0, r1
-    msr PSP, r0
-    movs.n r0, #2	/* switch to using PSP (bit1 of CONTROL reg) */
-    msr CONTROL, r0
-    /*
-     * When changing the stack pointer, software must use an ISB instruction
-     * immediately after the MSR instruction. This ensures that instructions
-     * after the ISB instruction execute using the new stack pointer.
-    */
-    isb
-
-    b _PrepC
-
-#if defined(CONFIG_SOC_TI_LM3S6965_QEMU)
-
-GTEXT(_do_software_reboot)
-SECTION_FUNC(TEXT,_do_software_reboot)
-
-	eors r0, r0
-
-	/* move exception table back to 0 */
-	ldr r1, =0xe000e000
-	str r0, [r1, #0xd08] /* VTOR */
-
-	ldr r0, [r0, #4]
-	bx r0
-
-
-GTEXT(_force_exit_one_nested_irq)
-SECTION_FUNC(TEXT,_force_exit_one_nested_irq)
-
-	ldr r0, =_SCS_ICSR_RETTOBASE
-	ldr r1, =_SCS_ICSR
-	ldr r1, [r1]
-	ands.w r0, r1
-
-	/*
-	 *  If Z flag is set, we are nested, so un-nest one level and get back to
-	 *  this function to unwind the next level; else, exit the last interrupt
-	 *  by jumping to reboot code.
-	 */
-	ittee eq
-		ldreq lr, =0xfffffff1
-		ldreq r2, =_force_exit_one_nested_irq
-		ldrne lr, =0xfffffffd
-		ldrne r2, =_do_software_reboot
-
-	ldr ip, =_interrupt_stack
-	add.w ip, #(___esf_t_SIZEOF * 2) /* enough for a stack frame */
-	ldr r1, =0xfffffffe
-	and.w r2, r1
-	str r2, [ip, #(6 * 4)]
-	ldr r2, =0x01000000
-	str r2, [ip, #(7 * 4)]
-
-	ite eq
-		moveq sp, ip
-		msrne PSP, ip
-
-	bx lr
-
-#endif
+    bl _PrepC

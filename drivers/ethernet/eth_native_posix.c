@@ -11,14 +11,15 @@
  * connectivity between host and Zephyr.
  */
 
-#define SYS_LOG_DOMAIN "eth-posix"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_ETHERNET_LEVEL
+#define LOG_MODULE_NAME eth_posix
+#define LOG_LEVEL CONFIG_ETHERNET_LOG_LEVEL
 
-#include <logging/sys_log.h>
+#include <logging/log.h>
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+
 #include <stdio.h>
 
 #include <kernel.h>
-
 #include <stdbool.h>
 #include <errno.h>
 #include <stddef.h>
@@ -27,21 +28,53 @@
 #include <net/net_core.h>
 #include <net/net_if.h>
 #include <net/ethernet.h>
+#include <ethernet/eth_stats.h>
+
+#include <ptp_clock.h>
+#include <net/gptp.h>
 
 #include "eth_native_posix_priv.h"
-#include "ethernet/eth_stats.h"
 
 #if defined(CONFIG_NET_L2_ETHERNET)
 #define _ETH_MTU 1500
 #endif
 
-#define NET_BUF_TIMEOUT MSEC(10)
+#define NET_BUF_TIMEOUT K_MSEC(100)
 
 #if defined(CONFIG_NET_VLAN)
 #define ETH_HDR_LEN sizeof(struct net_eth_vlan_hdr)
 #else
 #define ETH_HDR_LEN sizeof(struct net_eth_hdr)
 #endif
+
+#if defined(CONFIG_NET_LLDP)
+static const struct net_lldpdu lldpdu = {
+	.chassis_id = {
+		.type_length = htons((LLDP_TLV_CHASSIS_ID << 9) |
+			NET_LLDP_CHASSIS_ID_TLV_LEN),
+		.subtype = CONFIG_NET_LLDP_CHASSIS_ID_SUBTYPE,
+		.value = NET_LLDP_CHASSIS_ID_VALUE
+	},
+	.port_id = {
+		.type_length = htons((LLDP_TLV_PORT_ID << 9) |
+			NET_LLDP_PORT_ID_TLV_LEN),
+		.subtype = CONFIG_NET_LLDP_PORT_ID_SUBTYPE,
+		.value = NET_LLDP_PORT_ID_VALUE
+	},
+	.ttl = {
+		.type_length = htons((LLDP_TLV_TTL << 9) |
+			NET_LLDP_TTL_TLV_LEN),
+		.ttl = htons(NET_LLDP_TTL)
+	},
+#if defined(CONFIG_NET_LLDP_END_LLDPDU_TLV_ENABLED)
+	.end_lldpdu_tlv = NET_LLDP_END_LLDPDU_VALUE
+#endif /* CONFIG_NET_LLDP_END_LLDPDU_TLV_ENABLED */
+};
+
+#define lldpdu_ptr (&lldpdu)
+#else
+#define lldpdu_ptr NULL
+#endif /* CONFIG_NET_LLDP */
 
 struct eth_context {
 	u8_t recv[_ETH_MTU + ETH_HDR_LEN];
@@ -53,9 +86,13 @@ struct eth_context {
 	int dev_fd;
 	bool init_done;
 	bool status;
+	bool promisc_mode;
 
 #if defined(CONFIG_NET_STATISTICS_ETHERNET)
 	struct net_stats_eth stats;
+#endif
+#if defined(CONFIG_ETH_NATIVE_POSIX_PTP_CLOCK)
+	struct device *ptp_clock;
 #endif
 };
 
@@ -67,51 +104,130 @@ static struct k_thread rx_thread_data;
 /* TODO: support multiple interfaces */
 static struct eth_context eth_context_data;
 
-static struct eth_context *get_context(struct net_if *iface)
+#if defined(CONFIG_NET_GPTP)
+static bool need_timestamping(struct gptp_hdr *hdr)
 {
-	return net_if_get_device(iface)->driver_data;
+	switch (hdr->message_type) {
+	case GPTP_SYNC_MESSAGE:
+	case GPTP_PATH_DELAY_RESP_MESSAGE:
+		return true;
+	default:
+		return false;
+	}
 }
 
-static int eth_send(struct net_if *iface, struct net_pkt *pkt)
+static struct gptp_hdr *check_gptp_msg(struct net_if *iface,
+				       struct net_pkt *pkt,
+				       bool is_tx)
 {
-	struct eth_context *ctx = get_context(iface);
-	struct net_buf *frag;
-	int count = 0;
+	u8_t *msg_start = net_pkt_data(pkt);
+	struct gptp_hdr *gptp_hdr;
+	int eth_hlen;
 
-	/* First fragment contains link layer (Ethernet) headers.
-	 */
-	count = net_pkt_ll_reserve(pkt) + pkt->frags->len;
-	memcpy(ctx->send, net_pkt_ll(pkt), count);
+#if defined(CONFIG_NET_VLAN)
+	if (net_eth_get_vlan_status(iface)) {
+		struct net_eth_vlan_hdr *hdr_vlan;
 
-	/* Then the remaining data */
-	frag = pkt->frags->frags;
-	while (frag) {
-		memcpy(ctx->send + count, frag->data, frag->len);
-		count += frag->len;
-		frag = frag->frags;
-	}
-
-	eth_stats_update_bytes_tx(iface, count);
-	eth_stats_update_pkts_tx(iface);
-
-	if (IS_ENABLED(CONFIG_NET_STATISTICS_ETHERNET)) {
-		if (net_eth_is_addr_broadcast(
-			    &((struct net_eth_hdr *)NET_ETH_HDR(pkt))->dst)) {
-			eth_stats_update_broadcast_tx(iface);
-		} else if (net_eth_is_addr_multicast(
-				   &((struct net_eth_hdr *)
-						NET_ETH_HDR(pkt))->dst)) {
-			eth_stats_update_multicast_tx(iface);
+		hdr_vlan = (struct net_eth_vlan_hdr *)msg_start;
+		if (ntohs(hdr_vlan->type) != NET_ETH_PTYPE_PTP) {
+			return NULL;
 		}
+
+		eth_hlen = sizeof(struct net_eth_vlan_hdr);
+	} else
+#endif
+	{
+		struct net_eth_hdr *hdr;
+
+		hdr = (struct net_eth_hdr *)msg_start;
+		if (ntohs(hdr->type) != NET_ETH_PTYPE_PTP) {
+			return NULL;
+		}
+
+
+		eth_hlen = sizeof(struct net_eth_hdr);
 	}
 
-	SYS_LOG_DBG("Send pkt %p len %d", pkt, count);
+	/* In TX, the first net_buf contains the Ethernet header
+	 * and the actual gPTP header is in the second net_buf.
+	 * In RX, the Ethernet header + other headers are in the
+	 * first net_buf.
+	 */
+	if (is_tx) {
+		if (pkt->frags->frags == NULL) {
+			return false;
+		}
 
-	eth_write_data(ctx->dev_fd, ctx->send, count);
+		gptp_hdr = (struct gptp_hdr *)pkt->frags->frags->data;
+	} else {
+		gptp_hdr = (struct gptp_hdr *)(pkt->frags->data + eth_hlen);
+	}
 
-	net_pkt_unref(pkt);
+	return gptp_hdr;
+}
 
-	return 0;
+static void update_pkt_priority(struct gptp_hdr *hdr, struct net_pkt *pkt)
+{
+	if (GPTP_IS_EVENT_MSG(hdr->message_type)) {
+		net_pkt_set_priority(pkt, NET_PRIORITY_CA);
+	} else {
+		net_pkt_set_priority(pkt, NET_PRIORITY_IC);
+	}
+}
+
+static void update_gptp(struct net_if *iface, struct net_pkt *pkt,
+			bool send)
+{
+	struct net_ptp_time timestamp;
+	struct gptp_hdr *hdr;
+	int ret;
+
+	ret = eth_clock_gettime(&timestamp);
+	if (ret < 0) {
+		return;
+	}
+
+	net_pkt_set_timestamp(pkt, &timestamp);
+
+	hdr = check_gptp_msg(iface, pkt, send);
+	if (!hdr) {
+		return;
+	}
+
+	if (send) {
+		ret = need_timestamping(hdr);
+		if (ret) {
+			net_if_add_tx_timestamp(pkt);
+		}
+	} else {
+		update_pkt_priority(hdr, pkt);
+	}
+}
+#else
+#define update_gptp(iface, pkt, send)
+#endif /* CONFIG_NET_GPTP */
+
+static int eth_send(struct device *dev, struct net_pkt *pkt)
+{
+	struct eth_context *ctx = dev->driver_data;
+	int count = net_pkt_get_len(pkt);
+	int ret;
+
+	ret = net_pkt_read_new(pkt, ctx->send, count);
+	if (ret) {
+		return ret;
+	}
+
+	update_gptp(net_pkt_iface(pkt), pkt, true);
+
+	LOG_DBG("Send pkt %p len %d", pkt, count);
+
+	ret = eth_write_data(ctx->dev_fd, ctx->send, count);
+	if (ret < 0) {
+		LOG_DBG("Cannot send pkt %p (%d)", pkt, ret);
+	}
+
+	return ret < 0 ? ret : 0;
 }
 
 static int eth_init(struct device *dev)
@@ -152,36 +268,22 @@ static int read_data(struct eth_context *ctx, int fd)
 	u16_t vlan_tag = NET_VLAN_TAG_UNSPEC;
 	struct net_if *iface;
 	struct net_pkt *pkt;
-	struct net_buf *frag;
-	u32_t pkt_len;
-	int ret;
+	int count;
 
-	ret = eth_read_data(fd, ctx->recv, sizeof(ctx->recv));
-	if (ret <= 0) {
+	count = eth_read_data(fd, ctx->recv, sizeof(ctx->recv));
+	if (count <= 0) {
 		return 0;
 	}
 
-	pkt = net_pkt_get_reserve_rx(0, NET_BUF_TIMEOUT);
+	pkt = net_pkt_rx_alloc_with_buffer(ctx->iface, count,
+					   AF_UNSPEC, 0, NET_BUF_TIMEOUT);
 	if (!pkt) {
 		return -ENOMEM;
 	}
 
-	do {
-		int count = 0;
-
-		frag = net_pkt_get_frag(pkt, NET_BUF_TIMEOUT);
-		if (!frag) {
-			net_pkt_unref(pkt);
-			return -ENOMEM;
-		}
-
-		net_pkt_frag_add(pkt, frag);
-
-		net_buf_add_mem(frag, ctx->recv + count,
-				min(net_buf_tailroom(frag), ret));
-		ret -= frag->len;
-		count += frag->len;
-	} while (ret > 0);
+	if (net_pkt_write_new(pkt, ctx->recv, count)) {
+		return -ENOBUFS;
+	}
 
 #if defined(CONFIG_NET_VLAN)
 	{
@@ -194,27 +296,23 @@ static int read_data(struct eth_context *ctx, int fd)
 			net_pkt_set_vlan_tci(pkt, ntohs(hdr_vlan->vlan.tci));
 			vlan_tag = net_pkt_vlan_tag(pkt);
 		}
+
+#if CONFIG_NET_TC_RX_COUNT > 1
+		{
+			enum net_priority prio;
+
+			prio = net_vlan2priority(net_pkt_vlan_priority(pkt));
+			net_pkt_set_priority(pkt, prio);
+		}
+#endif
 	}
 #endif
 
 	iface = get_iface(ctx, vlan_tag);
-	pkt_len = net_pkt_get_len(pkt);
 
-	eth_stats_update_bytes_rx(iface, pkt_len);
-	eth_stats_update_pkts_rx(iface);
+	LOG_DBG("Recv pkt %p len %d", pkt, count);
 
-	if (IS_ENABLED(CONFIG_NET_STATISTICS_ETHERNET)) {
-		if (net_eth_is_addr_broadcast(
-			    &((struct net_eth_hdr *)NET_ETH_HDR(pkt))->dst)) {
-			eth_stats_update_broadcast_rx(iface);
-		} else if (net_eth_is_addr_multicast(
-				   &((struct net_eth_hdr *)
-				    NET_ETH_HDR(pkt))->dst)) {
-			eth_stats_update_multicast_rx(iface);
-		}
-	}
-
-	SYS_LOG_DBG("Recv pkt %p len %d", pkt, pkt_len);
+	update_gptp(iface, pkt, false);
 
 	if (net_recv_data(iface, pkt) < 0) {
 		net_pkt_unref(pkt);
@@ -227,17 +325,19 @@ static void eth_rx(struct eth_context *ctx)
 {
 	int ret;
 
-	SYS_LOG_DBG("Starting ZETH RX thread");
+	LOG_DBG("Starting ZETH RX thread");
 
 	while (1) {
 		if (net_if_is_up(ctx->iface)) {
 			ret = eth_wait_data(ctx->dev_fd);
 			if (!ret) {
 				read_data(ctx, ctx->dev_fd);
+			} else {
+				eth_stats_update_errors_rx(ctx->iface);
 			}
 		}
 
-		k_sleep(MSEC(50));
+		k_sleep(K_MSEC(50));
 	}
 }
 
@@ -263,6 +363,8 @@ static void eth_iface_init(struct net_if *iface)
 		return;
 	}
 
+	net_eth_set_lldpdu(iface, lldpdu_ptr);
+
 	ctx->init_done = true;
 
 #if defined(CONFIG_ETH_NATIVE_POSIX_RANDOM_MAC)
@@ -284,8 +386,8 @@ static void eth_iface_init(struct net_if *iface)
 	if (CONFIG_ETH_NATIVE_POSIX_MAC_ADDR[0] != 0) {
 		if (net_bytes_from_str(ctx->mac_addr, sizeof(ctx->mac_addr),
 				       CONFIG_ETH_NATIVE_POSIX_MAC_ADDR) < 0) {
-			SYS_LOG_ERR("Invalid MAC address %s",
-				    CONFIG_ETH_NATIVE_POSIX_MAC_ADDR);
+			LOG_ERR("Invalid MAC address %s",
+				CONFIG_ETH_NATIVE_POSIX_MAC_ADDR);
 		}
 	}
 #endif
@@ -293,17 +395,18 @@ static void eth_iface_init(struct net_if *iface)
 	net_if_set_link_addr(iface, ll_addr->addr, ll_addr->len,
 			     NET_LINK_ETHERNET);
 
-	ctx->if_name = CONFIG_ETH_NATIVE_POSIX_DRV_NAME;
+	ctx->if_name = ETH_NATIVE_POSIX_DRV_NAME;
 
 	ctx->dev_fd = eth_iface_create(ctx->if_name, false);
 	if (ctx->dev_fd < 0) {
-		SYS_LOG_ERR("Cannot create %s (%d)", ctx->if_name,
-			    ctx->dev_fd);
+		LOG_ERR("Cannot create %s (%d)", ctx->if_name, ctx->dev_fd);
 	} else {
 		/* Create a thread that will handle incoming data from host */
 		create_rx_handler(ctx);
 
 		eth_setup_host(ctx->if_name);
+
+		eth_start_script(ctx->if_name);
 	}
 }
 
@@ -312,21 +415,206 @@ enum ethernet_hw_caps eth_posix_native_get_capabilities(struct device *dev)
 {
 	ARG_UNUSED(dev);
 
-	return ETHERNET_HW_VLAN;
+	return ETHERNET_HW_VLAN
+#if defined(CONFIG_ETH_NATIVE_POSIX_PTP_CLOCK)
+		| ETHERNET_PTP
+#endif
+#if defined(CONFIG_NET_PROMISCUOUS_MODE)
+		| ETHERNET_PROMISC_MODE
+#endif
+#if defined(CONFIG_NET_LLDP)
+		| ETHERNET_LLDP
+#endif
+		;
+}
+
+#if defined(CONFIG_ETH_NATIVE_POSIX_PTP_CLOCK)
+static struct device *eth_get_ptp_clock(struct device *dev)
+{
+	struct eth_context *context = dev->driver_data;
+
+	return context->ptp_clock;
+}
+#endif
+
+#if defined(CONFIG_NET_STATISTICS_ETHERNET)
+static struct net_stats_eth *get_stats(struct device *dev)
+{
+	struct eth_context *context = dev->driver_data;
+
+	return &(context->stats);
+}
+#endif
+
+static int set_config(struct device *dev,
+		      enum ethernet_config_type type,
+		      const struct ethernet_config *config)
+{
+	int ret = 0;
+
+	if (IS_ENABLED(CONFIG_NET_PROMISCUOUS_MODE) &&
+	    type == ETHERNET_CONFIG_TYPE_PROMISC_MODE) {
+		struct eth_context *context = dev->driver_data;
+
+		if (config->promisc_mode) {
+			if (context->promisc_mode) {
+				return -EALREADY;
+			}
+
+			context->promisc_mode = true;
+		} else {
+			if (!context->promisc_mode) {
+				return -EALREADY;
+			}
+
+			context->promisc_mode = false;
+		}
+
+		ret = eth_promisc_mode(context->if_name,
+				       context->promisc_mode);
+	}
+
+	return ret;
+}
+
+#if defined(CONFIG_NET_VLAN)
+static int vlan_setup(struct device *dev, struct net_if *iface,
+		      u16_t tag, bool enable)
+{
+	if (enable) {
+		net_eth_set_lldpdu(iface, lldpdu_ptr);
+	} else {
+		net_eth_unset_lldpdu(iface);
+	}
+
+	return 0;
+}
+#endif /* CONFIG_NET_VLAN */
+
+static int eth_start_device(struct device *dev)
+{
+	struct eth_context *context = dev->driver_data;
+	int ret;
+
+	context->status = true;
+
+	ret = eth_if_up(context->if_name);
+
+	eth_setup_host(context->if_name);
+
+	return ret;
+}
+
+static int eth_stop_device(struct device *dev)
+{
+	struct eth_context *context = dev->driver_data;
+
+	context->status = false;
+
+	return eth_if_down(context->if_name);
 }
 
 static const struct ethernet_api eth_if_api = {
 	.iface_api.init = eth_iface_init,
-	.iface_api.send = eth_send,
 
 	.get_capabilities = eth_posix_native_get_capabilities,
+	.set_config = set_config,
+	.start = eth_start_device,
+	.stop = eth_stop_device,
+	.send = eth_send,
 
+#if defined(CONFIG_NET_VLAN)
+	.vlan_setup = vlan_setup,
+#endif
 #if defined(CONFIG_NET_STATISTICS_ETHERNET)
-	.stats = &eth_context_data.stats,
+	.get_stats = get_stats,
+#endif
+#if defined(CONFIG_ETH_NATIVE_POSIX_PTP_CLOCK)
+	.get_ptp_clock = eth_get_ptp_clock,
 #endif
 };
 
-ETH_NET_DEVICE_INIT(eth_native_posix, CONFIG_ETH_NATIVE_POSIX_DRV_NAME,
+ETH_NET_DEVICE_INIT(eth_native_posix, ETH_NATIVE_POSIX_DRV_NAME,
 		    eth_init, &eth_context_data, NULL,
 		    CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &eth_if_api,
 		    _ETH_MTU);
+
+#if defined(CONFIG_ETH_NATIVE_POSIX_PTP_CLOCK)
+struct ptp_context {
+	struct eth_context *eth_context;
+};
+
+static struct ptp_context ptp_0_context;
+
+
+static int ptp_clock_set_native_posix(struct device *clk,
+				      struct net_ptp_time *tm)
+{
+	ARG_UNUSED(clk);
+	ARG_UNUSED(tm);
+
+	/* We cannot set the host device time so this function
+	 * does nothing.
+	 */
+
+	return 0;
+}
+
+static int ptp_clock_get_native_posix(struct device *clk,
+				      struct net_ptp_time *tm)
+{
+	ARG_UNUSED(clk);
+
+	return eth_clock_gettime(tm);
+}
+
+static int ptp_clock_adjust_native_posix(struct device *clk,
+					 int increment)
+{
+	ARG_UNUSED(clk);
+	ARG_UNUSED(increment);
+
+	/* We cannot adjust the host device time so this function
+	 * does nothing.
+	 */
+
+	return 0;
+}
+
+static int ptp_clock_rate_adjust_native_posix(struct device *clk,
+					      float ratio)
+{
+	ARG_UNUSED(clk);
+	ARG_UNUSED(ratio);
+
+	/* We cannot adjust the host device time so this function
+	 * does nothing.
+	 */
+
+	return 0;
+}
+
+static const struct ptp_clock_driver_api api = {
+	.set = ptp_clock_set_native_posix,
+	.get = ptp_clock_get_native_posix,
+	.adjust = ptp_clock_adjust_native_posix,
+	.rate_adjust = ptp_clock_rate_adjust_native_posix,
+};
+
+static int ptp_init(struct device *port)
+{
+	struct device *eth_dev = DEVICE_GET(eth_native_posix);
+	struct eth_context *context = eth_dev->driver_data;
+	struct ptp_context *ptp_context = port->driver_data;
+
+	context->ptp_clock = port;
+	ptp_context->eth_context = context;
+
+	return 0;
+}
+
+DEVICE_AND_API_INIT(eth_native_posix_ptp_clock_0, PTP_CLOCK_NAME,
+		    ptp_init, &ptp_0_context, NULL, POST_KERNEL,
+		    CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &api);
+
+#endif /* CONFIG_ETH_NATIVE_POSIX_PTP_CLOCK */

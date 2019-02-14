@@ -85,7 +85,7 @@
   *         by the reception API().
   *         This masking operation is not carried out in the case of
   *         DMA transfers.
-  * @param  __HANDLE__: specifies the USART Handle
+  * @param  __HANDLE__ specifies the USART Handle
   * @retval none
   */
 #define __HAL_USART_MASK_COMPUTATION(__HANDLE__)                      \
@@ -127,7 +127,7 @@
 
 #define IS_USART_WORD_LENGTH(__LENGTH__) (((__LENGTH__) == USART_WORDLENGTH_7B) || \
                                           ((__LENGTH__) == USART_WORDLENGTH_8B) || \
-                                          ((__LENGTH__) == USART_WORDLENGTH_9B))                                 
+                                          ((__LENGTH__) == USART_WORDLENGTH_9B))
 /**
   * @}
   */

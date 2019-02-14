@@ -22,13 +22,13 @@
 #include <tc_util.h>
 #include <misc/util.h>
 
-#define  ONE_SECOND     (sys_clock_ticks_per_sec)
-#define  TENTH_SECOND   (sys_clock_ticks_per_sec / 10)
+#define  ONE_SECOND     (CONFIG_SYS_CLOCK_TICKS_PER_SEC)
+#define  TENTH_SECOND   (CONFIG_SYS_CLOCK_TICKS_PER_SEC / 10)
 
 #define  NUM_BLOCKS     64
 
 /* size of stack area used by each thread */
-#define STACKSIZE 512
+#define STACKSIZE (512 + CONFIG_TEST_EXTRA_STACKSIZE)
 
 K_SEM_DEFINE(ALTERNATE_SEM, 0, 1);
 K_SEM_DEFINE(REGRESS_SEM, 0, 1);
@@ -116,7 +116,6 @@ static int pool_block_get_wt_func(struct k_mem_block *block, struct k_mem_pool *
  *
  * @return N/A
  */
-
 static void free_blocks(struct TEST_CASE *tests, int n_tests)
 {
 	int i;
@@ -149,10 +148,12 @@ static void pool_block_get_work(char *string, pool_block_get_func_t func,
 }
 
 /**
+ * @ingroup kernel_memory_pool_tests
  * @brief Test the k_mem_pool_alloc(K_NO_WAIT) API
  *
  * The pool is 4 k_b in size.
  *
+ * @see k_mem_pool_alloc()
  */
 static void test_pool_block_get(void)
 {
@@ -185,8 +186,10 @@ void helper_task(void)
 }
 
 /**
+ * @ingroup kernel_memory_pool_tests
  * @brief Test k_mem_pool_alloc(timeout)
  *
+ * @see k_mem_pool_alloc()
  */
 static void test_pool_block_get_timeout(void)
 {
@@ -203,24 +206,28 @@ static void test_pool_block_get_timeout(void)
 
 	rv = k_mem_pool_alloc(&POOL_ID, &helper_block, 3148, 5);
 	zassert_true(rv == 0,
-		     "Failed to get size 3148 byte block from POOL_ID\n");
+		     "Failed to get size 3148 byte block from POOL_ID");
 
 	rv = k_mem_pool_alloc(&POOL_ID, &block, 3148, K_NO_WAIT);
 	zassert_true(rv == -ENOMEM, "Unexpectedly got size 3148 "
-		     "byte block from POOL_ID\n");
+		     "byte block from POOL_ID");
 
 	k_sem_give(&HELPER_SEM);    /* Activate helper_task */
 	rv = k_mem_pool_alloc(&POOL_ID, &block, 3148, 20);
-	zassert_true(rv == 0, "Failed to get size 3148 byte block from POOL_ID\n");
+	zassert_true(rv == 0, "Failed to get size 3148 byte block from POOL_ID");
 
 	rv = k_sem_take(&REGRESS_SEM, K_NO_WAIT);
 	zassert_true(rv == 0, "Failed to get size 3148 "
-		     "byte block within 20 ticks\n");
+		     "byte block within 20 ticks");
 
 	k_mem_pool_free(&block);
 
 }
 
+/**
+ * @ingroup kernel_memory_pool_tests
+ * @see k_mem_pool_alloc(), k_mem_pool_free()
+ */
 static void test_pool_block_get_wait(void)
 {
 	int rv;
@@ -235,13 +242,13 @@ static void test_pool_block_get_wait(void)
 
 	switch (evidence) {
 	case 0:
-		zassert_true(evidence == 0, "k_mem_pool_alloc(128) did not block!\n");
+		zassert_true(evidence == 0, "k_mem_pool_alloc(128) did not block!");
 	case 1:
 		break;
 	case 2:
 	default:
 		zassert_true(1, "Rescheduling did not occur "
-			     "after k_mem_pool_free()\n");
+			     "after k_mem_pool_free()");
 	}
 
 	k_mem_pool_free(&block_list[1]);
@@ -267,7 +274,7 @@ void alternate_task(void)
 }
 
 /**
- *
+ * @ingroup kernel_memory_pool_tests
  * @brief Test the k_malloc() and k_free() APIs
  *
  * The heap memory pool is 256 bytes in size, and thus has only 4 blocks
@@ -275,6 +282,8 @@ void alternate_task(void)
  * amount of usable space, due to the hidden block descriptor info the
  * kernel adds at the start of any block allocated from this memory pool.)
  *
+ *
+ * @see k_malloc(), k_free()
  */
 static void test_pool_malloc(void)
 {
@@ -283,22 +292,22 @@ static void test_pool_malloc(void)
 
 	/* allocate a large block (which consumes the entire pool buffer) */
 	block[0] = k_malloc(150);
-	zassert_not_null(block[0], "150 byte allocation failed\n");
+	zassert_not_null(block[0], "150 byte allocation failed");
 
 	/* ensure a small block can no longer be allocated */
 	block[1] = k_malloc(16);
-	zassert_is_null(block[1], "16 byte allocation did not fail\n");
+	zassert_is_null(block[1], "16 byte allocation did not fail");
 
 	/* return the large block */
 	k_free(block[0]);
 
 	/* allocate a small block (triggers block splitting)*/
 	block[0] = k_malloc(16);
-	zassert_not_null(block[0], "16 byte allocation 0 failed\n");
+	zassert_not_null(block[0], "16 byte allocation 0 failed");
 
 	/* ensure a large block can no longer be allocated */
 	block[1] = k_malloc(80);
-	zassert_is_null(block[1], "80 byte allocation did not fail\n");
+	zassert_is_null(block[1], "80 byte allocation did not fail");
 
 	/* ensure all remaining small blocks can be allocated */
 	for (j = 1; j < 4; j++) {
@@ -307,7 +316,7 @@ static void test_pool_malloc(void)
 	}
 
 	/* ensure a small block can no longer be allocated */
-	zassert_is_null(k_malloc(8), "8 byte allocation did not fail\n");
+	zassert_is_null(k_malloc(8), "8 byte allocation did not fail");
 
 	/* return the small blocks to pool in a "random" order */
 	k_free(block[2]);
@@ -317,10 +326,10 @@ static void test_pool_malloc(void)
 
 	/* allocate large block (triggers autodefragmentation) */
 	block[0] = k_malloc(100);
-	zassert_not_null(block[0], "100 byte allocation failed\n");
+	zassert_not_null(block[0], "100 byte allocation failed");
 
 	/* ensure a small block can no longer be allocated */
-	zassert_is_null(k_malloc(32), "32 byte allocation did not fail\n");
+	zassert_is_null(k_malloc(32), "32 byte allocation did not fail");
 
 	/* ensure overflow detection is working */
 	zassert_is_null(k_malloc(0xffffffff), "overflow check failed");

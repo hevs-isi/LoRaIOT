@@ -9,8 +9,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef __SENSOR_H__
-#define __SENSOR_H__
+#ifndef ZEPHYR_INCLUDE_SENSOR_H_
+#define ZEPHYR_INCLUDE_SENSOR_H_
 
 /**
  * @brief Sensor Interface
@@ -19,13 +19,13 @@
  * @{
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <zephyr/types.h>
 #include <device.h>
 #include <errno.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @brief Representation of a sensor readout value.
@@ -59,13 +59,6 @@ enum sensor_channel {
 	SENSOR_CHAN_ACCEL_Z,
 	/** Acceleration on the X, Y and Z axes. */
 	SENSOR_CHAN_ACCEL_XYZ,
-	/**
-	 * This enum value will be deprecated.
-	 * Please use SENSOR_CHAN_ACCEL_XYZ instead.
-	 *
-	 * Acceleration on any axis.
-	 */
-	SENSOR_CHAN_ACCEL_ANY = SENSOR_CHAN_ACCEL_XYZ,
 	/** Angular velocity around the X axis, in radians/s. */
 	SENSOR_CHAN_GYRO_X,
 	/** Angular velocity around the Y axis, in radians/s. */
@@ -74,13 +67,6 @@ enum sensor_channel {
 	SENSOR_CHAN_GYRO_Z,
 	/** Angular velocity around the X, Y and Z axes. */
 	SENSOR_CHAN_GYRO_XYZ,
-	/**
-	 * This enum value will be deprecated.
-	 * Please use SENSOR_CHAN_GYRO_XYZ instead.
-	 *
-	 * Angular velocity on any axis.
-	 */
-	SENSOR_CHAN_GYRO_ANY = SENSOR_CHAN_GYRO_XYZ,
 	/** Magnetic field on the X axis, in Gauss. */
 	SENSOR_CHAN_MAGN_X,
 	/** Magnetic field on the Y axis, in Gauss. */
@@ -89,15 +75,6 @@ enum sensor_channel {
 	SENSOR_CHAN_MAGN_Z,
 	/** Magnetic field on the X, Y and Z axes. */
 	SENSOR_CHAN_MAGN_XYZ,
-	/**
-	 * This enum value will be deprecated.
-	 * Please use SENSOR_CHAN_MAGN_XYZ instead.
-	 *
-	 * Magnetic field on any axis.
-	 */
-	SENSOR_CHAN_MAGN_ANY = SENSOR_CHAN_MAGN_XYZ,
-	/** Temperature in degrees Celsius. (deprecated) */
-	SENSOR_CHAN_TEMP,
 	/** Device die temperature in degrees Celsius. */
 	SENSOR_CHAN_DIE_TEMP,
 	/** Ambient temperature in degrees Celsius. */
@@ -151,7 +128,10 @@ enum sensor_channel {
 	SENSOR_CHAN_CURRENT_3,
 	SENSOR_CHAN_CURRENT_4,
 
-		/** All channels. */
+	/** Angular rotation, in degrees */
+	SENSOR_CHAN_ROTATION,
+
+	/** All channels. */
 	SENSOR_CHAN_ALL,
 };
 
@@ -534,4 +514,4 @@ static inline double sensor_value_to_double(struct sensor_value *val)
  * @}
  */
 
-#endif /* __SENSOR_H__ */
+#endif /* ZEPHYR_INCLUDE_SENSOR_H_ */

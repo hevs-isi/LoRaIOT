@@ -13,23 +13,15 @@ config SS_RESET_VECTOR
 if FLASH && SPI
 
 config SPI_FLASH_W25QXXDV
-	def_bool y
+	default y
 
 config GPIO
-	def_bool y
-
-config SPI_CS_GPIO
-	def_bool y
-
-config SPI_0_CS_GPIO_PIN
-	default 24
+	default y
 
 if SPI_FLASH_W25QXXDV
 
-config SPI_FLASH_W25QXXDV_SPI_NAME
-	default "SPI_0"
-config SPI_FLASH_W25QXXDV_SPI_SLAVE
-	default 1
+config SPI_FLASH_W25QXXDV_GPIO_SPI_CS
+	default y
 
 if DISK_ACCESS_FLASH
 
@@ -40,7 +32,7 @@ config DISK_FLASH_START
 	default 0x0
 
 config DISK_FLASH_MAX_RW_SIZE
-	default SPI_FLASH_W25QXXDV_MAX_DATA_LEN
+	default 256
 
 config DISK_ERASE_BLOCK_SIZE
 	default 0x1000
@@ -56,5 +48,18 @@ endif # DISK_ACCESS_FLASH
 endif # SPI_FLASH_W25QXXDV
 
 endif # FLASH && SPI
+
+if USB_DEVICE_STACK
+
+config USB_VBUS_GPIO
+	default y
+
+config USB_VBUS_GPIO_DEV_NAME
+	default "GPIO_0"
+
+config USB_VBUS_GPIO_PIN_NUM
+        default 28
+
+endif # USB_DEVICE_STACK
 
 endif # BOARD_ARDUINO_101

@@ -3,6 +3,5 @@ sample:
 
 tests:
   test:
-    platform_whitelist: nrf51_pca10028
-    tags: samples
+    tags: settings
     depends_on: nvs

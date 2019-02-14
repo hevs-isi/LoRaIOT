@@ -26,16 +26,13 @@ struct k_mbox_async {
 	struct k_mbox_msg tx_msg;	/* transmit message descriptor */
 };
 
-/* array of asynchronous message descriptors */
-static struct k_mbox_async __noinit async_msg[CONFIG_NUM_MBOX_ASYNC_MSGS];
-
 /* stack of unused asynchronous message descriptors */
 K_STACK_DEFINE(async_msg_free, CONFIG_NUM_MBOX_ASYNC_MSGS);
 
 /* allocate an asynchronous message descriptor */
 static inline void mbox_async_alloc(struct k_mbox_async **async)
 {
-	k_stack_pop(&async_msg_free, (u32_t *)async, K_FOREVER);
+	(void)k_stack_pop(&async_msg_free, (u32_t *)async, K_FOREVER);
 }
 
 /* free an asynchronous message descriptor */
@@ -62,6 +59,9 @@ struct k_mbox *_trace_list_k_mbox;
 static int init_mbox_module(struct device *dev)
 {
 	ARG_UNUSED(dev);
+
+	/* array of asynchronous message descriptors */
+	static struct k_mbox_async __noinit async_msg[CONFIG_NUM_MBOX_ASYNC_MSGS];
 
 #if (CONFIG_NUM_MBOX_ASYNC_MSGS > 0)
 	/*
@@ -105,6 +105,7 @@ void k_mbox_init(struct k_mbox *mbox_ptr)
 {
 	_waitq_init(&mbox_ptr->tx_msg_queue);
 	_waitq_init(&mbox_ptr->rx_msg_queue);
+	mbox_ptr->lock = (struct k_spinlock) {};
 	SYS_TRACING_OBJ_INIT(k_mbox, mbox_ptr);
 }
 
@@ -151,6 +152,8 @@ static int mbox_message_match(struct k_mbox_msg *tx_msg,
 			rx_msg->tx_block.data = NULL;
 		} else if (rx_msg->tx_block.data != NULL) {
 			rx_msg->tx_data = rx_msg->tx_block.data;
+		} else {
+			/* no data */
 		}
 
 		/* update syncing thread field for receiver only */
@@ -176,7 +179,6 @@ static void mbox_message_dispose(struct k_mbox_msg *rx_msg)
 {
 	struct k_thread *sending_thread;
 	struct k_mbox_msg *tx_msg;
-	unsigned int key;
 
 	/* do nothing if message was disposed of when it was received */
 	if (rx_msg->_syncing_thread == NULL) {
@@ -202,7 +204,7 @@ static void mbox_message_dispose(struct k_mbox_msg *rx_msg)
 	 * asynchronous send: free asynchronous message descriptor +
 	 * dummy thread pair, then give semaphore (if needed)
 	 */
-	if (sending_thread->base.thread_state & _THREAD_DUMMY) {
+	if ((sending_thread->base.thread_state & _THREAD_DUMMY) != 0) {
 		struct k_sem *async_sem = tx_msg->_async_sem;
 
 		mbox_async_free((struct k_mbox_async *)sending_thread);
@@ -214,11 +216,10 @@ static void mbox_message_dispose(struct k_mbox_msg *rx_msg)
 #endif
 
 	/* synchronous send: wake up sending thread */
-	key = irq_lock();
 	_set_thread_return_value(sending_thread, 0);
 	_mark_thread_as_not_pending(sending_thread);
 	_ready_thread(sending_thread);
-	_reschedule(key);
+	_reschedule_unlocked();
 }
 
 /**
@@ -241,7 +242,7 @@ static int mbox_message_put(struct k_mbox *mbox, struct k_mbox_msg *tx_msg,
 	struct k_thread *sending_thread;
 	struct k_thread *receiving_thread;
 	struct k_mbox_msg *rx_msg;
-	unsigned int key;
+	k_spinlock_key_t key;
 
 	/* save sender id so it can be used during message matching */
 	tx_msg->rx_source_thread = _current;
@@ -251,7 +252,7 @@ static int mbox_message_put(struct k_mbox *mbox, struct k_mbox_msg *tx_msg,
 	sending_thread->base.swap_data = tx_msg;
 
 	/* search mailbox's rx queue for a compatible receiver */
-	key = irq_lock();
+	key = k_spin_lock(&mbox->lock);
 
 	_WAIT_Q_FOR_EACH(&mbox->rx_msg_queue, receiving_thread) {
 		rx_msg = (struct k_mbox_msg *)receiving_thread->base.swap_data;
@@ -272,8 +273,9 @@ static int mbox_message_put(struct k_mbox *mbox, struct k_mbox_msg *tx_msg,
 			 * note: dummy sending thread sits (unqueued)
 			 * until the receiver consumes the message
 			 */
-			if (sending_thread->base.thread_state & _THREAD_DUMMY) {
-				_reschedule(key);
+			if ((sending_thread->base.thread_state & _THREAD_DUMMY)
+			    != 0) {
+				_reschedule(&mbox->lock, key);
 				return 0;
 			}
 #endif
@@ -282,28 +284,28 @@ static int mbox_message_put(struct k_mbox *mbox, struct k_mbox_msg *tx_msg,
 			 * synchronous send: pend current thread (unqueued)
 			 * until the receiver consumes the message
 			 */
-			return _pend_current_thread(key, NULL, K_FOREVER);
+			return _pend_curr(&mbox->lock, key, NULL, K_FOREVER);
 
 		}
 	}
 
 	/* didn't find a matching receiver: don't wait for one */
 	if (timeout == K_NO_WAIT) {
-		irq_unlock(key);
+		k_spin_unlock(&mbox->lock, key);
 		return -ENOMSG;
 	}
 
 #if (CONFIG_NUM_MBOX_ASYNC_MSGS > 0)
 	/* asynchronous send: dummy thread waits on tx queue for receiver */
-	if (sending_thread->base.thread_state & _THREAD_DUMMY) {
+	if ((sending_thread->base.thread_state & _THREAD_DUMMY) != 0) {
 		_pend_thread(sending_thread, &mbox->tx_msg_queue, K_FOREVER);
-		irq_unlock(key);
+		k_spin_unlock(&mbox->lock, key);
 		return 0;
 	}
 #endif
 
 	/* synchronous send: sender waits on tx queue for receiver or timeout */
-	return _pend_current_thread(key, &mbox->tx_msg_queue, timeout);
+	return _pend_curr(&mbox->lock, key, &mbox->tx_msg_queue, timeout);
 }
 
 int k_mbox_put(struct k_mbox *mbox, struct k_mbox_msg *tx_msg, s32_t timeout)
@@ -332,7 +334,7 @@ void k_mbox_async_put(struct k_mbox *mbox, struct k_mbox_msg *tx_msg,
 	async->tx_msg._syncing_thread = (struct k_thread *)&async->thread;
 	async->tx_msg._async_sem = sem;
 
-	mbox_message_put(mbox, &async->tx_msg, K_FOREVER);
+	(void)mbox_message_put(mbox, &async->tx_msg, K_FOREVER);
 }
 #endif
 
@@ -347,7 +349,7 @@ void k_mbox_data_get(struct k_mbox_msg *rx_msg, void *buffer)
 
 	/* copy message data to buffer, then dispose of message */
 	if ((rx_msg->tx_data != NULL) && (rx_msg->size > 0)) {
-		memcpy(buffer, rx_msg->tx_data, rx_msg->size);
+		(void)memcpy(buffer, rx_msg->tx_data, rx_msg->size);
 	}
 	mbox_message_dispose(rx_msg);
 }
@@ -422,14 +424,14 @@ int k_mbox_get(struct k_mbox *mbox, struct k_mbox_msg *rx_msg, void *buffer,
 {
 	struct k_thread *sending_thread;
 	struct k_mbox_msg *tx_msg;
-	unsigned int key;
+	k_spinlock_key_t key;
 	int result;
 
 	/* save receiver id so it can be used during message matching */
 	rx_msg->tx_target_thread = _current;
 
 	/* search mailbox's tx queue for a compatible sender */
-	key = irq_lock();
+	key = k_spin_lock(&mbox->lock);
 
 	_WAIT_Q_FOR_EACH(&mbox->tx_msg_queue, sending_thread) {
 		tx_msg = (struct k_mbox_msg *)sending_thread->base.swap_data;
@@ -438,7 +440,7 @@ int k_mbox_get(struct k_mbox *mbox, struct k_mbox_msg *rx_msg, void *buffer,
 			/* take sender out of mailbox's tx queue */
 			_unpend_thread(sending_thread);
 
-			irq_unlock(key);
+			k_spin_unlock(&mbox->lock, key);
 
 			/* consume message data immediately, if needed */
 			return mbox_message_data_check(rx_msg, buffer);
@@ -449,13 +451,13 @@ int k_mbox_get(struct k_mbox *mbox, struct k_mbox_msg *rx_msg, void *buffer,
 
 	if (timeout == K_NO_WAIT) {
 		/* don't wait for a matching sender to appear */
-		irq_unlock(key);
+		k_spin_unlock(&mbox->lock, key);
 		return -ENOMSG;
 	}
 
 	/* wait until a matching sender appears or a timeout occurs */
 	_current->base.swap_data = rx_msg;
-	result = _pend_current_thread(key, &mbox->rx_msg_queue, timeout);
+	result = _pend_curr(&mbox->lock, key, &mbox->rx_msg_queue, timeout);
 
 	/* consume message data immediately, if needed */
 	if (result == 0) {

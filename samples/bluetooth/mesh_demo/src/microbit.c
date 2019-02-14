@@ -42,7 +42,7 @@ static void button_send_pressed(struct k_work *work)
 }
 
 static void button_pressed(struct device *dev, struct gpio_callback *cb,
-			   uint32_t pins)
+			   u32_t pins)
 {
 	struct mb_display *disp = mb_display_get();
 
@@ -101,13 +101,13 @@ static u32_t get_period(char note, bool sharp)
 void board_play_tune(const char *str)
 {
 	while (*str) {
-		u32_t period, duration = 0;
+		u32_t period, duration = 0U;
 
-		while (*str && !isdigit(*str)) {
+		while (*str && !isdigit((unsigned char)*str)) {
 			str++;
 		}
 
-		while (isdigit(*str)) {
+		while (isdigit((unsigned char)*str)) {
 			duration *= 10;
 			duration += *str - '0';
 			str++;
@@ -227,7 +227,7 @@ static void configure_button(void)
 
 	k_work_init(&button_work, button_send_pressed);
 
-	gpio = device_get_binding(SW0_GPIO_NAME);
+	gpio = device_get_binding(SW0_GPIO_CONTROLLER);
 
 	gpio_pin_configure(gpio, SW0_GPIO_PIN,
 			   (GPIO_DIR_IN | GPIO_INT | GPIO_INT_EDGE |
@@ -248,7 +248,7 @@ void board_init(u16_t *addr)
 {
 	struct mb_display *disp = mb_display_get();
 
-	nvm = device_get_binding(FLASH_DEV_NAME);
+	nvm = device_get_binding(DT_FLASH_DEV_NAME);
 	pwm = device_get_binding(CONFIG_PWM_NRF5_SW_0_DEV_NAME);
 
 	*addr = NRF_UICR->CUSTOMER[0];

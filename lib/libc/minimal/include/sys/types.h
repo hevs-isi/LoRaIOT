@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __INC_sys_types_h__
-#define __INC_sys_types_h__
+#ifndef ZEPHYR_LIB_LIBC_MINIMAL_INCLUDE_SYS_TYPES_H_
+#define ZEPHYR_LIB_LIBC_MINIMAL_INCLUDE_SYS_TYPES_H_
 
 #if !defined(__ssize_t_defined)
 #define __ssize_t_defined
@@ -20,15 +20,15 @@ typedef __SIZE_TYPE__ ssize_t;
 #if !defined(__off_t_defined)
 #define __off_t_defined
 
-#ifdef __i386
-typedef long int off_t;
+#if defined(__i386) || defined(__x86_64)
+typedef long int off_t; /* "long" works for all of i386, X32 and true 64 bit */
 #elif defined(__ARM_ARCH)
 typedef int off_t;
 #elif defined(__arc__)
 typedef int off_t;
 #elif defined(__NIOS2__)
 typedef int off_t;
-#elif defined(__riscv__)
+#elif defined(__riscv)
 typedef int off_t;
 #elif defined(__XTENSA__)
 typedef int off_t;
@@ -38,4 +38,4 @@ typedef int off_t;
 
 #endif
 
-#endif /* __INC_sys_types_h__ */
+#endif /* ZEPHYR_LIB_LIBC_MINIMAL_INCLUDE_SYS_TYPES_H_ */

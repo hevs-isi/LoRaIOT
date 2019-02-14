@@ -8,8 +8,8 @@
  * @brief Bluetooth transport for the mcumgr SMP protocol.
  */
 
-#ifndef H_SMP_BT_
-#define H_SMP_BT_
+#ifndef ZEPHYR_INCLUDE_MGMT_SMP_BT_H_
+#define ZEPHYR_INCLUDE_MGMT_SMP_BT_H_
 
 #include <zephyr/types.h>
 struct bt_conn;
@@ -24,6 +24,13 @@ extern "C" {
  * @return 0 on success; negative error code on failure.
  */
 int smp_bt_register(void);
+
+/**
+ * @brief Unregisters the SMP Bluetooth service.
+ *
+ * @return 0 on success; negative error code on failure.
+ */
+int smp_bt_unregister(void);
 
 #ifdef __cplusplus
 }

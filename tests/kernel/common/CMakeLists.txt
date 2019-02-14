@@ -1,5 +1,6 @@
+cmake_minimum_required(VERSION 3.13.1)
 include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
-project(NONE)
+project(kernel_common)
 
 if(NOT CONFIG_ARM)
 target_sources(app PRIVATE
@@ -21,4 +22,7 @@ target_sources(app PRIVATE
 	src/slist.c
 	src/timeout_order.c
 	src/multilib.c
+  src/errno.c
+  src/boot_delay.c
+  src/irq_offload.c
   )

@@ -6,6 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(net_test, CONFIG_NET_IPV6_NBR_CACHE_LOG_LEVEL);
+
 #include <ztest.h>
 #include <zephyr/types.h>
 #include <stddef.h>
@@ -279,13 +282,13 @@ static void test_neighbor(void)
 
 	net_nbr_clear_table(&net_test_neighbor.table);
 
-	zassert_true(clear_called, "Table clear check failed\n");
+	zassert_true(clear_called, "Table clear check failed");
 
 	/* The table should be empty now */
 	lladdr.addr = addrs[0]->addr;
 	nbr = net_nbr_lookup(&net_test_neighbor.table, iface1, &lladdr);
 
-	zassert_is_null(nbr, "Some entries still found in nbr cache\n");
+	zassert_is_null(nbr, "Some entries still found in nbr cache");
 
 	return;
 }

@@ -7,8 +7,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef __BT_MESH_MAIN_H
-#define __BT_MESH_MAIN_H
+#ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_MAIN_H_
+#define ZEPHYR_INCLUDE_BLUETOOTH_MESH_MAIN_H_
 
 /**
  * @brief Bluetooth Mesh Provisioning
@@ -16,6 +16,10 @@
  * @ingroup bt_mesh
  * @{
  */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef enum {
 	BT_MESH_NO_OUTPUT       = 0,
@@ -275,6 +279,27 @@ int bt_mesh_init(const struct bt_mesh_prov *prov,
  */
 void bt_mesh_reset(void);
 
+/** @brief Suspend the Mesh network temporarily.
+ *
+ *  This API can be used for power saving purposes, but the user should be
+ *  aware that leaving the local node suspended for a long period of time
+ *  may cause it to become permanently disconnected from the Mesh network.
+ *  If at all possible, the Friendship feature should be used instead, to
+ *  make the node into a Low Power Node.
+ *
+ *  @return 0 on success, or (negative) error code on failure.
+ */
+int bt_mesh_suspend(void);
+
+/** @brief Resume a suspended Mesh network.
+ *
+ *  This API resumes the local node, after it has been suspended using the
+ *  bt_mesh_suspend() API.
+ *
+ *  @return 0 on success, or (negative) error code on failure.
+ */
+int bt_mesh_resume(void);
+
 /** @brief Provision the local Mesh Node.
  *
  *  This API should normally not be used directly by the application. The
@@ -356,8 +381,12 @@ int bt_mesh_lpn_poll(void);
  */
 void bt_mesh_lpn_set_cb(void (*cb)(u16_t friend_addr, bool established));
 
+#ifdef __cplusplus
+}
+#endif
+
 /**
  * @}
  */
 
-#endif /* __BT_MESH_MAIN_H */
+#endif /* ZEPHYR_INCLUDE_BLUETOOTH_MESH_MAIN_H_ */

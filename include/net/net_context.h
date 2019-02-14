@@ -10,8 +10,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __NET_CONTEXT_H
-#define __NET_CONTEXT_H
+#ifndef ZEPHYR_INCLUDE_NET_NET_CONTEXT_H_
+#define ZEPHYR_INCLUDE_NET_NET_CONTEXT_H_
 
 /**
  * @brief Application network context
@@ -50,16 +50,13 @@ enum net_context_state {
  * stored into a bit field to save space.
  */
 /** Protocol family of this connection */
-#define NET_CONTEXT_FAMILY BIT(4)
+#define NET_CONTEXT_FAMILY (BIT(3) | BIT(4) | BIT(5))
 
-/** Type of the connection (datagram / stream) */
-#define NET_CONTEXT_TYPE   BIT(5)
-
-/** IP protocol (like UDP or TCP) */
-#define NET_CONTEXT_PROTO  BIT(6)
+/** Type of the connection (datagram / stream / raw) */
+#define NET_CONTEXT_TYPE   (BIT(6) | BIT(7))
 
 /** Remote address set */
-#define NET_CONTEXT_REMOTE_ADDR_SET  BIT(7)
+#define NET_CONTEXT_REMOTE_ADDR_SET  BIT(8)
 
 struct net_context;
 
@@ -76,6 +73,8 @@ struct net_context;
  * @param pkt Network buffer that is received. If the pkt is not NULL,
  * then the callback will own the buffer and it needs to to unref the pkt
  * as soon as it has finished working with it.  On EOF, pkt will be NULL.
+ * @param ip_hdr a pointer to relevant IP (v4 or v6) header.
+ * @param proto_hdr a pointer to relevant protocol (udp or tcp) header.
  * @param status Value is set to 0 if some data or the connection is
  * at EOF, <0 if there was an error receiving data, in this case the
  * pkt parameter is set to NULL.
@@ -83,6 +82,8 @@ struct net_context;
  */
 typedef void (*net_context_recv_cb_t)(struct net_context *context,
 				      struct net_pkt *pkt,
+				      union net_ip_header *ip_hdr,
+				      union net_proto_header *proto_hdr,
 				      int status,
 				      void *user_data);
 
@@ -184,6 +185,8 @@ struct net_tcp;
 
 struct net_conn_handle;
 
+struct tls_context;
+
 /**
  * Note that we do not store the actual source IP address in the context
  * because the address is already be set in the network interface struct.
@@ -202,21 +205,19 @@ struct net_context {
 	 */
 	atomic_t refcount;
 
-	/** Local IP address. Note that the values are in network byte order.
+	/** Internal lock for protecting this context from multiple access.
+	 */
+	struct k_mutex lock;
+
+	/** Local endpoint address. Note that the values are in network byte
+	 * order.
 	 */
 	struct sockaddr_ptr local;
 
-	/** Remote IP address. Note that the values are in network byte order.
+	/** Remote endpoint address. Note that the values are in network byte
+	 * order.
 	 */
 	struct sockaddr remote;
-
-	/** Option values */
-	struct {
-#if defined(CONFIG_NET_CONTEXT_PRIORITY)
-		/** Priority of the network data sent via this net_context */
-		u8_t priority;
-#endif
-	} options;
 
 	/** Connection handle */
 	struct net_conn_handle *conn_handler;
@@ -246,6 +247,11 @@ struct net_context {
 	net_pkt_get_pool_func_t data_pool;
 #endif /* CONFIG_NET_CONTEXT_NET_PKT_POOL */
 
+#if defined(CONFIG_NET_TCP)
+	/** TCP connection information */
+	struct net_tcp *tcp;
+#endif /* CONFIG_NET_TCP */
+
 #if defined(CONFIG_NET_CONTEXT_SYNC_RECV)
 	/**
 	 * Semaphore to signal synchronous recv call completion.
@@ -253,29 +259,40 @@ struct net_context {
 	struct k_sem recv_data_wait;
 #endif /* CONFIG_NET_CONTEXT_SYNC_RECV */
 
-	/** Network interface assigned to this context */
-	u8_t iface;
-
-	/** Flags for the context */
-	u8_t flags;
-
-#if defined(CONFIG_NET_TCP)
-	/** TCP connection information */
-	struct net_tcp *tcp;
-#endif /* CONFIG_NET_TCP */
-
-#if defined(CONFIG_NET_APP)
-	/** net_app connection information */
-	void *net_app;
-#endif /* CONFIG_NET_APP */
-
 #if defined(CONFIG_NET_SOCKETS)
 	/** Per-socket packet or connection queues */
 	union {
 		struct k_fifo recv_q;
 		struct k_fifo accept_q;
 	};
+
+#if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
+	/** TLS context information */
+	struct tls_context *tls;
+#endif /* CONFIG_NET_SOCKETS_SOCKOPT_TLS */
 #endif /* CONFIG_NET_SOCKETS */
+
+#if defined(CONFIG_NET_OFFLOAD)
+	/** context for use by offload drivers */
+	void *offload_context;
+#endif /* CONFIG_NET_OFFLOAD */
+
+	/** Option values */
+	struct {
+#if defined(CONFIG_NET_CONTEXT_PRIORITY)
+		/** Priority of the network data sent via this net_context */
+		u8_t priority;
+#endif
+	} options;
+
+	/** Protocol (UDP, TCP or IEEE 802.3 protocol value) */
+	u16_t proto;
+
+	/** Flags for the context */
+	u16_t flags;
+
+	/** Network interface assigned to this context */
+	s8_t iface;
 };
 
 static inline bool net_context_is_used(struct net_context *context)
@@ -302,8 +319,9 @@ enum net_context_state net_context_get_state(struct net_context *context)
 {
 	NET_ASSERT(context);
 
-	return (context->flags >> NET_CONTEXT_STATE_SHIFT) &
-		NET_CONTEXT_STATE_MASK;
+	return (enum net_context_state)
+		((context->flags >> NET_CONTEXT_STATE_SHIFT) &
+		NET_CONTEXT_STATE_MASK);
 }
 
 /**
@@ -338,39 +356,38 @@ static inline sa_family_t net_context_get_family(struct net_context *context)
 {
 	NET_ASSERT(context);
 
-	if (context->flags & NET_CONTEXT_FAMILY) {
-		return AF_INET6;
-	}
-
-	return AF_INET;
+	return ((context->flags & NET_CONTEXT_FAMILY) >> 3);
 }
 
 /**
  * @brief Set address family for this network context.
  *
- * @details This function sets the address family (IPv4 or IPv6)
+ * @details This function sets the address family (IPv4, IPv6 or AF_PACKET)
  * of the context.
  *
  * @param context Network context.
- * @param family Address family (AF_INET or AF_INET6)
+ * @param family Address family (AF_INET, AF_INET6, AF_PACKET, AF_CAN)
  */
 static inline void net_context_set_family(struct net_context *context,
 					  sa_family_t family)
 {
+	u8_t flag = 0;
+
 	NET_ASSERT(context);
 
-	if (family == AF_INET6) {
-		context->flags |= NET_CONTEXT_FAMILY;
-		return;
+	if (family == AF_UNSPEC || family == AF_INET || family == AF_INET6 ||
+	    family == AF_PACKET || family == AF_CAN) {
+		/* Family is in BIT(4), BIT(5) and BIT(6) */
+		flag = family << 3;
 	}
 
-	context->flags &= ~NET_CONTEXT_FAMILY;
+	context->flags |= flag;
 }
 
 /**
  * @brief Get context type for this network context.
  *
- * @details This function returns the context type (stream or datagram)
+ * @details This function returns the context type (stream, datagram or raw)
  * of the context.
  *
  * @param context Network context.
@@ -382,11 +399,7 @@ enum net_sock_type net_context_get_type(struct net_context *context)
 {
 	NET_ASSERT(context);
 
-	if (context->flags & NET_CONTEXT_TYPE) {
-		return SOCK_STREAM;
-	}
-
-	return SOCK_DGRAM;
+	return ((context->flags & NET_CONTEXT_TYPE) >> 6);
 }
 
 /**
@@ -401,36 +414,31 @@ enum net_sock_type net_context_get_type(struct net_context *context)
 static inline void net_context_set_type(struct net_context *context,
 					enum net_sock_type type)
 {
+	u16_t flag = 0;
+
 	NET_ASSERT(context);
 
-	if (type == SOCK_STREAM) {
-		context->flags |= NET_CONTEXT_TYPE;
-		return;
+	if (type == SOCK_DGRAM || type == SOCK_STREAM || type == SOCK_RAW) {
+		/* Type is in BIT(6) and BIT(7)*/
+		flag = type << 6;
 	}
 
-	context->flags &= ~NET_CONTEXT_TYPE;
+	context->flags |= flag;
 }
 
 /**
  * @brief Get context IP protocol for this network context.
  *
- * @details This function returns the context IP protocol (UDP / TCP)
- * of the context.
+ * @details This function returns the IP protocol (UDP / TCP /
+ * IEEE 802.3 protocol value) of the context.
  *
  * @param context Network context.
  *
  * @return Network context IP protocol.
  */
-static inline
-enum net_ip_protocol net_context_get_ip_proto(struct net_context *context)
+static inline u16_t net_context_get_ip_proto(struct net_context *context)
 {
-	NET_ASSERT(context);
-
-	if (context->flags & NET_CONTEXT_PROTO) {
-		return IPPROTO_TCP;
-	}
-
-	return IPPROTO_UDP;
+	return context->proto;
 }
 
 /**
@@ -440,19 +448,13 @@ enum net_ip_protocol net_context_get_ip_proto(struct net_context *context)
  * of the context.
  *
  * @param context Network context.
- * @param ip_proto Context IP protocol (IPPROTO_UDP or IPPROTO_TCP)
+ * @param proto Context IP protocol (IPPROTO_UDP, IPPROTO_TCP or IEEE 802.3
+ * protocol value)
  */
 static inline void net_context_set_ip_proto(struct net_context *context,
-					    enum net_ip_protocol ip_proto)
+					    u16_t proto)
 {
-	NET_ASSERT(context);
-
-	if (ip_proto == IPPROTO_TCP) {
-		context->flags |= NET_CONTEXT_PROTO;
-		return;
-	}
-
-	context->flags &= ~NET_CONTEXT_PROTO;
+	context->proto = proto;
 }
 
 /**
@@ -500,14 +502,15 @@ static inline void net_context_set_iface(struct net_context *context,
  *
  * @param family IP address family (AF_INET or AF_INET6)
  * @param type Type of the socket, SOCK_STREAM or SOCK_DGRAM
- * @param ip_proto IP protocol, IPPROTO_UDP or IPPROTO_TCP
+ * @param ip_proto IP protocol, IPPROTO_UDP or IPPROTO_TCP. For raw socket
+ * access, the value is the L2 protocol value from IEEE 802.3 (see ethernet.h)
  * @param context The allocated context is returned to the caller.
  *
  * @return 0 if ok, < 0 if error
  */
 int net_context_get(sa_family_t family,
 		    enum net_sock_type type,
-		    enum net_ip_protocol ip_proto,
+		    u16_t ip_proto,
 		    struct net_context **context);
 
 /**
@@ -553,6 +556,86 @@ int net_context_ref(struct net_context *context);
  * @return The new reference count, zero if the context was destroyed
  */
 int net_context_unref(struct net_context *context);
+
+/**
+ * @brief Create IPv4 packet in provided net_pkt from context
+ *
+ * @param context Network context for a connection
+ * @param pkt Network packet
+ * @param src Source address, or NULL to choose a default
+ * @param dst Destination IPv4 address
+ *
+ * @return Return network packet that contains the IPv4 packet.
+ */
+#if defined(CONFIG_NET_IPV4)
+struct net_pkt *net_context_create_ipv4(struct net_context *context,
+					struct net_pkt *pkt,
+					const struct in_addr *src,
+					const struct in_addr *dst);
+#else
+static inline
+struct net_pkt *net_context_create_ipv4(struct net_context *context,
+					struct net_pkt *pkt,
+					const struct in_addr *src,
+					const struct in_addr *dst)
+{
+	return NULL;
+}
+#endif /* CONFIG_NET_IPV4 */
+#if defined(CONFIG_NET_IPV4)
+int net_context_create_ipv4_new(struct net_context *context,
+				struct net_pkt *pkt,
+				const struct in_addr *src,
+				const struct in_addr *dst);
+#else
+static inline int net_context_create_ipv4_new(struct net_context *context,
+					      struct net_pkt *pkt,
+					      const struct in_addr *src,
+					      const struct in_addr *dst)
+{
+	return -1;
+}
+#endif /* CONFIG_NET_IPV4 */
+
+/**
+ * @brief Create IPv6 packet in provided net_pkt from context
+ *
+ * @param context Network context for a connection
+ * @param pkt Network packet
+ * @param src Source address, or NULL to choose a default from context
+ * @param dst Destination IPv6 address
+ *
+ * @return Return network packet that contains the IPv6 packet.
+ */
+#if defined(CONFIG_NET_IPV6)
+struct net_pkt *net_context_create_ipv6(struct net_context *context,
+					struct net_pkt *pkt,
+					const struct in6_addr *src,
+					const struct in6_addr *dst);
+#else
+static inline
+struct net_pkt *net_context_create_ipv6(struct net_context *context,
+					struct net_pkt *pkt,
+					const struct in6_addr *src,
+					const struct in6_addr *dst)
+{
+	return NULL;
+}
+#endif /* CONFIG_NET_IPV6 */
+#if defined(CONFIG_NET_IPV6)
+int net_context_create_ipv6_new(struct net_context *context,
+				struct net_pkt *pkt,
+				const struct in6_addr *src,
+				const struct in6_addr *dst);
+#else
+static inline int net_context_create_ipv6_new(struct net_context *context,
+					      struct net_pkt *pkt,
+					      const struct in6_addr *src,
+					      const struct in6_addr *dst)
+{
+	return -1;
+}
+#endif /* CONFIG_NET_IPV6 */
 
 /**
  * @brief Assign a socket a local address.
@@ -679,6 +762,41 @@ int net_context_send(struct net_pkt *pkt,
 		     void *user_data);
 
 /**
+ * @brief Send a network buffer to a peer.
+ *
+ * @details This function can be used to send network data to a peer
+ * connection. This function will return immediately if the timeout
+ * is set to K_NO_WAIT. If the timeout is set to K_FOREVER, the function
+ * will wait until the network buffer is sent. Timeout value > 0 will
+ * wait as many ms. After the network buffer is sent,
+ * a caller-supplied callback is called. The callback is called even
+ * if timeout was set to K_FOREVER, the callback is called
+ * before this function will return in this case. The callback is not
+ * called if the timeout expires. For context of type SOCK_DGRAM,
+ * the destination address must have been set by the call to
+ * net_context_connect().
+ * This is similar as BSD send() function.
+ *
+ * @param context The network context to use.
+ * @param buf The data buffer to send
+ * @param len Length of the buffer
+ * @param cb Caller-supplied callback function.
+ * @param timeout Timeout for the connection. Possible values
+ * are K_FOREVER, K_NO_WAIT, >0.
+ * @param token Caller specified value that is passed as is to callback.
+ * @param user_data Caller-supplied user data.
+ *
+ * @return 0 if ok, < 0 if error
+ */
+int net_context_send_new(struct net_context *context,
+			 const void *buf,
+			 size_t len,
+			 net_context_send_cb_t cb,
+			 s32_t timeout,
+			 void *token,
+			 void *user_data);
+
+/**
  * @brief Send a network buffer to a peer specified by address.
  *
  * @details This function can be used to send network data to a peer
@@ -712,6 +830,46 @@ int net_context_sendto(struct net_pkt *pkt,
 		       s32_t timeout,
 		       void *token,
 		       void *user_data);
+
+
+/**
+ * @brief Send a network buffer to a peer specified by address.
+ *
+ * @details This function can be used to send network data to a peer
+ * specified by address. This variant can only be used for datagram
+ * connections of type SOCK_DGRAM. This function will return immediately
+ * if the timeout is set to K_NO_WAIT. If the timeout is set to K_FOREVER,
+ * the function will wait until the network buffer is sent. Timeout
+ * value > 0 will wait as many ms. After the network buffer
+ * is sent, a caller-supplied callback is called. The callback is called
+ * even if timeout was set to K_FOREVER, the callback is called
+ * before this function will return. The callback is not called if the
+ * timeout expires.
+ * This is similar as BSD sendto() function.
+ *
+ * @param context The network context to use.
+ * @param buf The data buffer to send
+ * @param len Length of the buffer
+ * @param dst_addr Destination address. This will override the address
+ * already set in network buffer.
+ * @param addrlen Length of the address.
+ * @param cb Caller-supplied callback function.
+ * @param timeout Timeout for the connection. Possible values
+ * are K_FOREVER, K_NO_WAIT, >0.
+ * @param token Caller specified value that is passed as is to callback.
+ * @param user_data Caller-supplied user data.
+ *
+ * @return numbers of bytes sent on success, a negative errno otherwise
+ */
+int net_context_sendto_new(struct net_context *context,
+			   const void *buf,
+			   size_t len,
+			   const struct sockaddr *dst_addr,
+			   socklen_t addrlen,
+			   net_context_send_cb_t cb,
+			   s32_t timeout,
+			   void *token,
+			   void *user_data);
 
 /**
  * @brief Receive network data from a peer specified by context.
@@ -869,4 +1027,4 @@ static inline void net_context_setup_pools(struct net_context *context,
  * @}
  */
 
-#endif /* __NET_CONTEXT_H */
+#endif /* ZEPHYR_INCLUDE_NET_NET_CONTEXT_H_ */

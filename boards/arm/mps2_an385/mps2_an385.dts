@@ -10,22 +10,29 @@
 
 	chosen {
 		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+		zephyr,uart-pipe = &uart1;
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
 	};
 
 	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
 		cpu@0 {
 			compatible = "arm,cortex-m3";
+			reg = <0>;
 		};
 	};
 
-	sram0: memory {
+	sram0: memory@20000000 {
 		compatible = "mmio-sram";
 		reg = <0x20000000 0x400000>;
 	};
 
-	flash0: flash {
+	flash0: flash@0 {
+		compatible = "soc-nv-flash";
 		reg = <0 0x400000>;
 	};
 
@@ -34,18 +41,21 @@
 			compatible = "arm,cmsdk-timer";
 			reg = <0x40000000 0x1000>;
 			interrupts = <8 3>;
+			label = "TIMER_0";
 		};
 
 		timer1: timer@40001000 {
 			compatible = "arm,cmsdk-timer";
 			reg = <0x40001000 0x1000>;
 			interrupts = <9 3>;
+			label = "TIMER_1";
 		};
 
 		dtimer0: dtimer@40002000 {
 			compatible = "arm,cmsdk-dtimer";
-			reg = <0x40000000 0x1000>;
+			reg = <0x40002000 0x1000>;
 			interrupts = <10 3>;
+			label = "DTIMER_0";
 		};
 
 		uart0: uart@40004000 {
@@ -120,6 +130,16 @@
 			compatible = "arm,cmsdk-gpio";
 			reg = <0x40013000 0x1000>;
 			interrupts = <17 3>;
+		};
+
+		eth0: eth@40200000 {
+			/* Linux has "smsc,lan9115" */
+			compatible = "smsc,lan9220";
+			/* Such a big size from memory map in AN385 */
+			/* Actual reg range is ~0x200 */
+			reg = <0x40200000 0x100000>;
+			label = "eth0";
+			interrupts = <13 3>;
 		};
 
 		i2c_touch: i2c@40022000 {

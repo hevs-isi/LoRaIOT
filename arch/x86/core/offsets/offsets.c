@@ -39,7 +39,10 @@ GEN_OFFSET_SYM(_thread_arch_t, excNestCount);
 GEN_OFFSET_SYM(_thread_arch_t, coopFloatReg);
 GEN_OFFSET_SYM(_thread_arch_t, preempFloatReg);
 
-/* size of the struct tcs structure sans save area for floating point regs */
+/**
+ * size of the struct k_thread structure sans save area for floating
+ * point regs
+ */
 
 GEN_ABSOLUTE_SYM(_K_THREAD_NO_FLOAT_SIZEOF,
 		 sizeof(struct k_thread) - sizeof(tCoopFloatReg) -
@@ -77,10 +80,8 @@ GEN_OFFSET_SYM(NANO_ESF, eflags);
 /* tTaskStateSegment structure member offsets */
 
 
-/* size of the ISR_LIST structure. Used by linker scripts */
+/* size of the MMU_REGION structure. Used by linker scripts */
 
-GEN_ABSOLUTE_SYM(__ISR_LIST_SIZEOF, sizeof(ISR_LIST));
 GEN_ABSOLUTE_SYM(__MMU_REGION_SIZEOF, sizeof(struct mmu_region));
-
 
 GEN_ABS_SYM_END

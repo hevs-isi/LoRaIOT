@@ -75,12 +75,12 @@
 			clk-divider-flash = <5>;
 
 			clock-controller;
-			#clocks-cells = <3>;
+			#clock-cells = <3>;
 		};
 
-		uart0: uart@4006A000 {
+		uart0: uart@4006a000 {
 			compatible = "nxp,kinetis-lpsci";
-			reg = <0x4006A000 0xc>;
+			reg = <0x4006a000 0xc>;
 			interrupts = <12 0>;
 			clocks = <&sim KINETIS_SIM_CORESYS_CLK 0x1034 10>;
 			label = "UART_0";
@@ -136,6 +136,16 @@
 			label = "GPIO_4";
 			gpio-controller;
 			#gpio-cells = <2>;
+		};
+
+		usbd: usbd@40072000 {
+			compatible = "nxp,kinetis-usbd";
+			reg = <0x40072000 0x1000>;
+			interrupts = <24 1>;
+			interrupt-names = "usb_otg";
+			num-bidir-endpoints = <16>;
+			status = "disabled";
+			label = "USBD";
 		};
 	};
 };

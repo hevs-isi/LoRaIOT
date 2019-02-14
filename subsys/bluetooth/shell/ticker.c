@@ -10,18 +10,16 @@
  */
 
 #include <zephyr.h>
-#include <shell/shell.h>
-#include <misc/printk.h>
 
-#if defined(CONFIG_SOC_FAMILY_NRF)
-#include "../controller/hal/nrf5/ticker.h"
-#endif /* CONFIG_SOC_FAMILY_NRF */
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/conn.h>
+
+#include <shell/shell.h>
 
 #include "../controller/util/memq.h"
 #include "../controller/util/mayfly.h"
+#include "../controller/hal/ticker.h"
 #include "../controller/ticker/ticker.h"
-
-#define TICKER_SHELL_MODULE "ticker"
 
 #if defined(CONFIG_BT_MAX_CONN)
 #define TICKERS_MAX (CONFIG_BT_MAX_CONN + 2)
@@ -29,12 +27,14 @@
 #define TICKERS_MAX 2
 #endif
 
+#include "bt.h"
+
 static void ticker_op_done(u32_t err, void *context)
 {
 	*((u32_t volatile *)context) = err;
 }
 
-int cmd_ticker_info(int argc, char *argv[])
+int cmd_ticker_info(const struct shell *shell, size_t argc, char *argv[])
 {
 	struct {
 		u8_t id;
@@ -48,10 +48,10 @@ int cmd_ticker_info(int argc, char *argv[])
 	u8_t i;
 
 	ticker_id = TICKER_NULL;
-	ticks_to_expire = 0;
-	ticks_current = 0;
-	tickers_count = 0;
-	retry = 4;
+	ticks_to_expire = 0U;
+	ticks_current = 0U;
+	tickers_count = 0U;
+	retry = 4U;
 	do {
 		u32_t volatile err_cb = TICKER_STATUS_BUSY;
 		u32_t ticks_previous;
@@ -71,8 +71,8 @@ int cmd_ticker_info(int argc, char *argv[])
 
 		if ((err_cb != TICKER_STATUS_SUCCESS) ||
 		    (ticker_id == TICKER_NULL)) {
-			printk("Query done (0x%02x, err= %u).\n", ticker_id,
-			       err);
+			shell_print(shell, "Query done (0x%02x, err= %u).",
+				    ticker_id, err);
 
 			break;
 		}
@@ -80,16 +80,17 @@ int cmd_ticker_info(int argc, char *argv[])
 		if (ticks_current != ticks_previous) {
 			retry--;
 			if (!retry) {
-				printk("Retry again, tickers too busy now.\n");
+				shell_print(shell, "Retry again, tickers too "
+					    "busy now.");
 
 				return -EAGAIN;
 			}
 
 			if (tickers_count) {
-				tickers_count = 0;
+				tickers_count = 0U;
 
-				printk("Query reset, %u retries remaining.\n",
-				       retry);
+				shell_print(shell, "Query reset, %u retries "
+					    "remaining.", retry);
 			}
 		}
 
@@ -99,31 +100,46 @@ int cmd_ticker_info(int argc, char *argv[])
 
 	} while (tickers_count < TICKERS_MAX);
 
-	printk("Tickers: %u.\n", tickers_count);
-	printk("Tick: %u (%uus).\n", ticks_current,
+	shell_print(shell, "Tickers: %u.", tickers_count);
+	shell_print(shell, "Tick: %u (%uus).", ticks_current,
 	       HAL_TICKER_TICKS_TO_US(ticks_current));
 
 	if (!tickers_count) {
 		return 0;
 	}
 
-	printk("---------------------\n");
-	printk(" id   offset   offset\n");
-	printk("      (tick)     (us)\n");
-	printk("---------------------\n");
-	for (i = 0; i < tickers_count; i++) {
-		printk("%03u %08u %08u\n", tickers[i].id,
+	shell_print(shell, "---------------------");
+	shell_print(shell, " id   offset   offset");
+	shell_print(shell, "      (tick)     (us)");
+	shell_print(shell, "---------------------");
+	for (i = 0U; i < tickers_count; i++) {
+		shell_print(shell, "%03u %08u %08u", tickers[i].id,
 		       tickers[i].ticks_to_expire,
 		       HAL_TICKER_TICKS_TO_US(tickers[i].ticks_to_expire));
 	}
-	printk("---------------------\n");
+	shell_print(shell, "---------------------");
 
 	return 0;
 }
 
-static const struct shell_cmd ticker_commands[] = {
-	{ "info", cmd_ticker_info, "Enumerate active ticker details."},
-	{ NULL, NULL, NULL}
+#define HELP_NONE "[none]"
+
+SHELL_CREATE_STATIC_SUBCMD_SET(ticker_cmds) {
+	SHELL_CMD_ARG(info, NULL, HELP_NONE, cmd_ticker_info, 1, 0),
+	SHELL_SUBCMD_SET_END
 };
 
-SHELL_REGISTER(TICKER_SHELL_MODULE, ticker_commands);
+static int cmd_ticker(const struct shell *shell, size_t argc, char **argv)
+{
+	if (argc == 1) {
+		shell_help(shell);
+		/* shell returns 1 when help is printed */
+		return 1;
+	}
+
+	shell_error(shell, "%s:%s%s", argv[0], "unknown parameter: ", argv[1]);
+	return -ENOEXEC;
+}
+
+SHELL_CMD_ARG_REGISTER(ticker, &ticker_cmds, "Bluetooth Ticker shell commands",
+		       cmd_ticker, 1, 1);

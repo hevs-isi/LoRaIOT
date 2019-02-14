@@ -18,7 +18,7 @@
 #include <kernel.h>
 #include <kernel_structs.h>
 #include <misc/printk.h>
-
+#include <logging/log_ctrl.h>
 
 /**
  *
@@ -41,12 +41,21 @@
  *
  * @param reason the reason that the handler was called
  * @param pEsf pointer to the exception stack frame
+ *
+ * @return This function does not return.
  */
 void _NanoFatalErrorHandler(unsigned int reason,
 					  const NANO_ESF *pEsf)
 {
+	LOG_PANIC();
+
 	switch (reason) {
-#if defined(CONFIG_STACK_CANARIES) || defined(CONFIG_STACK_SENTINEL)
+	case _NANO_ERR_HW_EXCEPTION:
+		printk("***** Hardware exception *****\n");
+		break;
+#if defined(CONFIG_STACK_CANARIES) || defined(CONFIG_STACK_SENTINEL) || \
+		defined(CONFIG_HW_STACK_PROTECTION) || \
+		defined(CONFIG_USERSPACE)
 	case _NANO_ERR_STACK_CHK_FAIL:
 		printk("***** Stack Check Fail! *****\n");
 		break;
@@ -92,6 +101,8 @@ FUNC_NORETURN void _arch_syscall_oops(void *ssf_ptr)
 {
 	u32_t *ssf_contents = ssf_ptr;
 	NANO_ESF oops_esf = { 0 };
+
+	LOG_PANIC();
 
 	oops_esf.pc = ssf_contents[3];
 

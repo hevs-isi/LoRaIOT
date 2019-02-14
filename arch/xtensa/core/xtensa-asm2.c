@@ -27,7 +27,7 @@ void *xtensa_init_stack(int *stack_top,
 	const int bsasz = BASE_SAVE_AREA_SIZE - 16;
 	void **bsa = (void **) (((char *) stack_top) - bsasz);
 
-	memset(bsa, 0, bsasz);
+	(void)memset(bsa, 0, bsasz);
 
 	bsa[BSA_PC_OFF/4] = _thread_entry;
 	bsa[BSA_PS_OFF/4] = (void *)(PS_WOE | PS_UM | PS_CALLINC(1));
@@ -70,15 +70,6 @@ void _new_thread(struct k_thread *thread, k_thread_stack_t *stack, size_t sz,
 	top = (char *)(((unsigned int)top) & ~3);
 
 	_new_thread_init(thread, base, sz, prio, opts);
-
-#ifdef CONFIG_THREAD_MONITOR
-	top -= sizeof(struct __thread_entry);
-	thread->entry = (void *)top;
-	thread->entry->pEntry = entry;
-
-	thread_monitor_init(thread);
-#endif
-
 
 	thread->switch_handle = xtensa_init_stack((void *)top, entry,
 						  p1, p2, p3);
@@ -144,9 +135,10 @@ static void dump_stack(int *stack)
 #define DEF_INT_C_HANDLER(l)				\
 void *xtensa_int##l##_c(void *interrupted_stack)	\
 {							   \
-	int irqs, m;					   \
+	u32_t irqs, intenable, m;			   \
 	__asm__ volatile("rsr.interrupt %0" : "=r"(irqs)); \
-							   \
+	__asm__ volatile("rsr.intenable %0" : "=r"(intenable)); \
+	irqs &= intenable;					\
 	while ((m = _xtensa_handle_one_int##l(irqs))) {		\
 		irqs ^= m;					\
 		__asm__ volatile("wsr.intclear %0" : : "r"(m)); \

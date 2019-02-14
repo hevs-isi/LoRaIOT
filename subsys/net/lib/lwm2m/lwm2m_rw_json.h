@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017 Linaro Limited
+ * Copyright (c) 2018-2019 Foundries.io
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -45,8 +46,10 @@
 #include "lwm2m_object.h"
 
 extern const struct lwm2m_writer json_writer;
+extern const struct lwm2m_reader json_reader;
 
-int do_write_op_json(struct lwm2m_engine_obj *obj,
-		     struct lwm2m_engine_context *context);
+int do_read_op_json(struct lwm2m_engine_obj *obj, struct lwm2m_message *msg,
+		    int content_format);
+int do_write_op_json(struct lwm2m_engine_obj *obj, struct lwm2m_message *msg);
 
 #endif /* LWM2M_RW_JSON_H_ */

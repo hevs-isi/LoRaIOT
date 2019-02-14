@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017 Linaro Limited
+ * Copyright (c) 2018-2019 Foundries.io
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -46,12 +47,16 @@
 /* stdint conversions */
 #include <zephyr/types.h>
 #include <stddef.h>
+#include <kernel.h>
+
 #include <net/net_ip.h>
-#include <net/coap.h>
-#include <net/lwm2m.h>
 #include <misc/printk.h>
 #include <misc/util.h>
-#include <kernel.h>
+
+#include <net/coap.h>
+#include <net/lwm2m.h>
+
+#include "buf_util.h"
 
 /* #####/###/#####/### + NULL */
 #define MAX_RESOURCE_LEN	20
@@ -124,8 +129,15 @@
 #define WRITER_OUTPUT_VALUE      1
 #define WRITER_RESOURCE_INSTANCE 2
 
+#define MAX_PACKET_SIZE		(CONFIG_LWM2M_COAP_BLOCK_SIZE + \
+				 CONFIG_LWM2M_ENGINE_MESSAGE_HEADER_SIZE)
+
+/* buffer util macros */
+#define CPKT_BUF_WRITE(cpkt)	(cpkt)->data, &(cpkt)->offset, (cpkt)->max_len
+#define CPKT_BUF_READ(cpkt)	(cpkt)->data, (cpkt)->max_len
+
 struct lwm2m_engine_obj;
-struct lwm2m_engine_context;
+struct lwm2m_message;
 
 /* path representing object instances */
 struct lwm2m_obj_path {
@@ -169,6 +181,8 @@ struct lwm2m_engine_obj {
 	/* object event callbacks */
 	lwm2m_engine_obj_create_cb_t create_cb;
 	lwm2m_engine_obj_delete_cb_t delete_cb;
+	lwm2m_engine_user_cb_t user_create_cb;
+	lwm2m_engine_user_cb_t user_delete_cb;
 
 	/* object member data */
 	u16_t obj_id;
@@ -230,7 +244,7 @@ struct lwm2m_engine_res_inst {
 	lwm2m_engine_get_data_cb_t	read_cb;
 	lwm2m_engine_get_data_cb_t	pre_write_cb;
 	lwm2m_engine_set_data_cb_t	post_write_cb;
-	lwm2m_engine_exec_cb_t		execute_cb;
+	lwm2m_engine_user_cb_t		execute_cb;
 
 	u8_t  *multi_count_var;
 	void  *data_ptr;
@@ -255,35 +269,63 @@ struct lwm2m_output_context {
 	const struct lwm2m_writer *writer;
 	struct coap_packet *out_cpkt;
 
-	/* current write fragment in net_buf chain */
-	struct net_buf *frag;
-
-	/* markers for last resource inst */
-	struct net_buf *mark_frag_ri;
-
-	/* current write position in net_buf chain */
-	u16_t offset;
-
-	/* markers for last resource inst ID */
-	u16_t mark_pos_ri;
-
-	/* flags for reader/writer */
-	u8_t writer_flags;
+	/* private output data */
+	void *user_data;
 };
 
 struct lwm2m_input_context {
 	const struct lwm2m_reader *reader;
 	struct coap_packet *in_cpkt;
 
-	/* current read position in net_buf chain */
-	struct net_buf *frag;
+	/* current position in buffer */
 	u16_t offset;
-
-	/* length of incoming coap/lwm2m payload */
-	u16_t payload_len;
 
 	/* length of incoming opaque */
 	u16_t opaque_len;
+
+	/* private output data */
+	void *user_data;
+};
+
+/* Establish a message timeout callback */
+typedef void (*lwm2m_message_timeout_cb_t)(struct lwm2m_message *msg);
+
+/* Internal LwM2M message structure to track in-flight messages. */
+struct lwm2m_message {
+	/** LwM2M context related to this message */
+	struct lwm2m_ctx *ctx;
+
+	/** Incoming / outgoing contexts */
+	struct lwm2m_input_context in;
+	struct lwm2m_output_context out;
+
+	/** Incoming path */
+	struct lwm2m_obj_path path;
+
+	/** CoAP packet data related to the outgoing message */
+	struct coap_packet cpkt;
+
+	/** Buffer data related outgoing message */
+	u8_t msg_data[MAX_PACKET_SIZE];
+
+	/** Message transmission handling for TYPE_CON */
+	struct coap_pending *pending;
+	struct coap_reply *reply;
+
+	/** Message configuration */
+	u8_t *token;
+	coap_reply_t reply_cb;
+	lwm2m_message_timeout_cb_t message_timeout_cb;
+	u16_t mid;
+	u8_t type;
+	u8_t code;
+	u8_t tkl;
+
+	/** Incoming message action */
+	u8_t operation;
+
+	/** Counter for message re-send / abort handling */
+	u8_t send_attempts;
 };
 
 /* LWM2M format writer for the various formats supported */
@@ -292,6 +334,14 @@ struct lwm2m_writer {
 			    struct lwm2m_obj_path *path);
 	size_t (*put_end)(struct lwm2m_output_context *out,
 			  struct lwm2m_obj_path *path);
+	size_t (*put_begin_oi)(struct lwm2m_output_context *out,
+			       struct lwm2m_obj_path *path);
+	size_t (*put_end_oi)(struct lwm2m_output_context *out,
+			     struct lwm2m_obj_path *path);
+	size_t (*put_begin_r)(struct lwm2m_output_context *out,
+			      struct lwm2m_obj_path *path);
+	size_t (*put_end_r)(struct lwm2m_output_context *out,
+			    struct lwm2m_obj_path *path);
 	size_t (*put_begin_ri)(struct lwm2m_output_context *out,
 			       struct lwm2m_obj_path *path);
 	size_t (*put_end_ri)(struct lwm2m_output_context *out,
@@ -342,13 +392,41 @@ struct lwm2m_reader {
 			     u8_t *buf, size_t buflen, bool *last_block);
 };
 
-/* LWM2M engine context */
-struct lwm2m_engine_context {
-	struct lwm2m_input_context *in;
-	struct lwm2m_output_context *out;
-	struct lwm2m_obj_path *path;
-	u8_t operation;
-};
+/* output user_data management functions */
+
+static inline void engine_set_out_user_data(struct lwm2m_output_context *out,
+					    void *user_data)
+{
+	out->user_data = user_data;
+}
+
+static inline void *engine_get_out_user_data(struct lwm2m_output_context *out)
+{
+	return out->user_data;
+}
+
+static inline void
+engine_clear_out_user_data(struct lwm2m_output_context *out)
+{
+	out->user_data = NULL;
+}
+
+static inline void engine_set_in_user_data(struct lwm2m_input_context *in,
+					   void *user_data)
+{
+	in->user_data = user_data;
+}
+
+static inline void *engine_get_in_user_data(struct lwm2m_input_context *in)
+{
+	return in->user_data;
+}
+
+static inline void
+engine_clear_in_user_data(struct lwm2m_input_context *in)
+{
+	in->user_data = NULL;
+}
 
 /* inline multi-format write / read functions */
 
@@ -367,6 +445,46 @@ static inline size_t engine_put_end(struct lwm2m_output_context *out,
 {
 	if (out->writer->put_end) {
 		return out->writer->put_end(out, path);
+	}
+
+	return 0;
+}
+
+static inline size_t engine_put_begin_oi(struct lwm2m_output_context *out,
+					 struct lwm2m_obj_path *path)
+{
+	if (out->writer->put_begin_oi) {
+		return out->writer->put_begin_oi(out, path);
+	}
+
+	return 0;
+}
+
+static inline size_t engine_put_end_oi(struct lwm2m_output_context *out,
+				       struct lwm2m_obj_path *path)
+{
+	if (out->writer->put_end_oi) {
+		return out->writer->put_end_oi(out, path);
+	}
+
+	return 0;
+}
+
+static inline size_t engine_put_begin_r(struct lwm2m_output_context *out,
+					struct lwm2m_obj_path *path)
+{
+	if (out->writer->put_begin_r) {
+		return out->writer->put_begin_r(out, path);
+	}
+
+	return 0;
+}
+
+static inline size_t engine_put_end_r(struct lwm2m_output_context *out,
+				      struct lwm2m_obj_path *path)
+{
+	if (out->writer->put_end_r) {
+		return out->writer->put_end_r(out, path);
 	}
 
 	return 0;

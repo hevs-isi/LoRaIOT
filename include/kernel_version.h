@@ -6,14 +6,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _kernel_version__h_
-#define _kernel_version__h_
+#ifndef ZEPHYR_INCLUDE_KERNEL_VERSION_H_
+#define ZEPHYR_INCLUDE_KERNEL_VERSION_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/*
+/**
+ * @defgroup version_apis Version APIs
+ * @ingroup kernel_apis
+ * @{
+ *
  * The kernel version has been converted from a string to a four-byte
  * quantity that is divided into two parts.
  *
@@ -32,10 +36,22 @@ extern "C" {
 
 /* kernel version routines */
 
+/**
+ * @brief Return the kernel version of the present build
+ *
+ * The kernel version is a four-byte value, whose format is described in the
+ * file "kernel_version.h".
+ *
+ * @return kernel version
+ */
 extern u32_t sys_kernel_version_get(void);
+
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _kernel_version__h_ */
+#endif /* ZEPHYR_INCLUDE_KERNEL_VERSION_H_ */

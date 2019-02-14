@@ -19,6 +19,7 @@
 #include <bluetooth/mesh.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_TRANS)
+#define LOG_MODULE_NAME bt_mesh_transport
 #include "common/log.h"
 
 #include "../testing.h"
@@ -33,6 +34,13 @@
 #include "foundation.h"
 #include "settings.h"
 #include "transport.h"
+
+/* The transport layer needs at least three buffers for itself to avoid
+ * deadlocks. Ensure that there are a sufficient number of advertising
+ * buffers available compared to the maximum supported outgoing segment
+ * count.
+ */
+BUILD_ASSERT(CONFIG_BT_MESH_ADV_BUF_COUNT >= (CONFIG_BT_MESH_TX_SEG_MAX + 3));
 
 #define AID_MASK                    ((u8_t)(BIT_MASK(6)))
 
@@ -64,7 +72,7 @@
 
 static struct seg_tx {
 	struct bt_mesh_subnet   *sub;
-	struct net_buf          *seg[BT_MESH_TX_SEG_COUNT];
+	struct net_buf          *seg[CONFIG_BT_MESH_TX_SEG_MAX];
 	u64_t                    seq_auth;
 	u16_t                    dst;
 	u8_t                     seg_n:5,       /* Last segment index */
@@ -115,9 +123,7 @@ static int send_unseg(struct bt_mesh_net_tx *tx, struct net_buf_simple *sdu,
 	BT_DBG("src 0x%04x dst 0x%04x app_idx 0x%04x sdu_len %u",
 	       tx->src, tx->ctx->addr, tx->ctx->app_idx, sdu->len);
 
-	buf = bt_mesh_adv_create(BT_MESH_ADV_DATA,
-				 BT_MESH_TRANSMIT_COUNT(tx->xmit),
-				 BT_MESH_TRANSMIT_INT(tx->xmit), BUF_TIMEOUT);
+	buf = bt_mesh_adv_create(BT_MESH_ADV_DATA, tx->xmit, BUF_TIMEOUT);
 	if (!buf) {
 		BT_ERR("Out of network buffers");
 		return -ENOBUFS;
@@ -169,7 +175,7 @@ static void seg_tx_reset(struct seg_tx *tx)
 
 	tx->cb = NULL;
 	tx->cb_data = NULL;
-	tx->seq_auth = 0;
+	tx->seq_auth = 0U;
 	tx->sub = NULL;
 	tx->dst = BT_MESH_ADDR_UNASSIGNED;
 
@@ -186,11 +192,10 @@ static void seg_tx_reset(struct seg_tx *tx)
 		tx->seg[i] = NULL;
 	}
 
-	tx->nack_count = 0;
+	tx->nack_count = 0U;
 
-	if (bt_mesh.pending_update) {
+	if (atomic_test_and_clear_bit(bt_mesh.flags, BT_MESH_IVU_PENDING)) {
 		BT_DBG("Proceding with pending IV Update");
-		bt_mesh.pending_update = 0;
 		/* bt_mesh_net_iv_update() will re-enable the flag if this
 		 * wasn't the only transfer.
 		 */
@@ -331,7 +336,7 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 		seg_hdr = SEG_HDR(1, net_tx->aid);
 	}
 
-	seg_o = 0;
+	seg_o = 0U;
 	tx->dst = net_tx->ctx->addr;
 	tx->seg_n = (sdu->len - 1) / 12;
 	tx->nack_count = tx->seg_n + 1;
@@ -351,14 +356,12 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 
 	BT_DBG("SeqZero 0x%04x", seq_zero);
 
-	for (seg_o = 0; sdu->len; seg_o++) {
+	for (seg_o = 0U; sdu->len; seg_o++) {
 		struct net_buf *seg;
 		u16_t len;
 		int err;
 
-		seg = bt_mesh_adv_create(BT_MESH_ADV_DATA,
-					 BT_MESH_TRANSMIT_COUNT(net_tx->xmit),
-					 BT_MESH_TRANSMIT_INT(net_tx->xmit),
+		seg = bt_mesh_adv_create(BT_MESH_ADV_DATA, net_tx->xmit,
 					 BUF_TIMEOUT);
 		if (!seg) {
 			BT_ERR("Out of segment buffers");
@@ -415,7 +418,8 @@ static int send_seg(struct bt_mesh_net_tx *net_tx, struct net_buf_simple *sdu,
 		}
 	}
 
-	if (bt_mesh_lpn_established()) {
+	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER) &&
+	    bt_mesh_lpn_established()) {
 		bt_mesh_lpn_poll();
 	}
 
@@ -460,7 +464,7 @@ int bt_mesh_trans_send(struct bt_mesh_net_tx *tx, struct net_buf_simple *msg,
 
 	if (tx->ctx->app_idx == BT_MESH_KEY_DEV) {
 		key = bt_mesh.dev_key;
-		tx->aid = 0;
+		tx->aid = 0U;
 	} else {
 		struct bt_mesh_app_key *app_key;
 
@@ -480,9 +484,9 @@ int bt_mesh_trans_send(struct bt_mesh_net_tx *tx, struct net_buf_simple *msg,
 	}
 
 	if (!tx->ctx->send_rel || net_buf_simple_tailroom(msg) < 8) {
-		tx->aszmic = 0;
+		tx->aszmic = 0U;
 	} else {
-		tx->aszmic = 1;
+		tx->aszmic = 1U;
 	}
 
 	if (BT_MESH_ADDR_IS_VIRTUAL(tx->ctx->addr)) {
@@ -624,7 +628,7 @@ static int sdu_recv(struct bt_mesh_net_rx *rx, u32_t seq, u8_t hdr,
 		return 0;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(bt_mesh.app_keys); i++) {
+	for (i = 0U; i < ARRAY_SIZE(bt_mesh.app_keys); i++) {
 		struct bt_mesh_app_key *key = &bt_mesh.app_keys[i];
 		struct bt_mesh_app_keys *keys;
 
@@ -650,7 +654,8 @@ static int sdu_recv(struct bt_mesh_net_rx *rx, u32_t seq, u8_t hdr,
 					  rx->ctx.recv_dst, seq,
 					  BT_MESH_NET_IVI_RX(rx));
 		if (err) {
-			BT_WARN("Unable to decrypt with AppKey %u", i);
+			BT_WARN("Unable to decrypt with AppKey 0x%03x",
+				key->app_idx);
 			continue;
 
 		}
@@ -929,9 +934,7 @@ int bt_mesh_ctl_send(struct bt_mesh_net_tx *tx, u8_t ctl_op, void *data,
 	       tx->ctx->addr, tx->ctx->send_ttl, ctl_op);
 	BT_DBG("len %zu: %s", data_len, bt_hex(data, data_len));
 
-	buf = bt_mesh_adv_create(BT_MESH_ADV_DATA,
-				 BT_MESH_TRANSMIT_COUNT(tx->xmit),
-				 BT_MESH_TRANSMIT_INT(tx->xmit), BUF_TIMEOUT);
+	buf = bt_mesh_adv_create(BT_MESH_ADV_DATA, tx->xmit, BUF_TIMEOUT);
 	if (!buf) {
 		BT_ERR("Out of transport buffers");
 		return -ENOBUFS;
@@ -1011,14 +1014,14 @@ static void seg_rx_reset(struct seg_rx *rx, bool full_reset)
 						&rx->seq_auth);
 	}
 
-	rx->in_use = 0;
+	rx->in_use = 0U;
 
 	/* We don't always reset these values since we need to be able to
 	 * send an ack if we receive a segment after we've already received
 	 * the full SDU.
 	 */
 	if (full_reset) {
-		rx->seq_auth = 0;
+		rx->seq_auth = 0U;
 		rx->sub = NULL;
 		rx->src = BT_MESH_ADDR_UNASSIGNED;
 		rx->dst = BT_MESH_ADDR_UNASSIGNED;
@@ -1133,7 +1136,7 @@ static struct seg_rx *seg_rx_alloc(struct bt_mesh_net_rx *net_rx,
 			continue;
 		}
 
-		rx->in_use = 1;
+		rx->in_use = 1U;
 		net_buf_simple_reset(&rx->buf);
 		rx->sub = net_rx->sub;
 		rx->ctl = net_rx->ctl;
@@ -1143,7 +1146,7 @@ static struct seg_rx *seg_rx_alloc(struct bt_mesh_net_rx *net_rx,
 		rx->ttl = net_rx->ctx.send_ttl;
 		rx->src = net_rx->ctx.addr;
 		rx->dst = net_rx->ctx.recv_dst;
-		rx->block = 0;
+		rx->block = 0U;
 
 		BT_DBG("New RX context. Block Complete 0x%08x",
 		       BLOCK_COMPLETE(seg_n));
@@ -1187,8 +1190,23 @@ static int trans_seg(struct net_buf_simple *buf, struct bt_mesh_net_rx *net_rx,
 		return -EINVAL;
 	}
 
+	/* According to Mesh 1.0 specification:
+	 * "The SeqAuth is composed of the IV Index and the sequence number
+	 *  (SEQ) of the first segment"
+	 *
+	 * Therefore we need to calculate very first SEQ in order to find
+	 * seqAuth. We can calculate as below:
+	 *
+	 * SEQ(0) = SEQ(n) - (delta between seqZero and SEQ(n) by looking into
+	 * 14 least significant bits of SEQ(n))
+	 *
+	 * Mentioned delta shall be >= 0, if it is not then seq_auth will
+	 * be broken and it will be verified by the code below.
+	 */
 	*seq_auth = SEQ_AUTH(BT_MESH_NET_IVI_RX(net_rx),
-			     (net_rx->seq & 0xffffe000) | seq_zero);
+			     (net_rx->seq -
+			      ((((net_rx->seq & BIT_MASK(14)) - seq_zero)) &
+			       BIT_MASK(13))));
 
 	/* Look for old RX sessions */
 	rx = seg_rx_find(net_rx, seq_auth);
@@ -1425,7 +1443,7 @@ void bt_mesh_rx_reset(void)
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
 		bt_mesh_clear_rpl();
 	} else {
-		memset(bt_mesh.rpl, 0, sizeof(bt_mesh.rpl));
+		(void)memset(bt_mesh.rpl, 0, sizeof(bt_mesh.rpl));
 	}
 }
 
@@ -1459,5 +1477,5 @@ void bt_mesh_trans_init(void)
 void bt_mesh_rpl_clear(void)
 {
 	BT_DBG("");
-	memset(bt_mesh.rpl, 0, sizeof(bt_mesh.rpl));
+	(void)memset(bt_mesh.rpl, 0, sizeof(bt_mesh.rpl));
 }

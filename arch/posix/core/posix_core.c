@@ -347,9 +347,8 @@ static int ttable_get_empty_slot(void)
 	}
 
 	/* Clear new piece of table */
-	memset(&threads_table[threads_table_size],
-		0,
-		PC_ALLOC_CHUNK_SIZE * sizeof(struct threads_table_el));
+	(void)memset(&threads_table[threads_table_size], 0,
+		     PC_ALLOC_CHUNK_SIZE * sizeof(struct threads_table_el));
 
 	threads_table_size += PC_ALLOC_CHUNK_SIZE;
 
@@ -386,7 +385,7 @@ void posix_new_thread(posix_thread_status_t *ptr)
 }
 
 /**
- * Called from _IntLibInit()
+ * Called from zephyr_wrapper()
  * prepare whatever needs to be prepared to be able to start threads
  */
 void posix_init_multithreading(void)
@@ -511,7 +510,7 @@ void _impl_k_thread_abort(k_tid_t thread)
 			thread_idx,
 			__func__);
 
-		_Swap(key);
+		(void)_Swap_irqlock(key);
 		CODE_UNREACHABLE; /* LCOV_EXCL_LINE */
 	}
 
@@ -532,7 +531,7 @@ void _impl_k_thread_abort(k_tid_t thread)
 	}
 
 	/* The abort handler might have altered the ready queue. */
-	_reschedule(key);
+	_reschedule_irqlock(key);
 }
 #endif
 

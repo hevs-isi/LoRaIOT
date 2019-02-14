@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _FS_H_
-#define _FS_H_
+#ifndef ZEPHYR_INCLUDE_FS_H_
+#define ZEPHYR_INCLUDE_FS_H_
 
 #ifdef CONFIG_ARCH_POSIX
 #ifndef __ssize_t_defined
@@ -33,6 +33,11 @@ typedef long long int off_t;
 extern "C" {
 #endif
 
+/**
+ * @brief File System APIs
+ * @defgroup file_system_api File System APIs
+ * @{
+ */
 struct fs_file_system_t;
 
 enum fs_dir_entry_type {
@@ -46,19 +51,6 @@ enum fs_type {
 	FS_TYPE_END,
 };
 
-/**
- * @brief File System
- * @defgroup file_system File System
- * @{
- * @}
- */
-
-/**
- * @brief File System Data Structures
- * @defgroup data_structures File System Data Structures
- * @ingroup file_system
- * @{
- */
 
 /**
  * @brief File system mount info structure
@@ -168,10 +160,6 @@ struct fs_file_system_t {
 					struct fs_statvfs *stat);
 };
 
-/**
- * @}
- */
-
 #ifndef FS_SEEK_SET
 #define FS_SEEK_SET	0	/* Seek from beginning of file. */
 #endif
@@ -182,12 +170,6 @@ struct fs_file_system_t {
 #define FS_SEEK_END	2	/* Seek from end of file.  */
 #endif
 
-/**
- * @brief File System APIs
- * @defgroup file_system_api File System APIs
- * @ingroup file_system
- * @{
- */
 
 /**
  * @brief File open
@@ -494,4 +476,4 @@ int fs_unregister(enum fs_type type, struct fs_file_system_t *fs);
 }
 #endif
 
-#endif /* _FS_H_ */
+#endif /* ZEPHYR_INCLUDE_FS_H_ */

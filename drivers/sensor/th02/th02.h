@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _SENSOR_TH02
-#define _SENSOR_TH02
+#ifndef ZEPHYR_DRIVERS_SENSOR_TH02_TH02_H_
+#define ZEPHYR_DRIVERS_SENSOR_TH02_TH02_H_
 
 #include <device.h>
 #include <misc/util.h>
@@ -31,7 +31,4 @@ struct th02_data {
 	u16_t rh_sample;
 };
 
-#define SYS_LOG_DOMAIN "TH02"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
 #endif /* _SENSOR_TH02_ */

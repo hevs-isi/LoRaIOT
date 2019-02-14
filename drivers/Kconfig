@@ -27,8 +27,6 @@ source "drivers/timer/Kconfig"
 
 source "drivers/entropy/Kconfig"
 
-source "drivers/grove/Kconfig"
-
 source "drivers/pci/Kconfig"
 
 source "drivers/gpio/Kconfig"
@@ -52,6 +50,8 @@ source "drivers/rtc/Kconfig"
 source "drivers/watchdog/Kconfig"
 
 source "drivers/clock_control/Kconfig"
+
+source "drivers/ptp_clock/Kconfig"
 
 source "drivers/ipm/Kconfig"
 

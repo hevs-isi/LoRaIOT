@@ -131,10 +131,11 @@
    || ((__POLARITY__) == LL_COMP_OUTPUTPOL_INVERTED)                           \
   )
 
+#if defined(COMP2)
 #define IS_LL_COMP_OUTPUT_BLANKING_SOURCE(__COMP_INSTANCE__, __OUTPUT_BLANKING_SOURCE__)       \
   (((__OUTPUT_BLANKING_SOURCE__) == LL_COMP_BLANKINGSRC_NONE)                                  \
     ? (                                                                                        \
-       (1U)                                                                                    \
+       (1UL)                                                                                   \
       )                                                                                        \
       :                                                                                        \
       (((__COMP_INSTANCE__) == COMP1)                                                          \
@@ -151,7 +152,34 @@
           )                                                                                    \
       )                                                                                        \
   )
-
+#else
+#if defined(TIM3)
+#define IS_LL_COMP_OUTPUT_BLANKING_SOURCE(__COMP_INSTANCE__, __OUTPUT_BLANKING_SOURCE__)       \
+  (((__OUTPUT_BLANKING_SOURCE__) == LL_COMP_BLANKINGSRC_NONE)                                  \
+    ? (                                                                                        \
+       (1UL)                                                                                   \
+      )                                                                                        \
+      :                                                                                        \
+      (                                                                                        \
+           ((__OUTPUT_BLANKING_SOURCE__) == LL_COMP_BLANKINGSRC_TIM1_OC5_COMP1)                \
+        || ((__OUTPUT_BLANKING_SOURCE__) == LL_COMP_BLANKINGSRC_TIM2_OC3_COMP1)                \
+        || ((__OUTPUT_BLANKING_SOURCE__) == LL_COMP_BLANKINGSRC_TIM3_OC3_COMP1)                \
+      )                                                                                        \
+  )
+#else
+#define IS_LL_COMP_OUTPUT_BLANKING_SOURCE(__COMP_INSTANCE__, __OUTPUT_BLANKING_SOURCE__)       \
+  (((__OUTPUT_BLANKING_SOURCE__) == LL_COMP_BLANKINGSRC_NONE)                                  \
+    ? (                                                                                        \
+       (1UL)                                                                                   \
+      )                                                                                        \
+      :                                                                                        \
+      (                                                                                        \
+           ((__OUTPUT_BLANKING_SOURCE__) == LL_COMP_BLANKINGSRC_TIM1_OC5_COMP1)                \
+        || ((__OUTPUT_BLANKING_SOURCE__) == LL_COMP_BLANKINGSRC_TIM2_OC3_COMP1)                \
+      )                                                                                        \
+  )
+#endif /* TIM3 */
+#endif /* COMP2 */
 /**
   * @}
   */
@@ -182,15 +210,15 @@
 ErrorStatus LL_COMP_DeInit(COMP_TypeDef *COMPx)
 {
   ErrorStatus status = SUCCESS;
-  
+
   /* Check the parameters */
   assert_param(IS_COMP_ALL_INSTANCE(COMPx));
-  
+
   /* Note: Hardware constraint (refer to description of this function):       */
   /*       COMP instance must not be locked.                                  */
-  if(LL_COMP_IsLocked(COMPx) == 0U)
+  if(LL_COMP_IsLocked(COMPx) == 0UL)
   {
-    LL_COMP_WriteReg(COMPx, CSR, 0x00000000U);
+    LL_COMP_WriteReg(COMPx, CSR, 0x00000000UL);
 
   }
   else
@@ -200,7 +228,7 @@ ErrorStatus LL_COMP_DeInit(COMP_TypeDef *COMPx)
     /* The only way to unlock the comparator is a device hardware reset.       */
     status = ERROR;
   }
-  
+
   return status;
 }
 
@@ -219,7 +247,7 @@ ErrorStatus LL_COMP_DeInit(COMP_TypeDef *COMPx)
 ErrorStatus LL_COMP_Init(COMP_TypeDef *COMPx, LL_COMP_InitTypeDef *COMP_InitStruct)
 {
   ErrorStatus status = SUCCESS;
-  
+
   /* Check the parameters */
   assert_param(IS_COMP_ALL_INSTANCE(COMPx));
   assert_param(IS_LL_COMP_POWER_MODE(COMP_InitStruct->PowerMode));
@@ -228,10 +256,10 @@ ErrorStatus LL_COMP_Init(COMP_TypeDef *COMPx, LL_COMP_InitTypeDef *COMP_InitStru
   assert_param(IS_LL_COMP_INPUT_HYSTERESIS(COMP_InitStruct->InputHysteresis));
   assert_param(IS_LL_COMP_OUTPUT_POLARITY(COMP_InitStruct->OutputPolarity));
   assert_param(IS_LL_COMP_OUTPUT_BLANKING_SOURCE(COMPx, COMP_InitStruct->OutputBlankingSource));
-  
+
   /* Note: Hardware constraint (refer to description of this function)        */
   /*       COMP instance must not be locked.                                  */
-  if(LL_COMP_IsLocked(COMPx) == 0U)
+  if(LL_COMP_IsLocked(COMPx) == 0UL)
   {
     /* Configuration of comparator instance :                                 */
     /*  - PowerMode                                                           */
@@ -285,7 +313,7 @@ ErrorStatus LL_COMP_Init(COMP_TypeDef *COMPx, LL_COMP_InitTypeDef *COMP_InitStru
     /* Initialization error: COMP instance is locked.                         */
     status = ERROR;
   }
-  
+
   return status;
 }
 

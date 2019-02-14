@@ -1,8 +1,14 @@
+common:
+  harness: net
+  depends_on: netif
+  tags: net syslog
 sample:
-  description: sys_log network backend
-  name: sys_log_net
+  description: syslog network backend
+  name: syslog_net
 tests:
-  test:
-    harness: net
-    depends_on: netif
-    tags: net
+  test_with_timefuncs:
+    extra_configs:
+      - CONFIG_NEWLIB_LIBC=y
+  test_without_timefuncs:
+    extra_configs:
+      - CONFIG_NEWLIB_LIBC=n

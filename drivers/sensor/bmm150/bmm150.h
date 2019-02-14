@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _SENSOR_BMM150_H_
-#define _SENSOR_BMM150_H_
+#ifndef ZEPHYR_DRIVERS_SENSOR_BMM150_BMM150_H_
+#define ZEPHYR_DRIVERS_SENSOR_BMM150_BMM150_H_
 
 
 #include <zephyr/types.h>
@@ -21,7 +21,6 @@
 #include <misc/byteorder.h>
 #include <misc/__assert.h>
 #include <gpio.h>
-
 
 #define BMM150_REG_CHIP_ID         0x40
 #define BMM150_CHIP_ID_VAL         0x32
@@ -90,7 +89,7 @@
 	#define BMM150_SET_ATTR_REP
 #endif
 
-#if defined(CONFIG_BMM150_MAGN_SAMPLING_RATE_RUNTIME) || \
+#if defined(CONFIG_BMM150_SAMPLING_RATE_RUNTIME) || \
 	defined(BMM150_MAGN_SET_ATTR_REP)
 	#define BMM150_MAGN_SET_ATTR
 #endif
@@ -158,7 +157,4 @@ enum bmm150_presets {
 	#define BMM150_DEFAULT_PRESET BMM150_HIGH_ACCURACY_PRESET
 #endif
 
-#define SYS_LOG_DOMAIN "BMM150"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
 #endif /* __SENSOR_BMM150_H__ */

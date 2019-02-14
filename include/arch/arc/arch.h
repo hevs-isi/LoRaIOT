@@ -13,17 +13,8 @@
  * include/arch/cpu.h)
  */
 
-#ifndef _ARC_ARCH__H_
-#define _ARC_ARCH__H_
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* APIs need to support non-byte addressable architectures */
-
-#define OCTET_TO_SIZEOFUNIT(X) (X)
-#define SIZEOFUNIT_TO_OCTET(X) (X)
+#ifndef ZEPHYR_INCLUDE_ARCH_ARC_ARCH_H_
+#define ZEPHYR_INCLUDE_ARCH_ARC_ARCH_H_
 
 #include <generated_dts_board.h>
 #include <sw_isr_table.h>
@@ -37,6 +28,10 @@ extern "C" {
 #include <arch/arc/v2/arcv2_irq_unit.h>
 #include <arch/arc/v2/asm_inline.h>
 #include <arch/arc/v2/addr_types.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 #if defined(CONFIG_MPU_STACK_GUARD) || defined(CONFIG_USERSPACE)
@@ -59,7 +54,7 @@ extern "C" {
 		#error "Requires to enable MPU"
 	#endif
 
-#else  /* CONFIG_MPU_STACK_GUARD  || CONFIG_USERPSACE*/
+#else  /* CONFIG_MPU_STACK_GUARD  || CONFIG_USERSPACE */
 	#define STACK_ALIGN  4
 #endif
 
@@ -89,16 +84,20 @@ extern "C" {
 #if CONFIG_ARC_MPU_VER == 2
 
 #define _ARCH_THREAD_STACK_DEFINE(sym, size) \
-	struct _k_thread_stack_element __kernel_noinit \
+	struct _k_thread_stack_element __noinit \
 		__aligned(POW2_CEIL(STACK_SIZE_ALIGN(size))) \
 		sym[POW2_CEIL(STACK_SIZE_ALIGN(size)) + \
 		+  STACK_GUARD_SIZE + CONFIG_PRIVILEGED_STACK_SIZE]
 
+#define _ARCH_THREAD_STACK_LEN(size) \
+	    (POW2_CEIL(STACK_SIZE_ALIGN(size)) + \
+	     max(POW2_CEIL(STACK_SIZE_ALIGN(size)), \
+		 POW2_CEIL(STACK_GUARD_SIZE + CONFIG_PRIVILEGED_STACK_SIZE)))
+
 #define _ARCH_THREAD_STACK_ARRAY_DEFINE(sym, nmemb, size) \
-	struct _k_thread_stack_element __kernel_noinit \
+	struct _k_thread_stack_element __noinit \
 		__aligned(POW2_CEIL(STACK_SIZE_ALIGN(size))) \
-		sym[nmemb][POW2_CEIL(STACK_SIZE_ALIGN(size)) + \
-		+ STACK_GUARD_SIZE + CONFIG_PRIVILEGED_STACK_SIZE]
+		sym[nmemb][_ARCH_THREAD_STACK_LEN(size)]
 
 #define _ARCH_THREAD_STACK_MEMBER(sym, size) \
 	struct _k_thread_stack_element \
@@ -109,14 +108,16 @@ extern "C" {
 #elif CONFIG_ARC_MPU_VER == 3
 
 #define _ARCH_THREAD_STACK_DEFINE(sym, size) \
-	struct _k_thread_stack_element __kernel_noinit __aligned(STACK_ALIGN) \
+	struct _k_thread_stack_element __noinit __aligned(STACK_ALIGN) \
 		sym[size + \
 		+ STACK_GUARD_SIZE + CONFIG_PRIVILEGED_STACK_SIZE]
 
+#define _ARCH_THREAD_STACK_LEN(size) \
+		((size) + STACK_GUARD_SIZE + CONFIG_PRIVILEGED_STACK_SIZE)
+
 #define _ARCH_THREAD_STACK_ARRAY_DEFINE(sym, nmemb, size) \
-	struct _k_thread_stack_element __kernel_noinit __aligned(STACK_ALIGN) \
-		sym[nmemb][size + \
-		+ STACK_GUARD_SIZE + CONFIG_PRIVILEGED_STACK_SIZE]
+	struct _k_thread_stack_element __noinit __aligned(STACK_ALIGN) \
+		sym[nmemb][_ARCH_THREAD_STACK_LEN(size)]
 
 #define _ARCH_THREAD_STACK_MEMBER(sym, size) \
 	struct _k_thread_stack_element __aligned(STACK_ALIGN) \
@@ -134,12 +135,14 @@ extern "C" {
 #else /* CONFIG_USERSPACE */
 
 #define _ARCH_THREAD_STACK_DEFINE(sym, size) \
-	struct _k_thread_stack_element __kernel_noinit __aligned(STACK_ALIGN) \
+	struct _k_thread_stack_element __noinit __aligned(STACK_ALIGN) \
 		sym[size + STACK_GUARD_SIZE]
 
+#define _ARCH_THREAD_STACK_LEN(size) ((size) + STACK_GUARD_SIZE)
+
 #define _ARCH_THREAD_STACK_ARRAY_DEFINE(sym, nmemb, size) \
-	struct _k_thread_stack_element __kernel_noinit __aligned(STACK_ALIGN) \
-		sym[nmemb][size + STACK_GUARD_SIZE]
+	struct _k_thread_stack_element __noinit __aligned(STACK_ALIGN) \
+		sym[nmemb][_ARCH_THREAD_STACK_LEN(size)]
 
 #define _ARCH_THREAD_STACK_MEMBER(sym, size) \
 	struct _k_thread_stack_element __aligned(STACK_ALIGN) \
@@ -152,7 +155,6 @@ extern "C" {
 #endif /* CONFIG_USERSPACE */
 
 
-#ifdef CONFIG_USERSPACE
 #ifdef CONFIG_ARC_MPU
 #ifndef _ASMLANGUAGE
 #include <arch/arc/v2/mpu/arc_mpu.h>
@@ -214,171 +216,22 @@ extern "C" {
 		"start address of the partition must align with 32.")
 #endif
 #endif /* CONFIG_ARC_MPU*/
-#endif /* CONFIG_USERSPACE */
 
 #ifndef _ASMLANGUAGE
 /* Typedef for the k_mem_partition attribute*/
 typedef u32_t k_mem_partition_attr_t;
-#endif /* _ASMLANGUAGE */
 
-#ifdef CONFIG_USERSPACE
-#ifndef _ASMLANGUAGE
-/* Syscall invocation macros. arc-specific machine constraints used to ensure
- * args land in the proper registers. Currently, they are all stub functions
- * just for enabling CONFIG_USERSPACE on arc w/o errors.
+/**
+ * @brief Explicitly nop operation.
  */
-
-static inline u32_t _arch_syscall_invoke6(u32_t arg1, u32_t arg2, u32_t arg3,
-					  u32_t arg4, u32_t arg5, u32_t arg6,
-					  u32_t call_id)
+static ALWAYS_INLINE void arch_nop(void)
 {
-	register u32_t ret __asm__("r0") = arg1;
-	register u32_t r1 __asm__("r1") = arg2;
-	register u32_t r2 __asm__("r2") = arg3;
-	register u32_t r3 __asm__("r3") = arg4;
-	register u32_t r4 __asm__("r4") = arg5;
-	register u32_t r5 __asm__("r5") = arg6;
-	register u32_t r6 __asm__("r6") = call_id;
-
-	compiler_barrier();
-
-	__asm__ volatile(
-			 "trap_s %[trap_s_id]\n"
-			 : "=r"(ret)
-			 : [trap_s_id] "i" (_TRAP_S_CALL_SYSTEM_CALL),
-			   "r" (ret), "r" (r1), "r" (r2), "r" (r3),
-			   "r" (r4), "r" (r5), "r" (r6));
-
-	return ret;
-}
-
-static inline u32_t _arch_syscall_invoke5(u32_t arg1, u32_t arg2, u32_t arg3,
-					  u32_t arg4, u32_t arg5, u32_t call_id)
-{
-	register u32_t ret __asm__("r0") = arg1;
-	register u32_t r1 __asm__("r1") = arg2;
-	register u32_t r2 __asm__("r2") = arg3;
-	register u32_t r3 __asm__("r3") = arg4;
-	register u32_t r4 __asm__("r4") = arg5;
-	register u32_t r6 __asm__("r6") = call_id;
-
-	compiler_barrier();
-
-	__asm__ volatile(
-			 "trap_s %[trap_s_id]\n"
-			 : "=r"(ret)
-			 : [trap_s_id] "i" (_TRAP_S_CALL_SYSTEM_CALL),
-			   "r" (ret), "r" (r1), "r" (r2), "r" (r3),
-			   "r" (r4), "r" (r6));
-
-	return ret;
-}
-
-static inline u32_t _arch_syscall_invoke4(u32_t arg1, u32_t arg2, u32_t arg3,
-					  u32_t arg4, u32_t call_id)
-{
-	register u32_t ret __asm__("r0") = arg1;
-	register u32_t r1 __asm__("r1") = arg2;
-	register u32_t r2 __asm__("r2") = arg3;
-	register u32_t r3 __asm__("r3") = arg4;
-	register u32_t r6 __asm__("r6") = call_id;
-
-	compiler_barrier();
-
-	__asm__ volatile(
-			 "trap_s %[trap_s_id]\n"
-			 : "=r"(ret)
-			 : [trap_s_id] "i" (_TRAP_S_CALL_SYSTEM_CALL),
-			   "r" (ret), "r" (r1), "r" (r2), "r" (r3),
-			   "r" (r6));
-
-	return ret;
-}
-
-static inline u32_t _arch_syscall_invoke3(u32_t arg1, u32_t arg2, u32_t arg3,
-					  u32_t call_id)
-{
-	register u32_t ret __asm__("r0") = arg1;
-	register u32_t r1 __asm__("r1") = arg2;
-	register u32_t r2 __asm__("r2") = arg3;
-	register u32_t r6 __asm__("r6") = call_id;
-
-	compiler_barrier();
-
-	__asm__ volatile(
-			 "trap_s %[trap_s_id]\n"
-			 : "=r"(ret)
-			 : [trap_s_id] "i" (_TRAP_S_CALL_SYSTEM_CALL),
-			   "r" (ret), "r" (r1), "r" (r2), "r" (r6));
-
-	return ret;
-}
-
-static inline u32_t _arch_syscall_invoke2(u32_t arg1, u32_t arg2, u32_t call_id)
-{
-	register u32_t ret __asm__("r0") = arg1;
-	register u32_t r1 __asm__("r1") = arg2;
-	register u32_t r6 __asm__("r6") = call_id;
-
-	compiler_barrier();
-
-	__asm__ volatile(
-			 "trap_s %[trap_s_id]\n"
-			 : "=r"(ret)
-			 : [trap_s_id] "i" (_TRAP_S_CALL_SYSTEM_CALL),
-			   "r" (ret), "r" (r1), "r" (r6));
-
-	return ret;
-}
-
-static inline u32_t _arch_syscall_invoke1(u32_t arg1, u32_t call_id)
-{
-	register u32_t ret __asm__("r0") = arg1;
-	register u32_t r6 __asm__("r6") = call_id;
-
-	compiler_barrier();
-
-	__asm__ volatile(
-			 "trap_s %[trap_s_id]\n"
-			 : "=r"(ret)
-			 : [trap_s_id] "i" (_TRAP_S_CALL_SYSTEM_CALL),
-			   "r" (ret), "r" (r6));
-
-	return ret;
-}
-
-static inline u32_t _arch_syscall_invoke0(u32_t call_id)
-{
-	register u32_t ret __asm__("r0");
-	register u32_t r6 __asm__("r6") = call_id;
-
-	compiler_barrier();
-
-	__asm__ volatile(
-			 "trap_s %[trap_s_id]\n"
-			 : "=r"(ret)
-			 : [trap_s_id] "i" (_TRAP_S_CALL_SYSTEM_CALL),
-			   "r" (ret), "r" (r6));
-
-	return ret;
-}
-
-static inline int _arch_is_user_context(void)
-{
-	u32_t status;
-
-	compiler_barrier();
-
-	__asm__ volatile("lr %0, [%[status32]]\n"
-			 : "=r"(status)
-			 : [status32] "i" (_ARC_V2_STATUS32));
-
-	return !(status & _ARC_V2_STATUS32_US);
+	__asm__ volatile("nop");
 }
 
 #endif /* _ASMLANGUAGE */
-#endif /* CONFIG_USERSPACE */
+
 #ifdef __cplusplus
 }
 #endif
-#endif /* _ARC_ARCH__H_ */
+#endif /* ZEPHYR_INCLUDE_ARCH_ARC_ARCH_H_ */

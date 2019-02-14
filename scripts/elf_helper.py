@@ -5,15 +5,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import sys
-import argparse
-import pprint
 import os
 import struct
 from distutils.version import LooseVersion
 
 import elftools
 from elftools.elf.elffile import ELFFile
-from elftools.dwarf import descriptions
 from elftools.elf.sections import SymbolTableSection
 
 if LooseVersion(elftools.__version__) < LooseVersion('0.24'):
@@ -25,8 +22,13 @@ def subsystem_to_enum(subsys):
     return "K_OBJ_DRIVER_" + subsys[:-11].upper()
 
 
-def kobject_to_enum(ko):
-    return "K_OBJ_" + ko[2:].upper()
+def kobject_to_enum(kobj):
+    if kobj.startswith("k_") or kobj.startswith("_k_"):
+        name = kobj[2:]
+    else:
+        name = kobj
+
+    return "K_OBJ_%s" % name.upper()
 
 
 DW_OP_addr = 0x3
@@ -138,7 +140,19 @@ class AggregateTypeMember:
     def __init__(self, offset, member_name, member_type, member_offset):
         self.member_name = member_name
         self.member_type = member_type
-        self.member_offset = member_offset
+        if isinstance(member_offset, list):
+            # DWARF v2, location encoded as set of operations
+            # only "DW_OP_plus_uconst" with ULEB128 argument supported
+            if member_offset[0] == 0x23:
+                self.member_offset = member_offset[1] & 0x7f
+                for i in range(1, len(member_offset)-1):
+                    if (member_offset[i] & 0x80):
+                        self.member_offset += (
+                            member_offset[i+1] & 0x7f) << i*7
+            else:
+                self.debug_die("not yet supported location operation")
+        else:
+            self.member_offset = member_offset
 
     def __repr__(self):
         return "<member %s, type %d, offset %d>" % (
@@ -369,9 +383,6 @@ class ElfHelper:
 
         # Step 1: collect all type information.
         for CU in di.iter_CUs():
-            CU_path = CU.get_top_DIE().get_full_path()
-            lp = di.line_program_for_CU(CU)
-
             for idx, die in enumerate(CU.iter_DIEs()):
                 # Unions are disregarded, kernel objects should never be union
                 # members since the memory is not dedicated to that object and
@@ -402,6 +413,10 @@ class ElfHelper:
         for die in variables:
             name = die_get_name(die)
             if not name:
+                continue
+
+            if name.startswith("__device_sys_init"):
+                # Boot-time initialization function; not an actual device
                 continue
 
             type_offset = die_get_type_offset(die)
@@ -438,7 +453,7 @@ class ElfHelper:
                 # Check if frame pointer offset DW_OP_fbreg
                 if opcode == DW_OP_fbreg:
                     self.debug_die(die, "kernel object '%s' found on stack" %
-                              name)
+                                   name)
                 else:
                     self.debug_die(
                         die,
@@ -454,7 +469,7 @@ class ElfHelper:
                 continue
 
             if ((addr < kram_start or addr >= kram_end) and
-               (addr < krom_start or addr >= krom_end)):
+                    (addr < krom_start or addr >= krom_end)):
 
                 self.debug_die(die,
                                "object '%s' found in invalid location %s"
@@ -465,8 +480,8 @@ class ElfHelper:
             objs = type_obj.get_kobjects(addr)
             all_objs.update(objs)
 
-            self.debug("symbol '%s' at %s contains %d object(s)" % (name,
-                       hex(addr), len(objs)))
+            self.debug("symbol '%s' at %s contains %d object(s)"
+                       % (name, hex(addr), len(objs)))
 
         # Step 4: objs is a dictionary mapping variable memory addresses to
         # their associated type objects. Now that we have seen all variables
@@ -489,6 +504,12 @@ class ElfHelper:
             # if it has one.
             apiaddr = device_get_api_addr(self.elf, addr)
             if apiaddr not in all_objs:
+                if apiaddr == 0:
+                    self.debug("device instance at 0x%x has no associated subsystem"
+                            % addr);
+                else:
+                    self.debug("device instance at 0x%x has unknown API 0x%x"
+                            % (addr, apiaddr));
                 # API struct does not correspond to a known subsystem, skip it
                 continue
 
@@ -525,6 +546,3 @@ class ElfHelper:
 
     def get_thread_counter(self):
         return thread_counter
-
-if __name__ == '__main__':
-    sys.exit(main(sys.argv))

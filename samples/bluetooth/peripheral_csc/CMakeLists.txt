@@ -1,7 +1,11 @@
+cmake_minimum_required(VERSION 3.13.1)
 include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
-project(NONE)
+project(peripheral_csc)
 
 FILE(GLOB app_sources src/*.c)
-target_sources(app PRIVATE ${app_sources})
+target_sources(app PRIVATE
+  ${app_sources}
+  ../gatt/bas.c
+  )
 
 zephyr_library_include_directories($ENV{ZEPHYR_BASE}/samples/bluetooth)

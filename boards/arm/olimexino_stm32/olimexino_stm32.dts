@@ -5,7 +5,7 @@
  */
 
 /dts-v1/;
-#include <st/stm32f103Xb.dtsi>
+#include <st/f1/stm32f103Xb.dtsi>
 
 / {
 	model = "Olimex OLIMEXINO-STM32 board";
@@ -13,17 +13,18 @@
 
 	chosen {
 		zephyr,console = &usart1;
+		zephyr,shell-uart = &usart1;
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
 	};
 
 	leds {
 		compatible = "gpio-leds";
-		green_led_1: led@0 {
+		green_led_1: led_1 {
 			gpios = <&gpioa 5 GPIO_INT_ACTIVE_HIGH>;
 			label = "LED1";
 		};
-		yellow_led_2: led@1 {
+		yellow_led_2: led_2 {
 			gpios = <&gpioa 1 GPIO_INT_ACTIVE_HIGH>;
 			label = "LED2";
 		};
@@ -31,7 +32,7 @@
 
 	gpio_keys {
 		compatible = "gpio-keys";
-		user_button: button@0 {
+		user_button: button {
 			label = "Key";
 			gpios = <&gpioc 9 GPIO_INT_ACTIVE_LOW>;
 		};
@@ -42,6 +43,10 @@
 		sw0 = &user_button;
 	};
 };
+
+uext_i2c: &i2c2 {};
+uext_spi: &spi1 {};
+uext_serial: &usart1 {};
 
 &usart1 {
 	current-speed = <115200>;
@@ -73,9 +78,26 @@
 
 &spi2 {
 	status = "ok";
+	cs-gpios = <&gpiod 2 0>;
+
+	sdhc0: sdhc@0 {
+		compatible = "zephyr,mmc-spi-slot";
+		reg = <0>;
+		status = "ok";
+		label = "SDHC0";
+		spi-max-frequency = <24000000>;
+	};
 };
 
 &usb {
 	status = "ok";
 	disconnect-gpios = <&gpioc 12 0>;
+};
+
+&timers1 {
+	status = "ok";
+
+	pwm {
+		status = "ok";
+	};
 };

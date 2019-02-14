@@ -2,6 +2,7 @@
  * Human Interface Device (HID) USB class core header
  *
  * Copyright (c) 2018 Intel Corporation
+ * Copyright (c) 2018 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -14,8 +15,8 @@
  * Version 1.11 document (HID1_11-1.pdf).
  */
 
-#ifndef __USB_HID_H__
-#define __USB_HID_H__
+#ifndef ZEPHYR_INCLUDE_USB_CLASS_USB_HID_H_
+#define ZEPHYR_INCLUDE_USB_CLASS_USB_HID_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +41,11 @@ struct usb_hid_descriptor {
 	struct usb_hid_class_subdescriptor subdesc[1];
 } __packed;
 
+/* HID Class Descriptor Types */
+
+#define HID_CLASS_DESCRIPTOR_HID	(REQTYPE_TYPE_CLASS << 5 | 0x01)
+#define HID_CLASS_DESCRIPTOR_REPORT	(REQTYPE_TYPE_CLASS << 5 | 0x02)
+
 /* HID Class Specific Requests */
 
 #define HID_GET_REPORT		0x01
@@ -54,6 +60,8 @@ struct usb_hid_descriptor {
 typedef int (*hid_cb_t)(struct usb_setup_packet *setup, s32_t *len,
 			u8_t **data);
 typedef void (*hid_int_ready_callback)(void);
+typedef void (*hid_protocol_cb_t)(u8_t protocol);
+typedef void (*hid_idle_cb_t)(u16_t report_id);
 
 struct hid_ops {
 	hid_cb_t get_report;
@@ -62,6 +70,8 @@ struct hid_ops {
 	hid_cb_t set_report;
 	hid_cb_t set_idle;
 	hid_cb_t set_protocol;
+	hid_protocol_cb_t protocol_change;
+	hid_idle_cb_t on_idle;
 	/*
 	 * int_in_ready is an optional callback that is called when
 	 * the current interrupt IN transfer has completed.  This can
@@ -69,6 +79,10 @@ struct hid_ops {
 	 * the next transfer.
 	 */
 	hid_int_ready_callback int_in_ready;
+#ifdef CONFIG_ENABLE_HID_INT_OUT_EP
+	hid_int_ready_callback int_out_ready;
+#endif
+	usb_dc_status_callback status_cb;
 };
 
 /* HID Report Definitions */
@@ -150,15 +164,94 @@ struct hid_ops {
 #define COLLECTION_PHYSICAL		0x00
 #define COLLECTION_APPLICATION		0x01
 
+/* Protocols */
+#define HID_PROTOCOL_BOOT		0x00
+#define HID_PROTOCOL_REPORT		0x01
+
+/* Example HID report descriptors */
+/**
+ * @brief Simple HID mouse report descriptor for n button mouse.
+ *
+ * @param bcnt	Button count. Allowed values from 1 to 8.
+ */
+#define HID_MOUSE_REPORT_DESC(bcnt) {				\
+	/* USAGE_PAGE (Generic Desktop) */			\
+	HID_GI_USAGE_PAGE, USAGE_GEN_DESKTOP,			\
+	/* USAGE (Mouse) */					\
+	HID_LI_USAGE, USAGE_GEN_DESKTOP_MOUSE,			\
+	/* COLLECTION (Application) */				\
+	HID_MI_COLLECTION, COLLECTION_APPLICATION,		\
+		/* USAGE (Pointer) */				\
+		HID_LI_USAGE, USAGE_GEN_DESKTOP_POINTER,	\
+		/* COLLECTION (Physical) */			\
+		HID_MI_COLLECTION, COLLECTION_PHYSICAL,		\
+			/* Bits used for button signalling */	\
+			/* USAGE_PAGE (Button) */		\
+			HID_GI_USAGE_PAGE, USAGE_GEN_BUTTON,	\
+			/* USAGE_MINIMUM (Button 1) */		\
+			HID_LI_USAGE_MIN(1), 0x01,		\
+			/* USAGE_MAXIMUM (Button bcnt) */	\
+			HID_LI_USAGE_MAX(1), bcnt,		\
+			/* LOGICAL_MINIMUM (0) */		\
+			HID_GI_LOGICAL_MIN(1), 0x00,		\
+			/* LOGICAL_MAXIMUM (1) */		\
+			HID_GI_LOGICAL_MAX(1), 0x01,		\
+			/* REPORT_SIZE (1) */			\
+			HID_GI_REPORT_SIZE, 0x01,		\
+			/* REPORT_COUNT (bcnt) */		\
+			HID_GI_REPORT_COUNT, bcnt,		\
+			/* INPUT (Data,Var,Abs) */		\
+			HID_MI_INPUT, 0x02,			\
+			/* Unused bits */			\
+			/* REPORT_SIZE (8 - bcnt) */		\
+			HID_GI_REPORT_SIZE, (8 - bcnt),		\
+			/* REPORT_COUNT (1) */			\
+			HID_GI_REPORT_COUNT, 0x01,		\
+			/* INPUT (Cnst,Ary,Abs) */		\
+			HID_MI_INPUT, 0x01,			\
+			/* X and Y axis, scroll */		\
+			/* USAGE_PAGE (Generic Desktop) */	\
+			HID_GI_USAGE_PAGE, USAGE_GEN_DESKTOP,	\
+			/* USAGE (X) */				\
+			HID_LI_USAGE, USAGE_GEN_DESKTOP_X,	\
+			/* USAGE (Y) */				\
+			HID_LI_USAGE, USAGE_GEN_DESKTOP_Y,	\
+			/* USAGE (WHEEL) */			\
+			HID_LI_USAGE, USAGE_GEN_DESKTOP_WHEEL,	\
+			/* LOGICAL_MINIMUM (-127) */		\
+			HID_GI_LOGICAL_MIN(1), -127,		\
+			/* LOGICAL_MAXIMUM (127) */		\
+			HID_GI_LOGICAL_MAX(1), 127,		\
+			/* REPORT_SIZE (8) */			\
+			HID_GI_REPORT_SIZE, 0x08,		\
+			/* REPORT_COUNT (3) */			\
+			HID_GI_REPORT_COUNT, 0x03,		\
+			/* INPUT (Data,Var,Rel) */		\
+			HID_MI_INPUT, 0x06,			\
+		/* END_COLLECTION */				\
+		HID_MI_COLLECTION_END,				\
+	/* END_COLLECTION */					\
+	HID_MI_COLLECTION_END,					\
+}
+
+
 /* Register HID device */
-void usb_hid_register_device(const u8_t *desc, size_t size,
+void usb_hid_register_device(struct device *dev, const u8_t *desc, size_t size,
 			     const struct hid_ops *op);
 
+/* Write to hid interrupt endpoint */
+int hid_int_ep_write(const struct device *dev, const u8_t *data, u32_t data_len,
+		     u32_t *bytes_ret);
+
+/* Read from hid interrupt endpoint */
+int hid_int_ep_read(const struct device *dev, u8_t *data, u32_t max_data_len,
+		    u32_t *ret_bytes);
+
 /* Initialize USB HID */
-int usb_hid_init(void);
+int usb_hid_init(const struct device *dev);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __USB_HID_H__ */
+#endif /* ZEPHYR_INCLUDE_USB_CLASS_USB_HID_H_ */

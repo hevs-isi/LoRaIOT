@@ -18,7 +18,6 @@
 
 #include <net/socket.h>
 #include <kernel.h>
-#include <net/net_app.h>
 
 #endif
 
@@ -35,9 +34,16 @@ int main(void)
 	bind_addr.sin_family = AF_INET;
 	bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	bind_addr.sin_port = htons(PORT);
-	bind(serv, (struct sockaddr *)&bind_addr, sizeof(bind_addr));
 
-	listen(serv, 5);
+	if (bind(serv, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0) {
+		printf("error: bind: %d\n", errno);
+		exit(1);
+	}
+
+	if (listen(serv, 5) < 0) {
+		printf("error: listen: %d\n", errno);
+		exit(1);
+	}
 
 	printf("Single-threaded TCP echo server waits for a connection on port %d...\n", PORT);
 

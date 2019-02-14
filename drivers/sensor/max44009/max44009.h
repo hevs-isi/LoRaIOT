@@ -4,14 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _SENSOR_MAX44009
-#define _SENSOR_MAX44009
+#ifndef ZEPHYR_DRIVERS_SENSOR_MAX44009_MAX44009_H_
+#define ZEPHYR_DRIVERS_SENSOR_MAX44009_MAX44009_H_
 
 #include <misc/util.h>
-
-#define SYS_LOG_DOMAIN "MAX44009"
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_SENSOR_LEVEL
-#include <logging/sys_log.h>
 
 #define MAX44009_I2C_ADDRESS	CONFIG_MAX44009_I2C_ADDR
 

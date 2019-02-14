@@ -17,7 +17,6 @@ K_SEM_DEFINE(sem_bench, 0, 1);
 K_SEM_DEFINE(sem_bench_1, 0, 1);
 
 /* To time thread creation*/
-#define STACK_SIZE 500
 extern K_THREAD_STACK_DEFINE(my_stack_area, STACK_SIZE);
 extern K_THREAD_STACK_DEFINE(my_stack_area_0, STACK_SIZE);
 extern struct k_thread my_thread;
@@ -25,8 +24,8 @@ extern struct k_thread my_thread_0;
 
 /* u64_t thread_yield_start_time[1000]; */
 /* u64_t thread_yield_end_time[1000]; */
-u64_t thread_start_time;
-u64_t thread_end_time;
+extern u64_t thread_start_time;
+extern u64_t thread_end_time;
 u64_t sem_start_time;
 u64_t sem_end_time;
 u64_t sem_give_start_time;
@@ -124,13 +123,16 @@ void mutex_bench(void)
 {
 	u32_t mutex_lock_start_time;
 	u32_t mutex_lock_end_time;
-	u32_t mutex_lock_diff = 0;
+	u32_t mutex_lock_diff = 0U;
 
 	u32_t mutex_unlock_start_time;
 	u32_t mutex_unlock_end_time;
-	u32_t mutex_unlock_diff = 0;
+	u32_t mutex_unlock_diff = 0U;
+	u32_t count = 0U;
 
 	for (int i = 0; i < 1000; i++) {
+		s64_t before = k_uptime_get();
+
 		TIMING_INFO_PRE_READ();
 		mutex_lock_start_time = TIMING_INFO_OS_GET_TIME();
 
@@ -147,17 +149,24 @@ void mutex_bench(void)
 		TIMING_INFO_PRE_READ();
 		mutex_unlock_end_time = TIMING_INFO_OS_GET_TIME();
 
+		/* If timer interrupt occurs we need to omit that sample*/
+		s64_t after = k_uptime_get();
+
+		if (after - before)
+			continue;
+		count++;
+
 		mutex_lock_diff += (mutex_lock_end_time -
 					mutex_lock_start_time);
 		mutex_unlock_diff += (mutex_unlock_end_time -
 				      mutex_unlock_start_time);
 	}
 
-	PRINT_STATS("Mutex lock", mutex_lock_diff / 1000,
-		CYCLES_TO_NS(mutex_lock_diff / 1000));
+	PRINT_STATS("Mutex lock", mutex_lock_diff / count,
+		CYCLES_TO_NS(mutex_lock_diff / count));
 
-	PRINT_STATS("Mutex unlock", mutex_unlock_diff / 1000,
-		CYCLES_TO_NS(mutex_unlock_diff / 1000));
+	PRINT_STATS("Mutex unlock", mutex_unlock_diff / count,
+		CYCLES_TO_NS(mutex_unlock_diff / count));
 }
 
 /******************************************************************************/
@@ -166,7 +175,7 @@ void thread_sem1_test(void *p1, void *p2, void *p3)
 
 	k_sem_give(&sem_bench); /* sync the 2 threads*/
 
-	__read_swap_end_time_value = 1;
+	__read_swap_end_time_value = 1U;
 	TIMING_INFO_PRE_READ();
 	sem_start_time =  TIMING_INFO_OS_GET_TIME();
 	k_sem_take(&sem_bench, 10);
@@ -196,7 +205,7 @@ void thread_sem0_give_test(void *p1, void *p2, void *p3)
 	/* To make sure that the sem give will cause a swap to occur */
 	k_thread_priority_set(sem1_tid, 1);
 
-	__read_swap_end_time_value = 1;
+	__read_swap_end_time_value = 1U;
 	TIMING_INFO_PRE_READ();
 	sem_give_start_time =  TIMING_INFO_OS_GET_TIME();
 	k_sem_give(&sem_bench_1);

@@ -4,16 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_IEEE802154_DRIVER_LEVEL
-#define SYS_LOG_DOMAIN "net/ieee802154/upipe/"
-#include <logging/sys_log.h>
+#define LOG_MODULE_NAME ieee802154_uart_pipe
+#define LOG_LEVEL CONFIG_IEEE802154_DRIVER_LOG_LEVEL
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <errno.h>
 
 #include <kernel.h>
 #include <arch/cpu.h>
 
-#include <board.h>
 #include <device.h>
 #include <init.h>
 #include <net/net_if.h>
@@ -99,14 +100,14 @@ static bool received_dest_addr_matched(u8_t *rx_buffer)
 
 static u8_t *upipe_rx(u8_t *buf, size_t *off)
 {
-	struct upipe_context *upipe = upipe_dev->driver_data;
 	struct net_pkt *pkt = NULL;
-	struct net_buf *frag = NULL;
+	struct upipe_context *upipe;
 
 	if (!upipe_dev) {
 		goto done;
 	}
 
+	upipe = upipe_dev->driver_data;
 	if (!upipe->rx && *buf == UART_PIPE_RADIO_15_4_FRAME_TYPE) {
 		upipe->rx = true;
 		goto done;
@@ -124,15 +125,17 @@ static u8_t *upipe_rx(u8_t *buf, size_t *off)
 	upipe->rx_buf[upipe->rx_off++] = *buf;
 
 	if (upipe->rx_len == upipe->rx_off) {
-		pkt = net_pkt_get_reserve_rx(0, K_NO_WAIT);
+		struct net_buf *frag;
+
+		pkt = net_pkt_get_reserve_rx(K_NO_WAIT);
 		if (!pkt) {
-			SYS_LOG_DBG("No pkt available");
+			LOG_DBG("No pkt available");
 			goto flush;
 		}
 
 		frag = net_pkt_get_frag(pkt, K_NO_WAIT);
 		if (!frag) {
-			SYS_LOG_DBG("No fragment available");
+			LOG_DBG("No fragment available");
 			goto out;
 		}
 
@@ -143,19 +146,19 @@ static u8_t *upipe_rx(u8_t *buf, size_t *off)
 
 #if defined(CONFIG_IEEE802154_UPIPE_HW_FILTER)
 		if (received_dest_addr_matched(frag->data) == false) {
-			SYS_LOG_DBG("Packet received is not addressed to me");
+			LOG_DBG("Packet received is not addressed to me");
 			goto out;
 		}
 #endif
 
 		if (ieee802154_radio_handle_ack(upipe->iface, pkt) == NET_OK) {
-			SYS_LOG_DBG("ACK packet handled");
+			LOG_DBG("ACK packet handled");
 			goto out;
 		}
 
-		SYS_LOG_DBG("Caught a packet (%u)", upipe->rx_len);
+		LOG_DBG("Caught a packet (%u)", upipe->rx_len);
 		if (net_recv_data(upipe->iface, pkt) < 0) {
-			SYS_LOG_DBG("Packet dropped by NET stack");
+			LOG_DBG("Packet dropped by NET stack");
 			goto out;
 		}
 
@@ -164,8 +167,8 @@ out:
 		net_pkt_unref(pkt);
 flush:
 		upipe->rx = false;
-		upipe->rx_len = 0;
-		upipe->rx_off = 0;
+		upipe->rx_len = 0U;
+		upipe->rx_off = 0U;
 	}
 done:
 	*off = 0;
@@ -193,11 +196,8 @@ static int upipe_cca(struct device *dev)
 
 static int upipe_set_channel(struct device *dev, u16_t channel)
 {
-	struct upipe_context *upipe = dev->driver_data;
-
-	if (upipe->stopped) {
-		return -EIO;
-	}
+	ARG_UNUSED(dev);
+	ARG_UNUSED(channel);
 
 	return 0;
 }
@@ -240,7 +240,7 @@ static int upipe_filter(struct device *dev,
 			enum ieee802154_filter_type type,
 			const struct ieee802154_filter *filter)
 {
-	SYS_LOG_DBG("Applying filter %u", type);
+	LOG_DBG("Applying filter %u", type);
 
 	if (!set) {
 		return -ENOTSUP;
@@ -259,11 +259,8 @@ static int upipe_filter(struct device *dev,
 
 static int upipe_set_txpower(struct device *dev, s16_t dbm)
 {
-	struct upipe_context *upipe = dev->driver_data;
-
-	if (upipe->stopped) {
-		return -EIO;
-	}
+	ARG_UNUSED(dev);
+	ARG_UNUSED(dbm);
 
 	return 0;
 }
@@ -272,12 +269,12 @@ static int upipe_tx(struct device *dev,
 		    struct net_pkt *pkt,
 		    struct net_buf *frag)
 {
-	u8_t *pkt_buf = frag->data - net_pkt_ll_reserve(pkt);
-	u8_t len = net_pkt_ll_reserve(pkt) + frag->len;
 	struct upipe_context *upipe = dev->driver_data;
+	u8_t *pkt_buf = frag->data;
+	u8_t len = frag->len;
 	u8_t i, data;
 
-	SYS_LOG_DBG("%p (%u)", frag, len);
+	LOG_DBG("%p (%u)", frag, len);
 
 	if (upipe->stopped) {
 		return -EIO;
@@ -289,7 +286,7 @@ static int upipe_tx(struct device *dev,
 	data = len;
 	uart_pipe_send(&data, 1);
 
-	for (i = 0; i < len; i++) {
+	for (i = 0U; i < len; i++) {
 		uart_pipe_send(pkt_buf+i, 1);
 	}
 
@@ -326,7 +323,7 @@ static int upipe_init(struct device *dev)
 {
 	struct upipe_context *upipe = dev->driver_data;
 
-	memset(upipe, 0, sizeof(struct upipe_context));
+	(void)memset(upipe, 0, sizeof(struct upipe_context));
 
 	uart_pipe_register(upipe->uart_pipe_buf, 1, upipe_rx);
 
@@ -346,7 +343,7 @@ static inline u8_t *get_mac(struct device *dev)
 
 #if defined(CONFIG_IEEE802154_UPIPE_RANDOM_MAC)
 	UNALIGNED_PUT(sys_cpu_to_be32(sys_rand32_get()),
-		      (u32_t *) ((void *)upipe->mac_addr+4));
+		      (u32_t *) ((u8_t *)upipe->mac_addr+4));
 #else
 	upipe->mac_addr[4] = CONFIG_IEEE802154_UPIPE_MAC4;
 	upipe->mac_addr[5] = CONFIG_IEEE802154_UPIPE_MAC5;
@@ -363,8 +360,6 @@ static void upipe_iface_init(struct net_if *iface)
 	struct upipe_context *upipe = dev->driver_data;
 	u8_t *mac = get_mac(dev);
 
-	SYS_LOG_DBG("");
-
 	net_if_set_link_addr(iface, mac, 8, NET_LINK_IEEE802154);
 
 	upipe_dev = dev;
@@ -377,7 +372,6 @@ static struct upipe_context upipe_context_data;
 
 static struct ieee802154_radio_api upipe_radio_api = {
 	.iface_api.init		= upipe_iface_init,
-	.iface_api.send		= ieee802154_radio_send,
 
 	.get_capabilities	= upipe_get_capabilities,
 	.cca			= upipe_cca,

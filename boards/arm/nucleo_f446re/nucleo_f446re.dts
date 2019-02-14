@@ -5,7 +5,7 @@
  */
 
 /dts-v1/;
-#include <st/stm32f446.dtsi>
+#include <st/f4/stm32f446Xe.dtsi>
 
 / {
 	model = "STMicroelectronics STM32F446RE-NUCLEO board";
@@ -13,13 +13,14 @@
 
 	chosen {
 		zephyr,console = &usart2;
+		zephyr,shell-uart = &usart2;
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
 	};
 
 	leds {
 		compatible = "gpio-leds";
-		green_led_2: led@0 {
+		green_led_2: led_2 {
 			gpios = <&gpioa 5 GPIO_INT_ACTIVE_HIGH>;
 			label = "User LD2";
 		};
@@ -27,7 +28,7 @@
 
 	gpio_keys {
 		compatible = "gpio-keys";
-		user_button: button@0 {
+		user_button: button {
 			label = "User";
 			gpios = <&gpioc 13 GPIO_INT_ACTIVE_LOW>;
 		};
@@ -53,7 +54,25 @@
 	status = "ok";
 };
 
-&i2c1 {
+arduino_i2c: &i2c1 {
 	status = "ok";
 	clock-frequency = <I2C_BITRATE_FAST>;
+};
+
+&i2c2 {
+	status = "ok";
+	clock-frequency = <I2C_BITRATE_FAST>;
+};
+
+&i2c3 {
+	status = "ok";
+	clock-frequency = <I2C_BITRATE_FAST>;
+};
+
+arduino_spi: &spi1 {
+	status = "ok";
+};
+
+&rtc {
+	status = "ok";
 };

@@ -36,16 +36,16 @@ extern const int _k_neg_eagain;
  * Given that __swap() is called to effect a cooperative context switch,
  * only the caller-saved integer registers need to be saved in the thread of the
  * outgoing thread. This is all performed by the hardware, which stores it in
- * its exception stack frame, created when handling the svc exception.
+ * its exception stack frame, created when handling the __pendsv exception.
  *
  * On ARMv6-M, the intlock key is represented by the PRIMASK register,
  * as BASEPRI is not available.
  *
- * @return may contain a return value setup by a call to
+ * @return -EAGAIN, or a return value set by a call to
  * _set_thread_return_value()
  *
  */
-unsigned int __swap(int key)
+int __swap(int key)
 {
 #ifdef CONFIG_USERSPACE
 	/* Save off current privilege mode */

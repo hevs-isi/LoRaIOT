@@ -1,3 +1,9 @@
+#if defined(CONFIG_GEN_ISR_TABLES) && !defined(CONFIG_DYNAMIC_INTERRUPTS)
+	SECTION_PROLOGUE(sw_isr_table, (OPTIONAL),)
+	{
+		*(SW_ISR_TABLE)
+	} GROUP_LINK_IN(ROMABLE_REGION)
+#endif
 #ifdef CONFIG_CPLUSPLUS
 	SECTION_PROLOGUE(_CTOR_SECTION_NAME,,)
 	{
@@ -35,6 +41,14 @@
 		__object_access_end = .;
 	}
 #endif
+
+	SECTION_PROLOGUE(app_shmem_regions, (OPTIONAL),)
+	{
+		__app_shmem_regions_start = .;
+		KEEP(*(SORT(".app_regions.*")));
+		__app_shmem_regions_end = .;
+	} GROUP_LINK_IN(ROMABLE_REGION)
+
 	SECTION_PROLOGUE (devconfig, (OPTIONAL),)
 	{
 		__devconfig_start = .;
@@ -59,3 +73,42 @@
 		_bt_settings_end = .;
 	} GROUP_LINK_IN(ROMABLE_REGION)
 #endif
+
+	SECTION_DATA_PROLOGUE(log_const_sections, (OPTIONAL),)
+	{
+		__log_const_start = .;
+		KEEP(*(SORT(.log_const_*)));
+		__log_const_end = .;
+	} GROUP_LINK_IN(ROMABLE_REGION)
+
+	SECTION_DATA_PROLOGUE(log_backends_sections, (OPTIONAL),)
+	{
+		__log_backends_start = .;
+		KEEP(*(".log_backends"));
+		__log_backends_end = .;
+	} GROUP_LINK_IN(ROMABLE_REGION)
+
+	SECTION_DATA_PROLOGUE(shell_root_cmds_sections, (OPTIONAL),)
+	{
+		__shell_root_cmds_start = .;
+		KEEP(*(SORT(.shell_root_cmd_*)));
+		__shell_root_cmds_end = .;
+	} GROUP_LINK_IN(ROMABLE_REGION)
+
+	SECTION_DATA_PROLOGUE(font_entry_sections, (OPTIONAL),)
+	{
+		__font_entry_start = .;
+		KEEP(*(SORT_BY_NAME(".font_entry.*")))
+		__font_entry_end = .;
+	} GROUP_LINK_IN(ROMABLE_REGION)
+
+#ifdef CONFIG_COVERAGE_GCOV
+	/* Section needed by gcov when coverage is turned on.*/
+	SECTION_PROLOGUE (gcov, (OPTIONAL),)
+	{
+		PROVIDE_HIDDEN (__init_array_start = .);
+		KEEP (*(SORT(.init_array.*)))
+		KEEP (*(.init_array*))
+		PROVIDE_HIDDEN (__init_array_end = .);
+	} GROUP_LINK_IN(ROMABLE_REGION)
+#endif  /* CONFIG_COVERAGE_GCOV */

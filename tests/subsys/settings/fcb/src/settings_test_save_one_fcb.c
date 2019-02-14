@@ -8,6 +8,11 @@
 #include "settings_test.h"
 #include "settings/settings_fcb.h"
 
+static int test_config_save_one_byte_value(const char *name, u8_t val)
+{
+	return settings_save_one(name, &val, 1);
+}
+
 void test_config_save_one_fcb(void)
 {
 	int rc;
@@ -21,27 +26,27 @@ void test_config_save_one_fcb(void)
 	cf.cf_fcb.f_sector_cnt = ARRAY_SIZE(fcb_sectors);
 
 	rc = settings_fcb_src(&cf);
-	zassert_true(rc == 0, "can't register FCB as configuration source\n");
+	zassert_true(rc == 0, "can't register FCB as configuration source");
 
 	rc = settings_fcb_dst(&cf);
 	zassert_true(rc == 0,
-			 "can't register FCB as configuration destination\n");
+			 "can't register FCB as configuration destination");
 
-	val8 = 33;
+	val8 = 33U;
 	rc = settings_save();
-	zassert_true(rc == 0, "fcb write error\n");
+	zassert_true(rc == 0, "fcb write error");
 
-	rc = settings_save_one("myfoo/mybar", "42");
-	zassert_true(rc == 0, "fcb one item write error\n");
-
-	rc = settings_load();
-	zassert_true(rc == 0, "fcb read error\n");
-	zassert_true(val8 == 42, "bad value read\n");
-
-	rc = settings_save_one("myfoo/mybar", "44");
-	zassert_true(rc == 0, "fcb one item write error\n");
+	rc = test_config_save_one_byte_value("myfoo/mybar", 42);
+	zassert_true(rc == 0, "fcb one item write error");
 
 	rc = settings_load();
-	zassert_true(rc == 0, "fcb read error\n");
-	zassert_true(val8 == 44, "bad value read\n");
+	zassert_true(rc == 0, "fcb read error");
+	zassert_true(val8 == 42, "bad value read");
+
+	rc = test_config_save_one_byte_value("myfoo/mybar", 44);
+	zassert_true(rc == 0, "fcb one item write error");
+
+	rc = settings_load();
+	zassert_true(rc == 0, "fcb read error");
+	zassert_true(val8 == 44, "bad value read");
 }

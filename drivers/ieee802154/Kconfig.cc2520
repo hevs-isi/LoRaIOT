@@ -9,7 +9,6 @@
 menuconfig IEEE802154_CC2520
 	bool "TI CC2520 Driver support"
 	depends on NETWORKING
-	default n
 
 if IEEE802154_CC2520
 
@@ -19,50 +18,11 @@ config IEEE802154_CC2520_DRV_NAME
 	help
 	  This option sets the driver name
 
-config IEEE802154_CC2520_SPI_DRV_NAME
-	string "SPI driver's name to use to access CC2520"
-	default ""
-	help
-	  This option is mandatory to set which SPI controller to use in order
-	  to actually control the CC2520 chip.
-
-config IEEE802154_CC2520_SPI_FREQ
-	int "SPI system frequency"
-	default 0
-	help
-	  This option sets the SPI controller's frequency. Beware this value
-	  depends on the SPI controller being used and also on the system
-	  clock.
-
-config IEEE802154_CC2520_SPI_SLAVE
-	int "SPI slave linked to CC2520"
-	default 0
-	help
-	  This option sets the SPI slave number SPI controller has to switch
-	  to when dealing with CC2520 chip.
-
 config IEEE802154_CC2520_GPIO_SPI_CS
 	bool "Manage SPI CS through a GPIO pin"
-	default n
 	help
 	This option is useful if one needs to manage SPI CS through a GPIO
 	pin to by-pass the SPI controller's CS logic.
-
-config IEEE802154_CC2520_GPIO_SPI_CS_DRV_NAME
-	string "GPIO driver's name to use to drive SPI CS through"
-	default ""
-	depends on IEEE802154_CC2520_GPIO_SPI_CS
-	help
-	This option is mandatory to set which GPIO controller to use in order
-	to actually emulate the SPI CS.
-
-config IEEE802154_CC2520_GPIO_SPI_CS_PIN
-	int "GPIO PIN to use to drive SPI CS through"
-	default 0
-	depends on IEEE802154_CC2520_GPIO_SPI_CS
-	help
-	This option is mandatory to set which GPIO pin to use in order
-	to actually emulate the SPI CS.
 
 config IEEE802154_CC2520_RX_STACK_SIZE
 	int "Driver's internal RX thread stack size"
@@ -92,28 +52,28 @@ if ! IEEE802154_CC2520_RANDOM_MAC
 config IEEE802154_CC2520_MAC4
 	hex "MAC Address Byte 4"
 	default 0
-	range 0 ff
+	range 0 0xff
 	help
 	  This is the byte 4 of the MAC address.
 
 config IEEE802154_CC2520_MAC5
 	hex "MAC Address Byte 5"
 	default 0
-	range 0 ff
+	range 0 0xff
 	help
 	  This is the byte 5 of the MAC address.
 
 config IEEE802154_CC2520_MAC6
 	hex "MAC Address Byte 6"
 	default 0
-	range 0 ff
+	range 0 0xff
 	help
 	  This is the byte 6 of the MAC address.
 
 config IEEE802154_CC2520_MAC7
 	hex "MAC Address Byte 7"
 	default 0
-	range 0 ff
+	range 0 0xff
 	help
 	  This is the byte 7 of the MAC address.
 
@@ -121,7 +81,6 @@ endif # IEEE802154_CC2520_RANDOM_MAC
 
 config IEEE802154_CC2520_CRYPTO
 	bool "Enable hardware crypto helper on cc2520"
-	default n
 	depends on NET_L2_IEEE802154_SECURITY
 	help
 	  This option will expose the hardware AES encryption from CC2520.

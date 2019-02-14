@@ -8,29 +8,44 @@
 
 if BT_HCI
 
+config BT_HCI_VS
+	bool "Zephyr HCI Vendor-Specific Commands"
+	default y
+	help
+	  Enable support for the Zephyr HCI Vendor-Specific Commands in the
+	  Host and/or Controller. This enables Set Version Information,
+	  Supported Commands, Supported Features vendor commands.
+
 config BT_HCI_VS_EXT
 	bool "Zephyr HCI Vendor-Specific Extensions"
+	depends on BT_HCI_VS
 	default y
 	help
 	  Enable support for the Zephyr HCI Vendor-Specific Extensions in the
-	  Host and/or Controller.
+	  Host and/or Controller. This enables  Write BD_ADDR, Read Build Info,
+	  Read Static Addresses and Read Key Hierarchy Roots vendor commands.
 
 config BT_HCI_VS_EXT_DETECT
 	bool "Use heuristics to guess HCI vendor extensions support in advance"
 	depends on BT_HCI_VS_EXT && !BT_CTLR
-	default y if BOARD_QEMU_X86 || BOARD_QEMU_CORTEX_M3
+	default y if BOARD_QEMU_X86 || BOARD_QEMU_CORTEX_M3 || BOARD_NATIVE_POSIX
 	help
 	  Use some heuristics to try to guess in advance whether the controller
 	  supports the HCI vendor extensions in advance, in order to prevent
 	  sending vendor commands to controller which may interpret them in
 	  completely different ways.
 
+config BT_HCI_MESH_EXT
+	bool "Mesh HCI Command support"
+	depends on BT_BROADCASTER && BT_OBSERVER && !BT_LL_SW_SPLIT
+	help
+	  Enable support for the Bluetooth Mesh HCI Commands.
+
 config BT_RPA
 	# Virtual/hidden option
 	bool
 	select TINYCRYPT
 	select TINYCRYPT_AES
-	default n
 
 config BT_DEBUG
 	# Virtual/hidden option to make the conditions more intuitive
@@ -49,8 +64,7 @@ config BT_DEBUG_NONE
 config BT_DEBUG_LOG
 	bool "Normal printf-style to console"
 	select BT_DEBUG
-	select PRINTK
-	select SYS_LOG
+	select LOG
 	help
 	  This option enables Bluetooth debug going to standard
 	  serial console.
@@ -58,7 +72,7 @@ config BT_DEBUG_LOG
 config BT_DEBUG_MONITOR
 	bool "Monitor protocol over UART"
 	select BT_DEBUG
-	select PRINTK
+	select LOG
 	select CONSOLE_HAS_DRIVER
 	help
 	  Use a custom logging protocol over the console UART
@@ -76,15 +90,14 @@ endchoice
 
 if BT_DEBUG
 
-if !HAS_DTS
 config BT_MONITOR_ON_DEV_NAME
 	string "Device Name of Bluetooth monitor logging UART"
 	depends on BT_DEBUG_MONITOR
+	default "$(dt_str_val,DT_BT_MONITOR_ON_DEV_NAME)" if HAS_DTS
 	default "UART_0"
 	help
 	 This option specifies the name of UART device to be used
 	 for the Bluetooth monitor logging.
-endif
 
 config BT_DEBUG_HCI_DRIVER
 	bool "Bluetooth HCI driver debug"

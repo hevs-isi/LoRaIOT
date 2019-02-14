@@ -8,11 +8,11 @@
 if BOARD_STM32F072B_DISCO
 
 config BOARD
-	default stm32f072b_disco
+	default "stm32f072b_disco"
 
 if UART_CONSOLE
 
-config UART_STM32_PORT_1
+config UART_1
 	default y
 
 endif # UART_CONSOLE

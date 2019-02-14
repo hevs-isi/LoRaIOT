@@ -48,8 +48,8 @@
  * E.g., "s0", "s1", etc.
  */
 
-#ifndef H_STATS_
-#define H_STATS_
+#ifndef ZEPHYR_INCLUDE_STATS_H_
+#define ZEPHYR_INCLUDE_STATS_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -61,7 +61,7 @@ extern "C" {
 struct stats_name_map {
 	u16_t snm_off;
 	const char *snm_name;
-} __packed;
+} __attribute__((packed));
 
 struct stats_hdr {
 	const char *s_name;
@@ -105,28 +105,28 @@ struct stats_hdr {
 /**
  * @brief Declares a 32-bit stat entry inside a group struct.
  *
- * @param var__                 The name ot assign to the entry.
+ * @param var__                 The name to assign to the entry.
  */
 #define STATS_SECT_ENTRY(var__) u32_t var__;
 
 /**
  * @brief Declares a 16-bit stat entry inside a group struct.
  *
- * @param var__                 The name ot assign to the entry.
+ * @param var__                 The name to assign to the entry.
  */
 #define STATS_SECT_ENTRY16(var__) u16_t var__;
 
 /**
  * @brief Declares a 32-bit stat entry inside a group struct.
  *
- * @param var__                 The name ot assign to the entry.
+ * @param var__                 The name to assign to the entry.
  */
 #define STATS_SECT_ENTRY32(var__) u32_t var__;
 
 /**
  * @brief Declares a 64-bit stat entry inside a group struct.
  *
- * @param var__                 The name ot assign to the entry.
+ * @param var__                 The name to assign to the entry.
  */
 #define STATS_SECT_ENTRY64(var__) u64_t var__;
 
@@ -383,4 +383,4 @@ struct stats_hdr *stats_group_find(const char *name);
 }
 #endif
 
-#endif /* H_STATS_ */
+#endif /* ZEPHYR_INCLUDE_STATS_H_ */

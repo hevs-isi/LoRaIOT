@@ -1,21 +1,21 @@
-/**
+/*
  * Copyright (c) 2015 - 2018, Nordic Semiconductor ASA
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -280,6 +280,52 @@ __STATIC_INLINE void nrf_spim_int_disable(NRF_SPIM_Type * p_reg,
  */
 __STATIC_INLINE bool nrf_spim_int_enable_check(NRF_SPIM_Type * p_reg,
                                                nrf_spim_int_mask_t spim_int);
+
+#if defined(DPPI_PRESENT) || defined(__NRFX_DOXYGEN__)
+/**
+ * @brief Function for setting the subscribe configuration for a given
+ *        SPIM task.
+ *
+ * @param[in] p_reg   Pointer to the structure of registers of the peripheral.
+ * @param[in] task    Task for which to set the configuration.
+ * @param[in] channel Channel through which to subscribe events.
+ */
+__STATIC_INLINE void nrf_spim_subscribe_set(NRF_SPIM_Type * p_reg,
+                                            nrf_spim_task_t task,
+                                            uint8_t         channel);
+
+/**
+ * @brief Function for clearing the subscribe configuration for a given
+ *        SPIM task.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ * @param[in] task  Task for which to clear the configuration.
+ */
+__STATIC_INLINE void nrf_spim_subscribe_clear(NRF_SPIM_Type * p_reg,
+                                              nrf_spim_task_t task);
+
+/**
+ * @brief Function for setting the publish configuration for a given
+ *        SPIM event.
+ *
+ * @param[in] p_reg   Pointer to the structure of registers of the peripheral.
+ * @param[in] event   Event for which to set the configuration.
+ * @param[in] channel Channel through which to publish the event.
+ */
+__STATIC_INLINE void nrf_spim_publish_set(NRF_SPIM_Type *  p_reg,
+                                          nrf_spim_event_t event,
+                                          uint8_t         channel);
+
+/**
+ * @brief Function for clearing the publish configuration for a given
+ *        SPIM event.
+ *
+ * @param[in] p_reg Pointer to the structure of registers of the peripheral.
+ * @param[in] event Event for which to clear the configuration.
+ */
+__STATIC_INLINE void nrf_spim_publish_clear(NRF_SPIM_Type *  p_reg,
+                                            nrf_spim_event_t event);
+#endif // defined(DPPI_PRESENT) || defined(__NRFX_DOXYGEN__)
 
 /**
  * @brief Function for enabling the SPIM peripheral.
@@ -556,6 +602,36 @@ __STATIC_INLINE bool nrf_spim_int_enable_check(NRF_SPIM_Type * p_reg,
 {
     return (bool)(p_reg->INTENSET & spim_int);
 }
+
+#if defined(DPPI_PRESENT)
+__STATIC_INLINE void nrf_spim_subscribe_set(NRF_SPIM_Type * p_reg,
+                                            nrf_spim_task_t task,
+                                            uint8_t         channel)
+{
+    *((volatile uint32_t *) ((uint8_t *) p_reg + (uint32_t) task + 0x80uL)) =
+            ((uint32_t)channel | SPIM_SUBSCRIBE_START_EN_Msk);
+}
+
+__STATIC_INLINE void nrf_spim_subscribe_clear(NRF_SPIM_Type * p_reg,
+                                              nrf_spim_task_t task)
+{
+    *((volatile uint32_t *) ((uint8_t *) p_reg + (uint32_t) task + 0x80uL)) = 0;
+}
+
+__STATIC_INLINE void nrf_spim_publish_set(NRF_SPIM_Type *  p_reg,
+                                          nrf_spim_event_t event,
+                                          uint8_t          channel)
+{
+    *((volatile uint32_t *) ((uint8_t *) p_reg + (uint32_t) event + 0x80uL)) =
+            ((uint32_t)channel | SPIM_PUBLISH_STARTED_EN_Msk);
+}
+
+__STATIC_INLINE void nrf_spim_publish_clear(NRF_SPIM_Type *  p_reg,
+                                            nrf_spim_event_t event)
+{
+    *((volatile uint32_t *) ((uint8_t *) p_reg + (uint32_t) event + 0x80uL)) = 0;
+}
+#endif // defined(DPPI_PRESENT)
 
 __STATIC_INLINE void nrf_spim_enable(NRF_SPIM_Type * p_reg)
 {

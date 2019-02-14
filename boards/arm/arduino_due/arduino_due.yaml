@@ -6,4 +6,7 @@ ram: 96
 flash: 512
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
+supported:
+  - watchdog

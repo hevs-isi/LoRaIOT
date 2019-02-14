@@ -8,11 +8,16 @@
 
 / {
 	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
 		cpu@0 {
 			compatible = "arm,cortex-m4f";
+			reg = <0>;
 		};
 		cpu@1 {
 			compatible = "arm,cortex-m0+";
+			reg = <1>;
 		};
 	};
 
@@ -39,6 +44,7 @@
 	soc {
 
 		flash0:flash@0 {
+			compatible = "soc-nv-flash";
 			reg = <0 0x40000>;
 		};
 
@@ -52,7 +58,7 @@
 
 		gpio0: gpio@0 {
 			compatible = "nxp,kinetis-gpio";
-			reg = <0x4008C000 0x2488>;
+			reg = <0x4008c000 0x2488>;
 			interrupts = <2 2>;
 			label = "GPIO_0";
 			gpio-controller;
@@ -68,9 +74,9 @@
 			#gpio-cells = <2>;
 		};
 
-		mailbox0:mailbox@4008B000 {
+		mailbox0:mailbox@4008b000 {
 			compatible = "nxp,lpc-mailbox";
-			reg = <0x4008B000 0xEC>;
+			reg = <0x4008b000 0xEC>;
 			interrupts = <31 0>;
 			label = "MAILBOX_0";
 			status = "disabled";
@@ -81,4 +87,3 @@
 &nvic {
 	arm,num-irq-priority-bits = <3>;
 };
-

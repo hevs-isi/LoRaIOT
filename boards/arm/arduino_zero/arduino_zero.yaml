@@ -6,4 +6,5 @@ ram: 32
 flash: 256
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools

@@ -8,9 +8,4 @@ zephyr_cc_option(-g3 -gdwarf-2)
 # See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63691
 zephyr_cc_option(-fno-delete-null-pointer-checks)
 
-zephyr_cc_option_ifdef (CONFIG_LTO         -flto)
-
-set_property(GLOBAL PROPERTY E_KERNEL_ENTRY  -e${CONFIG_KERNEL_ENTRY})
-
-add_subdirectory(soc/${SOC_PATH})
 add_subdirectory(core)

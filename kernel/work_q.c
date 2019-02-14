@@ -13,46 +13,22 @@
 
 #include <kernel_structs.h>
 #include <wait_q.h>
+#include <spinlock.h>
 #include <errno.h>
+#include <stdbool.h>
 
-static void work_q_main(void *work_q_ptr, void *p2, void *p3)
-{
-	struct k_work_q *work_q = work_q_ptr;
+#define WORKQUEUE_THREAD_NAME	"workqueue"
 
-	ARG_UNUSED(p2);
-	ARG_UNUSED(p3);
-
-	while (1) {
-		struct k_work *work;
-		k_work_handler_t handler;
-
-		work = k_queue_get(&work_q->queue, K_FOREVER);
-		if (!work) {
-			continue;
-		}
-
-		handler = work->handler;
-
-		/* Reset pending state so it can be resubmitted by handler */
-		if (atomic_test_and_clear_bit(work->flags,
-					      K_WORK_STATE_PENDING)) {
-			handler(work);
-		}
-
-		/* Make sure we don't hog up the CPU if the FIFO never (or
-		 * very rarely) gets empty.
-		 */
-		k_yield();
-	}
-}
+extern void z_work_q_main(void *work_q_ptr, void *p2, void *p3);
 
 void k_work_q_start(struct k_work_q *work_q, k_thread_stack_t *stack,
 		    size_t stack_size, int prio)
 {
 	k_queue_init(&work_q->queue);
-	k_thread_create(&work_q->thread, stack, stack_size, work_q_main,
-			work_q, 0, 0, prio, 0, 0);
-	_k_object_init(work_q);
+	(void)k_thread_create(&work_q->thread, stack, stack_size, z_work_q_main,
+			work_q, NULL, NULL, prio, 0, 0);
+
+	k_thread_name_set(&work_q->thread, WORKQUEUE_THREAD_NAME);
 }
 
 #ifdef CONFIG_SYS_CLOCK_EXISTS
@@ -70,15 +46,34 @@ void k_delayed_work_init(struct k_delayed_work *work, k_work_handler_t handler)
 	k_work_init(&work->work, handler);
 	_init_timeout(&work->timeout, work_timeout);
 	work->work_q = NULL;
+}
 
-	_k_object_init(work);
+static int work_cancel(struct k_delayed_work *work)
+{
+	__ASSERT(work->work_q != NULL, "");
+
+	if (k_work_pending(&work->work)) {
+		/* Remove from the queue if already submitted */
+		if (!k_queue_remove(&work->work_q->queue, &work->work)) {
+			return -EINVAL;
+		}
+	} else {
+		(void)_abort_timeout(&work->timeout);
+	}
+
+	/* Detach from workqueue */
+	work->work_q = NULL;
+
+	atomic_clear_bit(work->work.flags, K_WORK_STATE_PENDING);
+
+	return 0;
 }
 
 int k_delayed_work_submit_to_queue(struct k_work_q *work_q,
 				   struct k_delayed_work *work,
 				   s32_t delay)
 {
-	int key = irq_lock();
+	k_spinlock_key_t key = k_spin_lock(&work_q->lock);
 	int err;
 
 	/* Work cannot be active in multiple queues */
@@ -89,7 +84,7 @@ int k_delayed_work_submit_to_queue(struct k_work_q *work_q,
 
 	/* Cancel if work has been submitted */
 	if (work->work_q == work_q) {
-		err = k_delayed_work_cancel(work);
+		err = work_cancel(work);
 		if (err < 0) {
 			goto done;
 		}
@@ -103,43 +98,30 @@ int k_delayed_work_submit_to_queue(struct k_work_q *work_q,
 		k_work_submit_to_queue(work_q, &work->work);
 	} else {
 		/* Add timeout */
-		_add_timeout(NULL, &work->timeout, NULL,
-				_TICK_ALIGN + _ms_to_ticks(delay));
+		_add_timeout(&work->timeout, work_timeout,
+			     _TICK_ALIGN + _ms_to_ticks(delay));
 	}
 
 	err = 0;
 
 done:
-	irq_unlock(key);
+	k_spin_unlock(&work_q->lock, key);
 
 	return err;
 }
 
 int k_delayed_work_cancel(struct k_delayed_work *work)
 {
-	int key = irq_lock();
-
 	if (!work->work_q) {
-		irq_unlock(key);
 		return -EINVAL;
 	}
 
-	if (k_work_pending(&work->work)) {
-		/* Remove from the queue if already submitted */
-		if (!k_queue_remove(&work->work_q->queue, &work->work)) {
-			irq_unlock(key);
-			return -EINVAL;
-		}
-	} else {
-		_abort_timeout(&work->timeout);
-	}
+	struct k_spinlock *lock = &work->work_q->lock;
+	k_spinlock_key_t key = k_spin_lock(lock);
+	int ret = work_cancel(work);
 
-	/* Detach from workqueue */
-	work->work_q = NULL;
-
-	atomic_clear_bit(work->work.flags, K_WORK_STATE_PENDING);
-	irq_unlock(key);
-
-	return 0;
+	k_spin_unlock(lock, key);
+	return ret;
 }
+
 #endif /* CONFIG_SYS_CLOCK_EXISTS */

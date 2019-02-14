@@ -6,7 +6,8 @@ ram: 16
 flash: 512
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
 testing:
   ignore_tags:
     - net

@@ -46,6 +46,7 @@ static void callback(struct device *dev,
 static int test_callback(int mode)
 {
 	struct device *dev = device_get_binding(DEV_NAME);
+	struct drv_data *drv_data = &data;
 
 	gpio_pin_disable_callback(dev, PIN_IN);
 	gpio_pin_disable_callback(dev, PIN_OUT);
@@ -67,8 +68,6 @@ static int test_callback(int mode)
 		TC_ERROR("config PIN_IN fail");
 		goto err_exit;
 	}
-
-	struct drv_data *drv_data = &data;
 
 	drv_data->mode = mode;
 	gpio_init_callback(&drv_data->gpio_cb, callback, BIT(PIN_IN));
@@ -94,7 +93,7 @@ static int test_callback(int mode)
 		goto pass_exit;
 	}
 
-	if ((mode & GPIO_INT_LEVEL) == GPIO_INT_LEVEL) {
+	if ((mode & GPIO_INT_EDGE) == GPIO_INT_LEVEL) {
 		if (cb_cnt != MAX_INT_CNT) {
 			TC_ERROR("not trigger callback correctly\n");
 			goto err_exit;

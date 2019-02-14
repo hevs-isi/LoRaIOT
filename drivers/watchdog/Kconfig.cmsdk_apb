@@ -18,18 +18,10 @@ config WDOG_CMSDK_APB
 config WDOG_CMSDK_APB_START_AT_BOOT
 	bool "Start Watchdog during boot"
 	depends on WDOG_CMSDK_APB
-	default n
 	help
 	  Enable this setting to allow WDOG to be automatically started
 	  during device initialization. Note that once WDOG is started
 	  it must be reloaded before the counter reaches 0, otherwise
 	  the MCU will be reset.
-
-config WDOG_CMSDK_APB_DEVICE_NAME
-	string "Device name for CMSDK APB Watchdog"
-	depends on WDOG_CMSDK_APB
-	default "WATCHDOG_0"
-	help
-	  Set the name used by WDOG device during registration.
 
 endif # SOC_FAMILY_ARM

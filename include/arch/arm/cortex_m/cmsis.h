@@ -11,8 +11,8 @@
  * This header contains the interface to the ARM CMSIS Core headers.
  */
 
-#ifndef _CMSIS__H_
-#define _CMSIS__H_
+#ifndef ZEPHYR_INCLUDE_ARCH_ARM_CORTEX_M_CMSIS_H_
+#define ZEPHYR_INCLUDE_ARCH_ARM_CORTEX_M_CMSIS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,13 +81,15 @@ typedef enum {
 #error "Unknown Cortex-M device"
 #endif
 
-#define __MPU_PRESENT                  0 /* Zephyr has no MPU support */
-#define __NVIC_PRIO_BITS               CONFIG_NUM_IRQ_PRIO_BITS
+#ifndef __MPU_PRESENT
+#define __MPU_PRESENT             0U
+#endif
+#define __NVIC_PRIO_BITS               DT_NUM_IRQ_PRIO_BITS
 #define __Vendor_SysTickConfig         0 /* Default to standard SysTick */
 #endif /* __NVIC_PRIO_BITS */
 
-#if __NVIC_PRIO_BITS != CONFIG_NUM_IRQ_PRIO_BITS
-#error "CONFIG_NUM_IRQ_PRIO_BITS and __NVIC_PRIO_BITS are not set to the same value"
+#if __NVIC_PRIO_BITS != DT_NUM_IRQ_PRIO_BITS
+#error "DT_NUM_IRQ_PRIO_BITS and __NVIC_PRIO_BITS are not set to the same value"
 #endif
 
 #if defined(CONFIG_CPU_CORTEX_M0)
@@ -112,4 +114,4 @@ typedef enum {
 }
 #endif
 
-#endif /* _CMSIS__H_ */
+#endif /* ZEPHYR_INCLUDE_ARCH_ARM_CORTEX_M_CMSIS_H_ */

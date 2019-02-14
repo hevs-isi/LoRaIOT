@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _ASM_INLINE_GCC_H
-#define _ASM_INLINE_GCC_H
+#ifndef ZEPHYR_ARCH_X86_INCLUDE_ASM_INLINE_GCC_H_
+#define ZEPHYR_ARCH_X86_INCLUDE_ASM_INLINE_GCC_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,7 +72,7 @@ static inline void _FpAccessDisable(void)
  * This routine saves the system's "live" non-integer context into the
  * specified area.  If the specified thread supports SSE then
  * x87/MMX/SSEx thread info is saved, otherwise only x87/MMX thread is saved.
- * Function is invoked by _FpCtxSave(struct tcs *tcs)
+ * Function is invoked by _FpCtxSave(struct k_thread *thread)
  *
  * @return N/A
  */
@@ -92,7 +92,7 @@ static inline void _do_fp_regs_save(void *preemp_float_reg)
  * This routine saves the system's "live" non-integer context into the
  * specified area.  If the specified thread supports SSE then
  * x87/MMX/SSEx thread info is saved, otherwise only x87/MMX thread is saved.
- * Function is invoked by _FpCtxSave(struct tcs *tcs)
+ * Function is invoked by _FpCtxSave(struct k_thread *thread)
  *
  * @return N/A
  */
@@ -141,4 +141,4 @@ static inline void _do_sse_regs_init(void)
 }
 #endif
 
-#endif /* _ASM_INLINE_GCC_H */
+#endif /* ZEPHYR_ARCH_X86_INCLUDE_ASM_INLINE_GCC_H_ */

@@ -3,10 +3,34 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef _SPINLOCK_H
-#define _SPINLOCK_H
+#ifndef ZEPHYR_INCLUDE_SPINLOCK_H_
+#define ZEPHYR_INCLUDE_SPINLOCK_H_
 
 #include <atomic.h>
+
+/* These stubs aren't provided by the mocking framework, and I can't
+ * find a proper place to put them as mocking seems not to have a
+ * proper "arch" layer.
+ */
+#ifdef ZTEST_UNITTEST
+static inline int _arch_irq_lock(void)
+{
+	return 0;
+}
+
+static inline void _arch_irq_unlock(int key)
+{
+	ARG_UNUSED(key);
+}
+#endif
+
+#if defined(CONFIG_ASSERT) && (CONFIG_MP_NUM_CPUS < 4)
+#include <misc/__assert.h>
+struct k_spinlock;
+int z_spin_lock_valid(struct k_spinlock *l);
+int z_spin_unlock_valid(struct k_spinlock *l);
+#define SPIN_VALIDATE
+#endif
 
 struct k_spinlock_key {
 	int key;
@@ -17,14 +41,19 @@ typedef struct k_spinlock_key k_spinlock_key_t;
 struct k_spinlock {
 #ifdef CONFIG_SMP
 	atomic_t locked;
-#ifdef CONFIG_DEBUG
-	int saved_key;
 #endif
+
+#ifdef SPIN_VALIDATE
+	/* Stores the thread that holds the lock with the locking CPU
+	 * ID in the bottom two bits.
+	 */
+	size_t thread_cpu;
 #endif
 };
 
-static inline k_spinlock_key_t k_spin_lock(struct k_spinlock *l)
+static ALWAYS_INLINE k_spinlock_key_t k_spin_lock(struct k_spinlock *l)
 {
+	ARG_UNUSED(l);
 	k_spinlock_key_t k;
 
 	/* Note that we need to use the underlying arch-specific lock
@@ -33,10 +62,11 @@ static inline k_spinlock_key_t k_spin_lock(struct k_spinlock *l)
 	 */
 	k.key = _arch_irq_lock();
 
+#ifdef SPIN_VALIDATE
+	__ASSERT(z_spin_lock_valid(l), "Recursive spinlock");
+#endif
+
 #ifdef CONFIG_SMP
-# ifdef CONFIG_DEBUG
-	l->saved_key = k.key;
-# endif
 	while (!atomic_cas(&l->locked, 0, 1)) {
 	}
 #endif
@@ -44,16 +74,15 @@ static inline k_spinlock_key_t k_spin_lock(struct k_spinlock *l)
 	return k;
 }
 
-static inline void k_spin_unlock(struct k_spinlock *l, k_spinlock_key_t key)
+static ALWAYS_INLINE void k_spin_unlock(struct k_spinlock *l,
+					k_spinlock_key_t key)
 {
+	ARG_UNUSED(l);
+#ifdef SPIN_VALIDATE
+	__ASSERT(z_spin_unlock_valid(l), "Not my spinlock!");
+#endif
+
 #ifdef CONFIG_SMP
-# ifdef CONFIG_DEBUG
-	/* This doesn't attempt to catch all mismatches, just spots
-	 * where the arch state register shows a difference.  Should
-	 * add a nesting count or something...
-	 */
-	__ASSERT(l->saved_key == key.key, "Mismatched spin lock/unlock");
-# endif
 	/* Strictly we don't need atomic_clear() here (which is an
 	 * exchange operation that returns the old value).  We are always
 	 * setting a zero and (because we hold the lock) know the existing
@@ -66,4 +95,19 @@ static inline void k_spin_unlock(struct k_spinlock *l, k_spinlock_key_t key)
 	_arch_irq_unlock(key.key);
 }
 
-#endif /* _SPINLOCK_H */
+/* Internal function: releases the lock, but leaves local interrupts
+ * disabled
+ */
+static ALWAYS_INLINE void k_spin_release(struct k_spinlock *l)
+{
+	ARG_UNUSED(l);
+#ifdef SPIN_VALIDATE
+	__ASSERT(z_spin_unlock_valid(l), "Not my spinlock!");
+#endif
+#ifdef CONFIG_SMP
+	atomic_clear(&l->locked);
+#endif
+}
+
+
+#endif /* ZEPHYR_INCLUDE_SPINLOCK_H_ */

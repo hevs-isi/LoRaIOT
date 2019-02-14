@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __FLASH_MAP_H__
-#define __FLASH_MAP_H__
+#ifndef ZEPHYR_INCLUDE_FLASH_MAP_H_
+#define ZEPHYR_INCLUDE_FLASH_MAP_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,6 +42,7 @@ struct flash_area {
 	u16_t pad16;
 	off_t fa_off;
 	size_t fa_size;
+	const char *fa_dev_name;
 };
 
 struct flash_sector {
@@ -77,8 +78,18 @@ u8_t flash_area_align(const struct flash_area *fa);
 int flash_area_get_sectors(int fa_id, u32_t *count,
 			   struct flash_sector *sectors);
 
+/**
+ * Check whether given flash area has supporting flash driver
+ * in the system.
+ *
+ * @param fa Flash area.
+ *
+ * @return 1 On success. -ENODEV if no driver match.
+ */
+int flash_area_has_driver(const struct flash_area *fa);
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __FLASH_MAP_H__ */
+#endif /* ZEPHYR_INCLUDE_FLASH_MAP_H_ */

@@ -8,6 +8,7 @@
 #include <kernel_structs.h>
 #include <inttypes.h>
 #include <misc/printk.h>
+#include <logging/log_ctrl.h>
 
 const NANO_ESF _default_esf = {
 	0xdeadbaad,
@@ -30,13 +31,10 @@ const NANO_ESF _default_esf = {
 	0xdeadbaad,
 	0xdeadbaad,
 	0xdeadbaad,
-#if defined(CONFIG_SOC_RISCV32_PULPINO)
-	0xdeadbaad,
-	0xdeadbaad,
-	0xdeadbaad,
-	0xdeadbaad,
-	0xdeadbaad,
-	0xdeadbaad,
+#if defined(CONFIG_RISCV_SOC_CONTEXT_SAVE)
+	{
+		SOC_ESF_INIT,
+	},
 #endif
 };
 
@@ -60,6 +58,8 @@ const NANO_ESF _default_esf = {
 FUNC_NORETURN void _NanoFatalErrorHandler(unsigned int reason,
 					  const NANO_ESF *esf)
 {
+	LOG_PANIC();
+
 	switch (reason) {
 	case _NANO_ERR_CPU_EXCEPTION:
 	case _NANO_ERR_SPURIOUS_INT:
@@ -96,7 +96,7 @@ FUNC_NORETURN void _NanoFatalErrorHandler(unsigned int reason,
 	       "  a2: 0x%x  a3: 0x%x  a4: 0x%x  a5: 0x%x\n"
 	       "  a6: 0x%x  a7: 0x%x\n",
 	       k_current_get(),
-	       (esf->mepc == 0xdeadbaad) ? 0xdeadbaad : esf->mepc - 4,
+	       (esf->mepc == 0xdeadbaad) ? 0xdeadbaad : esf->mepc,
 	       esf->ra, esf->gp, esf->tp, esf->t0,
 	       esf->t1, esf->t2, esf->t3, esf->t4,
 	       esf->t5, esf->t6, esf->a0, esf->a1,
@@ -135,6 +135,8 @@ FUNC_NORETURN __weak void _SysFatalErrorHandler(unsigned int reason,
 {
 	ARG_UNUSED(esf);
 
+	LOG_PANIC();
+
 #if !defined(CONFIG_SIMPLE_FATAL_ERROR_HANDLER)
 #ifdef CONFIG_STACK_SENTINEL
 	if (reason == _NANO_ERR_STACK_CHK_FAIL) {
@@ -164,7 +166,6 @@ hang_system:
 }
 
 
-#ifdef CONFIG_PRINTK
 static char *cause_str(u32_t cause)
 {
 	switch (cause) {
@@ -184,7 +185,6 @@ static char *cause_str(u32_t cause)
 		return "unknown";
 	}
 }
-#endif
 
 
 FUNC_NORETURN void _Fault(const NANO_ESF *esf)
@@ -194,7 +194,6 @@ FUNC_NORETURN void _Fault(const NANO_ESF *esf)
 	__asm__ volatile("csrr %0, mcause" : "=r" (mcause));
 
 	mcause &= SOC_MCAUSE_EXP_MASK;
-
 	printk("Exception cause %s (%d)\n", cause_str(mcause), (int)mcause);
 
 	_NanoFatalErrorHandler(_NANO_ERR_CPU_EXCEPTION, esf);

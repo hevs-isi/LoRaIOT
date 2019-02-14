@@ -6,9 +6,14 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+config HAS_SPI_DW
+	bool
+	help
+	  Signifies whether DesignWare SPI compatible HW is available
+
 menuconfig SPI_DW
 	bool "Designware SPI controller driver"
-	default n
+	depends on HAS_SPI_DW
 	help
 	  Enable support for Designware's SPI controllers.
 
@@ -42,13 +47,11 @@ config SPI_DW_PORT_0_INTERRUPT_SINGLE_LINE
 config SPI_DW_PORT_0_CLOCK_GATE
 	bool "Enable clock gating"
 	depends on CLOCK_CONTROL
-	default n
 
 if SPI_DW_PORT_0_CLOCK_GATE
 
 config SPI_DW_PORT_0_CLOCK_GATE_DRV_NAME
 	string
-	default ""
 
 config SPI_DW_PORT_0_CLOCK_GATE_SUBSYS
 	int "Clock controller's subsystem"
@@ -66,13 +69,11 @@ config SPI_DW_PORT_1_INTERRUPT_SINGLE_LINE
 config SPI_DW_PORT_1_CLOCK_GATE
 	bool "Enable clock gating"
 	depends on CLOCK_CONTROL
-	default n
 
 if SPI_DW_PORT_1_CLOCK_GATE
 
 config SPI_DW_PORT_1_CLOCK_GATE_DRV_NAME
 	string
-	default ""
 
 config SPI_DW_PORT_1_CLOCK_GATE_SUBSYS
 	int "Clock controller's subsystem"
@@ -93,7 +94,6 @@ config SPI_DW_PORT_2_INTERRUPT_SINGLE_LINE
 config SPI_DW_PORT_2_CLOCK_GATE
 	bool "Enable clock gating"
 	depends on CLOCK_CONTROL
-	default n
 
 if SPI_DW_PORT_2_CLOCK_GATE
 
@@ -120,7 +120,6 @@ config SPI_DW_PORT_3_INTERRUPT_SINGLE_LINE
 config SPI_DW_PORT_3_CLOCK_GATE
 	bool "Enable clock gating"
 	depends on CLOCK_CONTROL
-	default n
 
 if SPI_DW_PORT_3_CLOCK_GATE
 

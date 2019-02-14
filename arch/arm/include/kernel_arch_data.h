@@ -9,7 +9,7 @@
  * @brief Private kernel definitions (ARM)
  *
  * This file contains private kernel structures definitions and various
- * other definitions for the ARM Cortex-M3 processor architecture.
+ * other definitions for the ARM Cortex-M processor architecture family.
  *
  * This file is also included by assembly language files which must #define
  * _ASMLANGUAGE before including this header file.  Note that kernel
@@ -17,8 +17,8 @@
  * in the offsets.o module.
  */
 
-#ifndef _kernel_arch_data__h_
-#define _kernel_arch_data__h_
+#ifndef ZEPHYR_ARCH_ARM_INCLUDE_KERNEL_ARCH_DATA_H_
+#define ZEPHYR_ARCH_ARM_INCLUDE_KERNEL_ARCH_DATA_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,4 +67,4 @@ typedef struct _kernel_arch _kernel_arch_t;
 }
 #endif
 
-#endif /* _kernel_arch_data__h_ */
+#endif /* ZEPHYR_ARCH_ARM_INCLUDE_KERNEL_ARCH_DATA_H_ */

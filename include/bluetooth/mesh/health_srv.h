@@ -7,8 +7,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef __BT_MESH_HEALTH_SRV_H
-#define __BT_MESH_HEALTH_SRV_H
+#ifndef ZEPHYR_INCLUDE_BLUETOOTH_MESH_HEALTH_SRV_H_
+#define ZEPHYR_INCLUDE_BLUETOOTH_MESH_HEALTH_SRV_H_
 
 /**
  * @brief Bluetooth Mesh Health Server Model
@@ -16,6 +16,10 @@
  * @ingroup bt_mesh
  * @{
  */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct bt_mesh_health_srv_cb {
 	/* Fetch current faults */
@@ -83,8 +87,12 @@ extern const struct bt_mesh_model_op bt_mesh_health_srv_op[];
 		BT_MESH_MODEL(BT_MESH_MODEL_ID_HEALTH_SRV,                   \
 			      bt_mesh_health_srv_op, pub, srv)
 
+#ifdef __cplusplus
+}
+#endif
+
 /**
  * @}
  */
 
-#endif /* __BT_MESH_HEALTH_SRV_H */
+#endif /* ZEPHYR_INCLUDE_BLUETOOTH_MESH_HEALTH_SRV_H_ */

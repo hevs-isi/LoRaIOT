@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <logging/log.h>
+LOG_MODULE_DECLARE(net_nats_sample, LOG_LEVEL_DBG);
+
 #include <ctype.h>
 #include <errno.h>
 #include <json.h>
@@ -65,7 +68,7 @@ static bool is_subject_valid(const char *subject, size_t len)
 
 			break;
 		default:
-			if (isalnum(subject[pos])) {
+			if (isalnum((unsigned char)subject[pos])) {
 				continue;
 			}
 
@@ -85,7 +88,7 @@ static bool is_sid_valid(const char *sid, size_t len)
 	}
 
 	for (pos = 0; pos < len; pos++) {
-		if (!isalnum(sid[pos])) {
+		if (!isalnum((unsigned char)sid[pos])) {
 			return false;
 		}
 	}
@@ -247,7 +250,7 @@ static int copy_pkt_to_buf(struct net_buf *src, u16_t offset,
 		src = src->frags;
 	}
 
-	for (copied = 0; src && n_bytes > 0; offset = 0) {
+	for (copied = 0U; src && n_bytes > 0; offset = 0U) {
 		to_copy = min(n_bytes, src->len - offset);
 
 		memcpy(dst + copied, (char *)src->data + offset, to_copy);
@@ -533,13 +536,17 @@ int nats_publish(const struct nats *nats,
 	});
 }
 
-static void receive_cb(struct net_context *ctx, struct net_pkt *pkt, int status,
+static void receive_cb(struct net_context *ctx,
+		       struct net_pkt *pkt,
+		       union net_ip_header *ip_hdr,
+		       union net_proto_header *proto_hdr,
+		       int status,
 		       void *user_data)
 {
 	struct nats *nats = user_data;
 	char cmd_buf[CMD_BUF_LEN];
 	struct net_buf *tmp;
-	u16_t pos = 0, cmd_len = 0;
+	u16_t pos = 0U, cmd_len = 0U;
 	size_t len;
 	u8_t *end_of_line;
 
@@ -588,7 +595,7 @@ static void receive_cb(struct net_context *ctx, struct net_pkt *pkt, int status,
 				/* FIXME: What to do with unhandled messages? */
 				break;
 			}
-			cmd_len = 0;
+			cmd_len = 0U;
 		}
 	}
 

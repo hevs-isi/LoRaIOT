@@ -1,6 +1,5 @@
 ---
 title: Kinetis UART
-id: nxp,kinetis-uart
 version: 0.1
 
 description: >
@@ -11,9 +10,6 @@ inherits:
 
 properties:
     compatible:
-      type: string
-      category: required
-      description: compatible strings
       constraint: "nxp,kinetis-uart"
 
     reg:
@@ -34,9 +30,15 @@ properties:
       description: pinmux information for RX, TX, CTS, RTS
       generation: define
 
+    hw-flow-control:
+      type: boolean
+      category: optional
+      description: use hw flow control
+      generation: define
+
     clocks:
       type: array
       category: required
-      description: Clock gate control information
-      generation: structures
+      description: Clock gate information
+      generation: define
 ...

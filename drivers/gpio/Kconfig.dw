@@ -7,10 +7,9 @@
 #
 
 menuconfig GPIO_DW
-	prompt "Designware GPIO"
-	default n
+	bool "Designware GPIO"
 	depends on GPIO
-	bool
+	select HAS_DTS_GPIO
 	help
 	  Enable driver for Designware GPIO
 
@@ -18,19 +17,16 @@ if GPIO_DW
 
 config GPIO_DW_SHARED_IRQ
 	bool
-	default n
 
 config GPIO_DW_INIT_PRIORITY
-	int
+	int "Init priority"
 	default 60
-	prompt "Init priority"
 	help
 	  Device driver initialization priority.
 
 config GPIO_DW_CLOCK_GATE
 	bool "Enable clock gating"
 	select CLOCK_CONTROL
-	default n
 
 config GPIO_DW_CLOCK_GATE_DRV_NAME
 	string
@@ -39,7 +35,6 @@ config GPIO_DW_CLOCK_GATE_DRV_NAME
 
 config GPIO_DW_0
 	bool "Designware GPIO block 0"
-	default n
 	help
 	  Include Designware GPIO driver
 
@@ -74,14 +69,6 @@ config GPIO_DW_0_IRQ_SHARED
 
 endchoice
 
-config GPIO_DW_0_IRQ_SHARED_NAME
-	string "Device name for Shared IRQ"
-	depends on GPIO_DW_0 && GPIO_DW_0_IRQ_SHARED
-	help
-	  Specify the device name for the shared IRQ driver. It is used to register
-	  this driver with the shared IRQ driver, so interrupts can be dispatched
-	  correctly.
-
 if !HAS_DTS
 config GPIO_DW_0_IRQ_PRI
 	int "Controller interrupt priority"
@@ -92,7 +79,6 @@ endif
 
 config GPIO_DW_1
 	bool "Designware GPIO block 1"
-	default n
 	help
 	  Include Designware GPIO driver
 
@@ -127,14 +113,6 @@ config GPIO_DW_1_IRQ_SHARED
 
 endchoice
 
-config GPIO_DW_1_IRQ_SHARED_NAME
-	string "Device name for Shared IRQ"
-	depends on GPIO_DW_1_IRQ_SHARED
-	help
-	  Specify the device name for the shared IRQ driver. It is used to register
-	  this driver with the shared IRQ driver, so interrupts can be dispatched
-	  correctly.
-
 if !HAS_DTS
 config GPIO_DW_1_IRQ_PRI
 	int "Controller interrupt priority"
@@ -145,7 +123,6 @@ endif
 
 config GPIO_DW_2
 	bool "Designware GPIO block 1"
-	default n
 	help
 	  Include Designware GPIO driver
 
@@ -180,14 +157,6 @@ config GPIO_DW_2_IRQ_SHARED
 
 endchoice
 
-config GPIO_DW_2_IRQ_SHARED_NAME
-	string "Device name for Shared IRQ"
-	depends on GPIO_DW_2_IRQ_SHARED
-	help
-	  Specify the device name for the shared IRQ driver. It is used to register
-	  this driver with the shared IRQ driver, so interrupts can be dispatched
-	  correctly.
-
 if !HAS_DTS
 config GPIO_DW_2_IRQ_PRI
 	int "Controller interrupt priority"
@@ -198,7 +167,6 @@ endif
 
 config GPIO_DW_3
 	bool "Designware GPIO block 1"
-	default n
 	help
 	  Include Designware GPIO driver
 
@@ -232,14 +200,6 @@ config GPIO_DW_3_IRQ_SHARED
 	  driver dispatches the interrupt to other drivers.
 
 endchoice
-
-config GPIO_DW_3_IRQ_SHARED_NAME
-	string "Device name for Shared IRQ"
-	depends on GPIO_DW_3_IRQ_SHARED
-	help
-	  Specify the device name for the shared IRQ driver. It is used to register
-	  this driver with the shared IRQ driver, so interrupts can be dispatched
-	  correctly.
 
 if !HAS_DTS
 config GPIO_DW_3_IRQ_PRI

@@ -6,6 +6,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define NET_LOG_LEVEL CONFIG_NET_TC_LOG_LEVEL
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(net_test, NET_LOG_LEVEL);
+
 #include <zephyr/types.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -17,6 +22,7 @@
 #include <ztest.h>
 
 #include <net/ethernet.h>
+#include <net/dummy.h>
 #include <net/buf.h>
 #include <net/net_ip.h>
 #include <net/net_l2.h>
@@ -27,7 +33,7 @@
 #define NET_LOG_ENABLED 1
 #include "net_private.h"
 
-#if defined(CONFIG_NET_DEBUG_L2_ETHERNET)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 #define DBG(fmt, ...) printk(fmt, ##__VA_ARGS__)
 #else
 #define DBG(fmt, ...)
@@ -148,7 +154,7 @@ static bool check_higher_priority_pkt_recv(int tc, struct net_pkt *pkt)
 /* The eth_tx() will handle both sent packets or and it will also
  * simulate the receiving of the packets.
  */
-static int eth_tx(struct net_if *iface, struct net_pkt *pkt)
+static int eth_tx(struct device *dev, struct net_pkt *pkt)
 {
 	if (!pkt->frags) {
 		DBG("No data to send!\n");
@@ -177,7 +183,8 @@ static int eth_tx(struct net_if *iface, struct net_pkt *pkt)
 		udp_hdr->src_port = udp_hdr->dst_port;
 		udp_hdr->dst_port = port;
 
-		if (net_recv_data(net_pkt_iface(pkt), pkt) < 0) {
+		if (net_recv_data(net_pkt_iface(pkt),
+				  net_pkt_clone(pkt, K_NO_WAIT)) < 0) {
 			test_failed = true;
 			zassert_true(false, "Packet %p receive failed\n", pkt);
 		}
@@ -186,7 +193,7 @@ static int eth_tx(struct net_if *iface, struct net_pkt *pkt)
 	}
 
 	if (test_started) {
-#if defined(CONFIG_NET_DEBUG_L2_ETHERNET)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 		k_tid_t thread = k_current_get();
 #endif
 		int i, prio, ret;
@@ -226,13 +233,11 @@ static int eth_tx(struct net_if *iface, struct net_pkt *pkt)
 	}
 
 fail:
-	net_pkt_unref(pkt);
-
 	return 0;
 }
 
-static struct net_if_api api_funcs = {
-	.init	= eth_iface_init,
+static struct dummy_api api_funcs = {
+	.iface_api.init	= eth_iface_init,
 	.send	= eth_tx,
 };
 
@@ -271,14 +276,14 @@ static void address_setup(void)
 
 	iface1 = net_if_get_default();
 
-	zassert_not_null(iface1, "Interface 1\n");
+	zassert_not_null(iface1, "Interface 1");
 
 	ifaddr = net_if_ipv6_addr_add(iface1, &my_addr1,
 				      NET_ADDR_MANUAL, 0);
 	if (!ifaddr) {
 		DBG("Cannot add IPv6 address %s\n",
 		       net_sprint_ipv6_addr(&my_addr1));
-		zassert_not_null(ifaddr, "addr1\n");
+		zassert_not_null(ifaddr, "addr1");
 	}
 
 	/* For testing purposes we need to set the adddresses preferred */
@@ -289,7 +294,7 @@ static void address_setup(void)
 	if (!ifaddr) {
 		DBG("Cannot add IPv6 address %s\n",
 		       net_sprint_ipv6_addr(&ll_addr));
-		zassert_not_null(ifaddr, "ll_addr\n");
+		zassert_not_null(ifaddr, "ll_addr");
 	}
 
 	ifaddr->addr_state = NET_ADDR_PREFERRED;
@@ -299,7 +304,7 @@ static void address_setup(void)
 	if (!ifaddr) {
 		DBG("Cannot add IPv6 address %s\n",
 		       net_sprint_ipv6_addr(&my_addr2));
-		zassert_not_null(ifaddr, "addr2\n");
+		zassert_not_null(ifaddr, "addr2");
 	}
 
 	ifaddr->addr_state = NET_ADDR_PREFERRED;
@@ -309,7 +314,7 @@ static void address_setup(void)
 	if (!ifaddr) {
 		DBG("Cannot add IPv6 address %s\n",
 		       net_sprint_ipv6_addr(&my_addr3));
-		zassert_not_null(ifaddr, "addr3\n");
+		zassert_not_null(ifaddr, "addr3");
 	}
 
 	net_if_up(iface1);
@@ -382,7 +387,7 @@ static void setup_net_context(struct net_context **ctx)
 	memcpy(&dst_addr6.sin6_addr, &dst_addr, sizeof(struct in6_addr));
 
 	ret = add_neighbor(iface1, &dst_addr);
-	zassert_true(ret, "Cannot add neighbor\n");
+	zassert_true(ret, "Cannot add neighbor");
 
 	ret = net_context_bind(*ctx, (struct sockaddr *)&src_addr6,
 			       sizeof(struct sockaddr_in6));
@@ -463,7 +468,7 @@ static void traffic_class_send_packets_with_prio(enum net_priority prio,
 	zassert_not_null(pkt, "Cannot get pkt for TC %d\n", tc);
 
 	frag = net_pkt_get_data(net_ctxs[tc].ctx, K_FOREVER);
-	zassert_not_null(frag, "Cannot get frag\n");
+	zassert_not_null(frag, "Cannot get frag");
 	net_pkt_frag_add(pkt, frag);
 
 	/* Convert num to ascii */
@@ -487,7 +492,7 @@ static void traffic_class_send_packets_with_prio(enum net_priority prio,
 				 (struct sockaddr *)&dst_addr6,
 				 sizeof(struct sockaddr_in6),
 				 NULL, 0, NULL, NULL);
-	zassert_equal(ret, 0, "Send UDP pkt failed\n");
+	zassert_equal(ret, 0, "Send UDP pkt failed");
 }
 
 static void traffic_class_send_priority(enum net_priority prio,
@@ -507,13 +512,13 @@ static void traffic_class_send_priority(enum net_priority prio,
 	if (wait_for_packets) {
 		if (k_sem_take(&wait_data, WAIT_TIME)) {
 			DBG("Timeout while waiting ok status\n");
-			zassert_false(true, "Timeout\n");
+			zassert_false(true, "Timeout");
 		}
 
 		/* This sleep is needed here so that the sending side
 		 * can run properly.
 		 */
-		k_sleep(MSEC(1));
+		k_sleep(K_MSEC(1));
 	}
 }
 
@@ -567,7 +572,7 @@ static void traffic_class_send_data_mix(void)
 	 */
 	int total_packets = 0;
 
-	memset(send_priorities, 0, sizeof(send_priorities));
+	(void)memset(send_priorities, 0, sizeof(send_priorities));
 
 	traffic_class_send_priority(NET_PRIORITY_BK, MAX_PKT_TO_SEND, false);
 	total_packets += MAX_PKT_TO_SEND;
@@ -580,17 +585,17 @@ static void traffic_class_send_data_mix(void)
 
 	if (k_sem_take(&wait_data, WAIT_TIME)) {
 		DBG("Timeout while waiting ok status\n");
-		zassert_false(true, "Timeout\n");
+		zassert_false(true, "Timeout");
 	}
 
-	zassert_false(test_failed, "Traffic class verification failed.\n");
+	zassert_false(test_failed, "Traffic class verification failed.");
 }
 
 static void traffic_class_send_data_mix_all_1(void)
 {
 	int total_packets = 0;
 
-	memset(send_priorities, 0, sizeof(send_priorities));
+	(void)memset(send_priorities, 0, sizeof(send_priorities));
 
 	traffic_class_send_priority(NET_PRIORITY_BK, MAX_PKT_TO_SEND, false);
 	total_packets += MAX_PKT_TO_SEND;
@@ -621,10 +626,10 @@ static void traffic_class_send_data_mix_all_1(void)
 
 	if (k_sem_take(&wait_data, WAIT_TIME)) {
 		DBG("Timeout while waiting ok status\n");
-		zassert_false(true, "Timeout\n");
+		zassert_false(true, "Timeout");
 	}
 
-	zassert_false(test_failed, "Traffic class verification failed.\n");
+	zassert_false(test_failed, "Traffic class verification failed.");
 }
 
 static void traffic_class_send_data_mix_all_2(void)
@@ -635,7 +640,7 @@ static void traffic_class_send_data_mix_all_2(void)
 	int total_packets = 0;
 	int i;
 
-	memset(send_priorities, 0, sizeof(send_priorities));
+	(void)memset(send_priorities, 0, sizeof(send_priorities));
 
 	/* In this test send one packet for each queue instead of sending
 	 * n packets to same queue at a time.
@@ -671,18 +676,20 @@ static void traffic_class_send_data_mix_all_2(void)
 
 	if (k_sem_take(&wait_data, WAIT_TIME)) {
 		DBG("Timeout while waiting ok status\n");
-		zassert_false(true, "Timeout\n");
+		zassert_false(true, "Timeout");
 	}
 
-	zassert_false(test_failed, "Traffic class verification failed.\n");
+	zassert_false(test_failed, "Traffic class verification failed.");
 }
 
 static void recv_cb(struct net_context *context,
 		    struct net_pkt *pkt,
+		    union net_ip_header *ip_hdr,
+		    union net_proto_header *proto_hdr,
 		    int status,
 		    void *user_data)
 {
-#if defined(CONFIG_NET_DEBUG_L2_ETHERNET)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 	k_tid_t thread = k_current_get();
 #endif
 	int i, prio, ret;
@@ -754,7 +761,7 @@ static void traffic_class_recv_packets_with_prio(enum net_priority prio,
 	zassert_not_null(pkt, "Cannot get pkt for TC %d\n", tc);
 
 	frag = net_pkt_get_data(net_ctxs[tc].ctx, K_FOREVER);
-	zassert_not_null(frag, "Cannot get frag\n");
+	zassert_not_null(frag, "Cannot get frag");
 	net_pkt_frag_add(pkt, frag);
 
 	/* Convert num to ascii */
@@ -776,11 +783,11 @@ static void traffic_class_recv_packets_with_prio(enum net_priority prio,
 	recv_priorities[net_rx_priority2tc(prio)][pkt_count - 1] = prio + 1;
 
 	src_addr = net_if_ipv6_select_src_addr(NULL, &dst_addr);
-	zassert_not_null(src_addr, "Cannot select source address\n");
+	zassert_not_null(src_addr, "Cannot select source address");
 
 	ifaddr = net_if_ipv6_addr_lookup(src_addr, &iface);
-	zassert_not_null(ifaddr, "Cannot find source address\n");
-	zassert_not_null(iface, "Interface not found\n");
+	zassert_not_null(ifaddr, "Cannot find source address");
+	zassert_not_null(iface, "Interface not found");
 
 	net_pkt_set_iface(pkt, iface);
 
@@ -791,10 +798,10 @@ static void traffic_class_recv_packets_with_prio(enum net_priority prio,
 				 (struct sockaddr *)&dst_addr6,
 				 sizeof(struct sockaddr_in6),
 				 NULL, 0, NULL, NULL);
-	zassert_equal(ret, 0, "Send UDP pkt failed\n");
+	zassert_equal(ret, 0, "Send UDP pkt failed");
 
 	/* Let the receiver to receive the packets */
-	k_sleep(MSEC(1));
+	k_sleep(K_MSEC(1));
 }
 
 static void traffic_class_recv_priority(enum net_priority prio,
@@ -814,13 +821,13 @@ static void traffic_class_recv_priority(enum net_priority prio,
 	if (wait_for_packets) {
 		if (k_sem_take(&wait_data, WAIT_TIME)) {
 			DBG("Timeout while waiting ok status\n");
-			zassert_false(true, "Timeout\n");
+			zassert_false(true, "Timeout");
 		}
 
 		/* This sleep is needed here so that the receiving side
 		 * can run properly.
 		 */
-		k_sleep(MSEC(1));
+		k_sleep(K_MSEC(1));
 	}
 }
 
@@ -831,7 +838,7 @@ static void traffic_class_recv_data_prio_bk(void)
 	 */
 	traffic_class_recv_priority(NET_PRIORITY_BK, MAX_PKT_TO_RECV, true);
 
-	zassert_false(test_failed, "Traffic class verification failed.\n");
+	zassert_false(test_failed, "Traffic class verification failed.");
 }
 
 static void traffic_class_recv_data_prio_be(void)
@@ -876,7 +883,7 @@ static void traffic_class_recv_data_mix(void)
 	 */
 	int total_packets = 0;
 
-	memset(recv_priorities, 0, sizeof(recv_priorities));
+	(void)memset(recv_priorities, 0, sizeof(recv_priorities));
 
 	traffic_class_recv_priority(NET_PRIORITY_BK, MAX_PKT_TO_RECV, false);
 	total_packets += MAX_PKT_TO_RECV;
@@ -889,17 +896,17 @@ static void traffic_class_recv_data_mix(void)
 
 	if (k_sem_take(&wait_data, WAIT_TIME)) {
 		DBG("Timeout while waiting ok status\n");
-		zassert_false(true, "Timeout\n");
+		zassert_false(true, "Timeout");
 	}
 
-	zassert_false(test_failed, "Traffic class verification failed.\n");
+	zassert_false(test_failed, "Traffic class verification failed.");
 }
 
 static void traffic_class_recv_data_mix_all_1(void)
 {
 	int total_packets = 0;
 
-	memset(recv_priorities, 0, sizeof(recv_priorities));
+	(void)memset(recv_priorities, 0, sizeof(recv_priorities));
 
 	traffic_class_recv_priority(NET_PRIORITY_BK, MAX_PKT_TO_RECV, false);
 	total_packets += MAX_PKT_TO_RECV;
@@ -930,10 +937,10 @@ static void traffic_class_recv_data_mix_all_1(void)
 
 	if (k_sem_take(&wait_data, WAIT_TIME)) {
 		DBG("Timeout while waiting ok status\n");
-		zassert_false(true, "Timeout\n");
+		zassert_false(true, "Timeout");
 	}
 
-	zassert_false(test_failed, "Traffic class verification failed.\n");
+	zassert_false(test_failed, "Traffic class verification failed.");
 }
 
 static void traffic_class_recv_data_mix_all_2(void)
@@ -944,7 +951,7 @@ static void traffic_class_recv_data_mix_all_2(void)
 	int total_packets = 0;
 	int i;
 
-	memset(recv_priorities, 0, sizeof(recv_priorities));
+	(void)memset(recv_priorities, 0, sizeof(recv_priorities));
 
 	/* In this test receive one packet for each queue instead of receiving
 	 * n packets to same queue at a time.
@@ -980,10 +987,10 @@ static void traffic_class_recv_data_mix_all_2(void)
 
 	if (k_sem_take(&wait_data, WAIT_TIME)) {
 		DBG("Timeout while waiting ok status\n");
-		zassert_false(true, "Timeout\n");
+		zassert_false(true, "Timeout");
 	}
 
-	zassert_false(test_failed, "Traffic class verification failed.\n");
+	zassert_false(test_failed, "Traffic class verification failed.");
 }
 
 void test_main(void)

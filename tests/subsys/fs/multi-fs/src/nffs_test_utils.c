@@ -55,7 +55,7 @@ void nffs_test_util_assert_ent_name(struct fs_dirent *fs_dirent,
 
 void nffs_test_util_assert_file_len(struct nffs_file *file, u32_t expected)
 {
-	u32_t len;
+	uint32_t len;
 	int rc;
 
 	rc = nffs_inode_data_len(file->nf_inode_entry, &len);
@@ -69,8 +69,8 @@ void nffs_test_util_assert_cache_is_sane(const char *filename)
 	struct nffs_cache_block *cache_block;
 	struct nffs_file *file;
 	struct fs_file_t fs_file;
-	u32_t cache_start;
-	u32_t cache_end;
+	uint32_t cache_start;
+	uint32_t cache_end;
 	u32_t block_end;
 	int rc;
 
@@ -87,7 +87,7 @@ void nffs_test_util_assert_cache_is_sane(const char *filename)
 		zassert_equal(cache_start, 0, NULL);
 		zassert_equal(cache_end, 0, NULL);
 	} else {
-		block_end = 0;  /* Pacify gcc. */
+		block_end = 0U;  /* Pacify gcc. */
 		TAILQ_FOREACH(cache_block, &cache_inode->nci_block_list,
 			      ncb_link) {
 			if (cache_block ==
@@ -185,8 +185,8 @@ void nffs_test_util_assert_cache_range(const char *filename,
 	struct nffs_cache_inode *cache_inode;
 	struct nffs_file *file;
 	struct fs_file_t fs_file;
-	u32_t cache_start;
-	u32_t cache_end;
+	uint32_t cache_start;
+	uint32_t cache_end;
 	int rc;
 
 	rc = fs_open(&fs_file, filename);
@@ -224,7 +224,7 @@ void nffs_test_util_create_file_blocks(const char *filename,
 	rc = fs_open(&file, filename);
 	zassert_equal(rc, 0, NULL);
 
-	total_len = 0;
+	total_len = 0U;
 	if (num_blocks <= 0) {
 		num_writes = 1;
 	} else {
@@ -243,7 +243,7 @@ void nffs_test_util_create_file_blocks(const char *filename,
 	zassert_true(total_len <= AREA_BUF_MAX_SIZE, "contents too large");
 	buf = area_buf;
 
-	offset = 0;
+	offset = 0U;
 	for (i = 0; i < num_writes; i++) {
 		memcpy(buf + offset, blks[i].data, blks[i].data_len);
 		offset += blks[i].data_len;

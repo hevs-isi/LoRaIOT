@@ -5,11 +5,14 @@
  */
 
 /*
- * @file
- * load/store portion of FPU sharing test
+ * @brief load/store portion of FPU sharing test
  *
- * This module implements the load/store portion of the FPU sharing test. This
- * version of this test utilizes a pair of tasks.
+ * @defgroup kernel_fpsharing_tests FP Sharing Tests
+ *
+ * @ingroup all_tests
+ *
+ * @details This module implements the load/store portion of the
+ * FPU sharing test. This version of this test utilizes a pair of tasks.
  *
  * The load/store test validates the floating point unit context
  * save/restore mechanism. This test utilizes a pair of threads of different
@@ -28,6 +31,8 @@
  * registers will be utilized (k_fp_enable()).  The thread should continue
  * to load ALL non-integer registers, but main() should validate that only the
  * x87 FPU registers are being saved/restored.
+ * @{
+ * @}
  */
 
 #ifndef CONFIG_FLOAT
@@ -52,7 +57,7 @@
 #else
 #include "float_regs_x86_other.h"
 #endif /* __GNUC__ */
-#elif defined(CONFIG_CPU_CORTEX_M4)
+#elif defined(CONFIG_ARMV7_M_ARMV8_M_FP)
 #if defined(__GNUC__)
 #include "float_regs_arm_gcc.h"
 #else
@@ -92,7 +97,6 @@ int fpu_sharing_error;
 static volatile unsigned int load_store_low_count;
 static volatile unsigned int load_store_high_count;
 
-extern u32_t _tick_get_32(void);
 extern void calculate_pi_low(void);
 extern void calculate_pi_high(void);
 
@@ -100,7 +104,10 @@ extern void calculate_pi_high(void);
  *
  * @brief Low priority FPU load/store thread
  *
- * @return N/A
+ * @ingroup kernel_fpsharing_tests
+ *
+ * @see k_sched_time_slice_set(), memset(),
+ * _load_all_float_registers(), _store_all_float_registers()
  */
 
 void load_store_low(void)
@@ -134,20 +141,20 @@ void load_store_low(void)
 	 */
 
 	init_byte = MAIN_FLOAT_REG_CHECK_BYTE;
-	for (i = 0; i < SIZEOF_FP_REGISTER_SET; i++) {
+	for (i = 0U; i < SIZEOF_FP_REGISTER_SET; i++) {
 		load_ptr[i] = init_byte++;
 	}
 
 	/* Keep cranking forever, or until an error is detected. */
 
-	for (load_store_low_count = 0;; load_store_low_count++) {
+	for (load_store_low_count = 0U;; load_store_low_count++) {
 
 		/*
 		 * Clear store buffer to erase all traces of any previous
 		 * floating point values that have been saved.
 		 */
 
-		memset(&float_reg_set_store, 0, SIZEOF_FP_REGISTER_SET);
+		(void)memset(&float_reg_set_store, 0, SIZEOF_FP_REGISTER_SET);
 
 		/*
 		 * Utilize an architecture specific function to load all the
@@ -161,11 +168,11 @@ void load_store_low(void)
 		 * thread an opportunity to run when the low priority thread is
 		 * using the floating point registers.
 		 *
-		 * IMPORTANT: This logic requires that sys_tick_get_32() not
+		 * IMPORTANT: This logic requires that z_tick_get_32() not
 		 * perform any floating point operations!
 		 */
 
-		while ((_tick_get_32() % 5) != 0) {
+		while ((z_tick_get_32() % 5) != 0) {
 			/*
 			 * Use a volatile variable to prevent compiler
 			 * optimizing out the spin loop.
@@ -191,7 +198,7 @@ void load_store_low(void)
 
 		init_byte = MAIN_FLOAT_REG_CHECK_BYTE;
 
-		for (i = 0; i < SIZEOF_FP_REGISTER_SET; i++) {
+		for (i = 0U; i < SIZEOF_FP_REGISTER_SET; i++) {
 			if (store_ptr[i] != init_byte) {
 				TC_ERROR("load_store_low found 0x%x instead "
 					 "of 0x%x @ offset 0x%x\n",
@@ -246,7 +253,9 @@ void load_store_low(void)
  *
  * @brief High priority FPU load/store thread
  *
- * @return N/A
+ * @ingroup kernel_fpsharing_tests
+ *
+ * @see _load_then_store_all_float_registers()
  */
 
 void load_store_high(void)
@@ -276,7 +285,7 @@ void load_store_high(void)
 
 		init_byte = FIBER_FLOAT_REG_CHECK_BYTE;
 
-		for (i = 0; i < SIZEOF_FP_REGISTER_SET; i++) {
+		for (i = 0U; i < SIZEOF_FP_REGISTER_SET; i++) {
 			reg_set_ptr[i] = init_byte++;
 		}
 

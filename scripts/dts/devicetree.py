@@ -48,15 +48,23 @@ def parse_node_name(line):
         addr = None
 
     if ':' in line:
-        label, name = line.split(':')
+        if len(line.split(':')) == 3:
+            alt_label, label, name = line.split(':')
+        else:
+            label, name = line.split(':')
+            alt_label = None
     else:
         name = line
         label = None
+        alt_label = None
 
     if addr is None:
-        return label, name.strip(), None, None
+        return label, name.strip(), None, None, None
 
-    return label, name.strip(), addr, int(addr, 16)
+    if alt_label is None:
+        return label, name.strip(), addr, int(addr, 16), None
+
+    return label, name.strip(), addr, int(addr, 16), alt_label
 
 def parse_values_internal(value, start, end, separator):
     out = []
@@ -142,7 +150,7 @@ def build_node_name(name, addr):
     return '%s@%s' % (name, addr.strip())
 
 def parse_node(line, fd):
-    label, name, addr, numeric_addr = parse_node_name(line)
+    label, name, addr, numeric_addr, alt_label = parse_node_name(line)
 
     node = {
         'label': label,
@@ -152,6 +160,9 @@ def parse_node(line, fd):
         'props': {},
         'name': build_node_name(name, addr)
     }
+    if alt_label:
+        node['alt_name'] = alt_label
+
     while True:
         line = fd.readline()
         if not line:
@@ -250,14 +261,14 @@ def dump_to_dot(nodes, indent=0, start_string='digraph devicetree', name=None):
 
     ref_list = []
     for key, value in nodes.items():
-        if value.get('children'):
+        if value['children']:
             refs = dump_to_dot(value['children'], indent + 1, next_subgraph(), get_dot_node_name(value))
             ref_list.extend(refs)
         else:
             print("%s\"%s\";" % (spaces, get_dot_node_name(value)))
 
     for key, value in nodes.items():
-        refs = dump_all_refs(get_dot_node_name(value), value.get('props', {}), indent)
+        refs = dump_all_refs(get_dot_node_name(value), value['props'], indent)
         ref_list.extend(refs)
 
     if start_string.startswith("digraph"):

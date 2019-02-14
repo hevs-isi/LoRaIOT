@@ -1,5 +1,6 @@
+cmake_minimum_required(VERSION 3.13.1)
 include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
-project(NONE)
+project(external_lib)
 
 target_sources(app PRIVATE src/main.c)
 
@@ -41,6 +42,7 @@ ExternalProject_Add(
   make
   PREFIX=${mylib_build_dir}
   CC=${CMAKE_C_COMPILER}
+  AR=${CMAKE_AR}
   CFLAGS=${external_project_cflags}
   INSTALL_COMMAND ""      # This particular build system has no install command
   BUILD_BYPRODUCTS ${MYLIB_LIB_DIR}/libmylib.a
@@ -55,4 +57,4 @@ add_dependencies(
 set_target_properties(mylib_lib PROPERTIES IMPORTED_LOCATION             ${MYLIB_LIB_DIR}/libmylib.a)
 set_target_properties(mylib_lib PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${MYLIB_INCLUDE_DIR})
 
-target_link_libraries(app mylib_lib)
+target_link_libraries(app PUBLIC mylib_lib)

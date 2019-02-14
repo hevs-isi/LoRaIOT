@@ -8,8 +8,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __NET_HOSTNAME_H
-#define __NET_HOSTNAME_H
+#ifndef ZEPHYR_INCLUDE_NET_HOSTNAME_H_
+#define ZEPHYR_INCLUDE_NET_HOSTNAME_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,7 +41,7 @@ void net_hostname_init(void);
 #else
 static inline const char *net_hostname_get(void)
 {
-	return NULL;
+	return "zephyr";
 }
 
 static inline void net_hostname_init(void)
@@ -80,4 +80,4 @@ static inline int net_hostname_set_postfix(const u8_t *hostname_postfix,
 }
 #endif
 
-#endif /* __NET_HOSTNAME_H */
+#endif /* ZEPHYR_INCLUDE_NET_HOSTNAME_H_ */

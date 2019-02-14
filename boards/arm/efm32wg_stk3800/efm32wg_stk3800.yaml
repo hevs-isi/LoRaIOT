@@ -6,7 +6,10 @@ ram: 32
 flash: 256
 toolchain:
   - zephyr
-  - gccarmemb
+  - gnuarmemb
+  - xtools
+supported:
+  - gpio
 testing:
   ignore_tags:
     - net

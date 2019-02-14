@@ -13,8 +13,9 @@
 #include <errno.h>
 #include <device.h>
 
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_DISK_LEVEL
-#include <logging/sys_log.h>
+#define LOG_LEVEL CONFIG_DISK_LOG_LEVEL
+#include <logging/log.h>
+LOG_MODULE_REGISTER(disk);
 
 /* list of mounted file systems */
 static sys_dlist_t disk_access_list;
@@ -57,7 +58,7 @@ int disk_access_init(const char *pdrv)
 	struct disk_info *disk = disk_access_get_di(pdrv);
 	int rc = -EINVAL;
 
-	if ((disk != NULL) || (disk->ops != NULL) ||
+	if ((disk != NULL) && (disk->ops != NULL) &&
 				(disk->ops->init != NULL)) {
 		rc = disk->ops->init(disk);
 	}
@@ -70,7 +71,7 @@ int disk_access_status(const char *pdrv)
 	struct disk_info *disk = disk_access_get_di(pdrv);
 	int rc = -EINVAL;
 
-	if ((disk != NULL) || (disk->ops != NULL) ||
+	if ((disk != NULL) && (disk->ops != NULL) &&
 				(disk->ops->status != NULL)) {
 		rc = disk->ops->status(disk);
 	}
@@ -84,7 +85,7 @@ int disk_access_read(const char *pdrv, u8_t *data_buf,
 	struct disk_info *disk = disk_access_get_di(pdrv);
 	int rc = -EINVAL;
 
-	if ((disk != NULL) || (disk->ops != NULL) ||
+	if ((disk != NULL) && (disk->ops != NULL) &&
 				(disk->ops->read != NULL)) {
 		rc = disk->ops->read(disk, data_buf, start_sector, num_sector);
 	}
@@ -98,7 +99,7 @@ int disk_access_write(const char *pdrv, const u8_t *data_buf,
 	struct disk_info *disk = disk_access_get_di(pdrv);
 	int rc = -EINVAL;
 
-	if ((disk != NULL) || (disk->ops != NULL) ||
+	if ((disk != NULL) && (disk->ops != NULL) &&
 				(disk->ops->write != NULL)) {
 		rc = disk->ops->write(disk, data_buf, start_sector, num_sector);
 	}
@@ -111,7 +112,7 @@ int disk_access_ioctl(const char *pdrv, u8_t cmd, void *buf)
 	struct disk_info *disk = disk_access_get_di(pdrv);
 	int rc = -EINVAL;
 
-	if ((disk != NULL) || (disk->ops != NULL) ||
+	if ((disk != NULL) && (disk->ops != NULL) &&
 				(disk->ops->ioctl != NULL)) {
 		rc = disk->ops->ioctl(disk, cmd, buf);
 	}
@@ -125,20 +126,20 @@ int disk_access_register(struct disk_info *disk)
 
 	k_mutex_lock(&mutex, K_FOREVER);
 	if ((disk == NULL) || (disk->name == NULL)) {
-		SYS_LOG_ERR("invalid disk interface!!");
+		LOG_ERR("invalid disk interface!!");
 		rc = -EINVAL;
 		goto reg_err;
 	}
 
 	if (disk_access_get_di(disk->name) != NULL) {
-		SYS_LOG_ERR("disk interface already registered!!");
+		LOG_ERR("disk interface already registered!!");
 		rc = -EINVAL;
 		goto reg_err;
 	}
 
 	/*  append to the disk list */
 	sys_dlist_append(&disk_access_list, &disk->node);
-	SYS_LOG_DBG("disk interface(%s) registred", name);
+	LOG_DBG("disk interface(%s) registred", disk->name);
 reg_err:
 	k_mutex_unlock(&mutex);
 	return rc;
@@ -150,19 +151,19 @@ int disk_access_unregister(struct disk_info *disk)
 
 	k_mutex_lock(&mutex, K_FOREVER);
 	if ((disk == NULL) || (disk->name == NULL)) {
-		SYS_LOG_ERR("invalid disk interface!!");
+		LOG_ERR("invalid disk interface!!");
 		rc = -EINVAL;
 		goto unreg_err;
 	}
 
 	if (disk_access_get_di(disk->name) == NULL) {
-		SYS_LOG_ERR("disk interface not registered!!");
+		LOG_ERR("disk interface not registered!!");
 		rc = -EINVAL;
 		goto unreg_err;
 	}
 	/* remove disk node from the list */
 	sys_dlist_remove(&disk->node);
-	SYS_LOG_DBG("disk interface(%s) unregistred", name);
+	LOG_DBG("disk interface(%s) unregistred", disk->name);
 unreg_err:
 	k_mutex_unlock(&mutex);
 	return rc;

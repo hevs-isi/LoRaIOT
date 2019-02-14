@@ -51,7 +51,7 @@
 
 #define STACKSIZE 512
 
-static int tc_rc = TC_PASS;         /* test case return code */
+static ZTEST_DMEM int tc_rc = TC_PASS;         /* test case return code */
 
 K_MUTEX_DEFINE(private_mutex);
 
@@ -228,7 +228,7 @@ void thread_11(void)
 }
 
 K_THREAD_STACK_DEFINE(thread_12_stack_area, STACKSIZE);
-__kernel struct k_thread thread_12_thread_data;
+struct k_thread thread_12_thread_data;
 extern void thread_12(void);
 
 /**
@@ -326,10 +326,10 @@ void test_mutex(void)
 	TC_PRINT("Testing recursive locking\n");
 
 	rv = k_mutex_lock(&private_mutex, K_NO_WAIT);
-	zassert_equal(rv, 0, "Failed to lock private mutex\n");
+	zassert_equal(rv, 0, "Failed to lock private mutex");
 
 	rv = k_mutex_lock(&private_mutex, K_NO_WAIT);
-	zassert_equal(rv, 0, "Failed to recursively lock private mutex\n");
+	zassert_equal(rv, 0, "Failed to recursively lock private mutex");
 
 	/* Start thread */
 	k_thread_create(&thread_12_thread_data, thread_12_stack_area, STACKSIZE,
@@ -342,10 +342,10 @@ void test_mutex(void)
 	k_mutex_unlock(&private_mutex); /* thread_12 should now have lock */
 
 	rv = k_mutex_lock(&private_mutex, K_NO_WAIT);
-	zassert_equal(rv, -EBUSY, "Unexpectedly got lock on private mutex\n");
+	zassert_equal(rv, -EBUSY, "Unexpectedly got lock on private mutex");
 
 	rv = k_mutex_lock(&private_mutex, K_SECONDS(1));
-	zassert_equal(rv, 0, "Failed to re-obtain lock on private mutex\n");
+	zassert_equal(rv, 0, "Failed to re-obtain lock on private mutex");
 
 	k_mutex_unlock(&private_mutex);
 
@@ -382,8 +382,8 @@ void test_main(void)
 {
 	k_thread_access_grant(k_current_get(), &private_mutex,
 			      &mutex_1, &mutex_2, &mutex_3, &mutex_4,
-			      &thread_12_thread_data, &thread_12_stack_area,
-			      NULL);
+			      &thread_12_thread_data, &thread_12_stack_area);
+
 	ztest_test_suite(mutex_complex, ztest_user_unit_test(test_mutex));
 	ztest_run_test_suite(mutex_complex);
 }

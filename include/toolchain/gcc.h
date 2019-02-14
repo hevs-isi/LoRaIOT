@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef TOOLCHAIN_GCC_H
-#define TOOLCHAIN_GCC_H
+#ifndef ZEPHYR_INCLUDE_TOOLCHAIN_GCC_H_
+#define ZEPHYR_INCLUDE_TOOLCHAIN_GCC_H_
+
 /**
  * @file
  * @brief GCC toolchain abstraction
@@ -18,16 +19,17 @@
 #define BUILD_ASSERT(EXPR) static_assert(EXPR, "")
 #define BUILD_ASSERT_MSG(EXPR, MSG) static_assert(EXPR, MSG)
 /*
- * GCC 4.6 and higher have _Static_assert built in, and its output is
- * easier to understand than the common BUILD_ASSERT macros.
+ * GCC 4.6 and higher have the C11 _Static_assert built in, and its
+ * output is easier to understand than the common BUILD_ASSERT macros.
  */
-#elif (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)) && \
-	(__STDC_VERSION__) > 199901L
+#elif (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)) || \
+	(__STDC_VERSION__) >= 201100
 #define BUILD_ASSERT(EXPR) _Static_assert(EXPR, "")
 #define BUILD_ASSERT_MSG(EXPR, MSG) _Static_assert(EXPR, MSG)
 #endif
 
 #include <toolchain/common.h>
+#include <stdbool.h>
 
 #define ALIAS_OF(of) __attribute__((alias(#of)))
 
@@ -66,13 +68,38 @@ __extension__ ({							\
 	__p->__v;							\
 })
 
+
+#if __GNUC__ >= 7 && defined(CONFIG_ARM)
+
+/* Version of UNALIGNED_PUT() which issues a compiler_barrier() after
+ * the store. It is required to workaround an apparent optimization
+ * bug in GCC for ARM Cortex-M3 and higher targets, when multiple
+ * byte, half-word and word stores (strb, strh, str instructions),
+ * which support unaligned access, can be coalesced into store double
+ * (strd) instruction, which doesn't support unaligned access (the
+ * compilers in question do this optimization ignoring __packed__
+ * attribute).
+ */
+#define UNALIGNED_PUT(v, p)                                             \
+do {                                                                    \
+	struct __attribute__((__packed__)) {                            \
+		__typeof__(*p) __v;                                     \
+	} *__p = (__typeof__(__p)) (p);                                 \
+	__p->__v = (v);                                                 \
+	compiler_barrier();                                             \
+} while (false)
+
+#else
+
 #define UNALIGNED_PUT(v, p)                                             \
 do {                                                                    \
 	struct __attribute__((__packed__)) {                            \
 		__typeof__(*p) __v;                                     \
 	} *__p = (__typeof__(__p)) (p);                                 \
 	__p->__v = (v);                                               \
-} while (0)
+} while (false)
+
+#endif
 
 /* Double indirection to ensure section names are expanded before
  * stringification
@@ -88,16 +115,6 @@ do {                                                                    \
 
 #define __in_section_unique(seg) ___in_section(seg, __FILE__, __COUNTER__)
 
-#ifdef CONFIG_APPLICATION_MEMORY
-#define __kernel	__in_section_unique(kernel)
-#define __kernel_noinit	__in_section_unique(kernel_noinit)
-#define __kernel_bss	__in_section_unique(kernel_bss)
-#else
-#define __kernel
-#define __kernel_noinit	__noinit
-#define __kernel_bss
-#endif
-
 #ifndef __packed
 #define __packed        __attribute__((__packed__))
 #endif
@@ -112,12 +129,14 @@ do {                                                                    \
 #define __deprecated	__attribute__((deprecated))
 #define ARG_UNUSED(x) (void)(x)
 
-#define likely(x)   __builtin_expect((long)!!(x), 1L)
-#define unlikely(x) __builtin_expect((long)!!(x), 0L)
+#define likely(x)   __builtin_expect((bool)!!(x), true)
+#define unlikely(x) __builtin_expect((bool)!!(x), false)
 
 #define popcount(x) __builtin_popcount(x)
 
+#ifndef __weak
 #define __weak __attribute__((__weak__))
+#endif
 #define __unused __attribute__((__unused__))
 
 /* Be *very* careful with this, you cannot filter out with -wno-deprecated,
@@ -318,6 +337,13 @@ A##a:
 		",%c0"                              \
 		"\n\t.type\t" #name ",@object" :  : "n"(value))
 
+#elif defined(CONFIG_X86_64)
+
+#define GEN_ABSOLUTE_SYM(name, value)               \
+	__asm__(".globl\t" #name "\n\t.equ\t" #name \
+		",%0"                               \
+		"\n\t.type\t" #name ",@object" :  : "n"(value))
+
 #elif defined(CONFIG_NIOS2) || defined(CONFIG_RISCV32) || defined(CONFIG_XTENSA)
 
 /* No special prefixes necessary for constants in this arch AFAICT */
@@ -337,6 +363,6 @@ A##a:
 
 #define compiler_barrier() do { \
 	__asm__ __volatile__ ("" ::: "memory"); \
-} while ((0))
+} while (false)
 
-#endif /* TOOLCHAIN_GCC_H */
+#endif /* ZEPHYR_INCLUDE_TOOLCHAIN_GCC_H_ */

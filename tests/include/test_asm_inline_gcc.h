@@ -23,6 +23,12 @@ static inline void timestamp_serialize(void)
 	:
 	: "%eax", "%ebx", "%ecx", "%edx");
 }
+#elif defined(CONFIG_X86_64)
+static inline void timestamp_serialize(void)
+{
+	__asm__ volatile("xorq %%rax,%%rax; cpuid"
+			 ::: "rax", "rdx", "rbx", "rcx");
+}
 #elif defined(CONFIG_CPU_CORTEX_M)
 #include <arch/arm/cortex_m/cmsis.h>
 static inline void timestamp_serialize(void)
@@ -33,6 +39,12 @@ static inline void timestamp_serialize(void)
 #elif defined(CONFIG_CPU_ARCV2)
 #define timestamp_serialize()
 #elif defined(CONFIG_ARCH_POSIX)
+#define timestamp_serialize()
+#elif defined(CONFIG_XTENSA)
+#define timestamp_serialize()
+#elif defined(CONFIG_NIOS2)
+#define timestamp_serialize()
+#elif defined(CONFIG_RISCV32)
 #define timestamp_serialize()
 #else
 #error implementation of timestamp_serialize() not provided for your CPU target
