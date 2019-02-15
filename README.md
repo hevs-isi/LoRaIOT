@@ -61,7 +61,7 @@ Stopped at 1.520s
 ## Testing on the nucleo_l432kc board + WiMOD_AB_01 + usb board + iM880x
 1. Wiring
 
-| mcu | testbutton |
+| mcu | WiMOD_AB_01 |
 |--- | ---------- |
 | GND | X6 pin 9 - GND |
 | pin D1 - PA9 - TX | X7 pin 20 - TX |
