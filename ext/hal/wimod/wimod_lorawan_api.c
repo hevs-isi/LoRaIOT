@@ -77,6 +77,9 @@ wimod_lorawan_process_c_data_rx_indication(wimod_hci_message_t* rx_msg);
 static void
 wimod_lorawan_show_response(const char* string, const id_string_t* status_table, u8_t status_id);
 
+static void
+wimod_lorawan_show_response_tx(const char* string, const id_string_t* status_table, u8_t status_id);
+
 //------------------------------------------------------------------------------
 //
 //  Section RAM
@@ -731,11 +734,11 @@ static void wimod_lorawan_process_lorawan_message(wimod_hci_message_t* rx_msg)
                 break;
 
         case    LORAWAN_MSG_SEND_UDATA_TX_IND:
-        		wimod_lorawan_show_response("send U-Data TX indication", wimod_lorawan_status_strings, rx_msg->payload[0]);
+        		wimod_lorawan_show_response_tx("send U-Data TX indication", wimod_lorawan_status_strings, rx_msg->payload[0]);
 				break;
 
         case    LORAWAN_MSG_SEND_CDATA_TX_IND:
-        		wimod_lorawan_show_response("send C-Data TX indication", wimod_lorawan_status_strings, rx_msg->payload[0]);
+        		wimod_lorawan_show_response_tx("send C-Data TX indication", wimod_lorawan_status_strings, rx_msg->payload[0]);
 				break;
 
         case    LORAWAN_MSG_JOIN_NETWORK_IND:
@@ -929,6 +932,25 @@ static void wimod_lorawan_show_response(const char* str, const id_string_t* stat
     while(status_table->string)
     {
         if (status_table->id == status_id)
+        {
+            LOG_DBG("%s: - Status(0x%02X) : %s", str, status_id, status_table->string);
+            return;
+        }
+
+        status_table++;
+    }
+}
+
+static void wimod_lorawan_show_response_tx(const char* str, const id_string_t* status_table, u8_t status_id)
+{
+    /* status for IND_TX messages are OK when status is 0x01.
+     * So display status 0x01, and string for 0x00.
+     */
+    uint32_t status_id2 = (status_id == 0x01 ? DEVMGMT_STATUS_OK : status_id);
+
+    while(status_table->string)
+    {
+        if (status_table->id == status_id2)
         {
             LOG_DBG("%s: - Status(0x%02X) : %s", str, status_id, status_table->string);
             return;

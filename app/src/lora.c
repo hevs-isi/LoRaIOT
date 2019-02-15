@@ -31,7 +31,7 @@ static struct lora_msg lmsg;
 
 void join_callback()
 {
-	LOG_INF("LoRaWAN Network joined.\n");
+	LOG_INF("LoRaWAN Network started.\n");
 	//blink_led(LED_GREEN, MSEC_PER_SEC/4, K_SECONDS(3));
 	#ifdef CONFIG_BOARD_NRF52840_LORAIOT
 		VDDH_DEACTIVATE();
