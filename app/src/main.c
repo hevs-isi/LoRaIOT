@@ -16,6 +16,8 @@
 #include "lora.h"
 #include <sensor.h>
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 #if CONFIG_LORA_IM881A
 #include <im881a.h>
@@ -23,5 +25,6 @@
 
 void main(void)
 {
+	LOG_DBG("main");
 	lora_init();
 }

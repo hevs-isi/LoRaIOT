@@ -68,15 +68,9 @@ static void lora_msg_send(struct k_work *item)
 	#endif
 }
 
-#ifdef CONFIG_BOARD_NRF52840_LORAIOT
-#define LORA_UART_DEV CONFIG_LORA_IM881A_UART_DRV_NAME
-#elif defined(CONFIG_BOARD_NUCLEO_L432KC)
-#define LORA_UART_DEV "UART_1"
-#endif
-
 void lora_init()
 {
-	uart = device_get_binding(LORA_UART_DEV);
+	uart = device_get_binding(CONFIG_LORA_IM881A_UART_DRV_NAME);
 	uart_cfg = (struct uart_device_config *)(uart->config->config_info);
 
 	/* BUG: couldn't launch the debug when the function 'uart_irq_rx_enable' is called too quickly */
@@ -86,14 +80,19 @@ void lora_init()
 	VDDH_ACTIVATE();
 	#endif
 
+	printk("uart: name:%s\n", CONFIG_LORA_IM881A_UART_DRV_NAME);
+	printk("uart: ptr:%p\n", uart);
+
 	wimod_lorawan_init();
 
-	wimod_lorawan_join_network_request(join_callback);
+	printk("here2\n");
 
 	k_work_q_start(&lora_msg_work_q, lora_msg_stack,
 		   K_THREAD_STACK_SIZEOF(lora_msg_stack), K_PRIO_PREEMPT(0));
 
 	k_work_init(&lmsg.work, lora_msg_send);
+
+	wimod_lorawan_join_network_request(join_callback);
 
 	disable_uart();
 }
