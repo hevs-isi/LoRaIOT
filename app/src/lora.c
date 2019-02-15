@@ -80,12 +80,7 @@ void lora_init()
 	VDDH_ACTIVATE();
 	#endif
 
-	printk("uart: name:%s\n", CONFIG_LORA_IM881A_UART_DRV_NAME);
-	printk("uart: ptr:%p\n", uart);
-
 	wimod_lorawan_init();
-
-	printk("here2\n");
 
 	k_work_q_start(&lora_msg_work_q, lora_msg_stack,
 		   K_THREAD_STACK_SIZEOF(lora_msg_stack), K_PRIO_PREEMPT(0));
