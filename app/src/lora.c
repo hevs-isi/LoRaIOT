@@ -1,242 +1,99 @@
-
-#include <zephyr.h>
-#include <shell/shell.h>
-
-#include <wimod_lorawan_api.h>
-
-#define SYS_LOG_DOMAIN			"lora"
-#include <logging/sys_log.h>
-
-#include <board_utils.h>
-#include <uart.h>
-
 #include "lora.h"
+#include <zephyr.h>
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(lora, LOG_LEVEL_DBG);
+
+#ifdef CONFIG_LORA_IM881A
+#include <wimod_lorawan_api.h>
+#endif
+
+#ifdef CONFIG_BOARD_NRF52840_LORAIOT
+#include <board_utils.h>
+#endif
 
 static struct device *uart;
 static struct uart_device_config *uart_cfg;
 
-static int shell_cmd_info(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
+K_THREAD_STACK_DEFINE(lora_msg_stack, 1024);
+static struct k_work_q lora_msg_work_q;
 
-	wimod_lorawan_get_firmware_version();
-
-	return 0;
-}
-
-static int shell_cmd_custom(int argc, char *argv[])
-{
-    ARG_UNUSED(argc);
-    ARG_UNUSED(argv);
-
-    wimod_lorawan_set_op_mode();
-
-    return 0;
-}
-
-static int shell_cmd_getmode(int argc, char *argv[])
-{
-    ARG_UNUSED(argc);
-    ARG_UNUSED(argv);
-
-    wimod_lorawan_get_op_mode();
-
-    return 0;
-}
-
-static int shell_cmd_get_rtc(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_get_rtc();
-
-	return 0;
-}
-
-static int shell_cmd_set_rtc(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_set_rtc();
-
-	return 0;
-}
-
-static int shell_cmd_get_rtc_alarm(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_get_rtc_alarm();
-
-	return 0;
-}
-
-static int shell_factory_reset(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_factory_reset();
-
-	return 0;
-}
-
-static int shell_cmd_deveui(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_get_device_eui();
-
-	return 0;
-}
-
-static int shell_cmd_setparam(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_set_join_param_request();
-
-	return 0;
-}
-
-static int shell_cmd_join(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_join_network_request(NULL);
-
-	return 0;
-}
-
-static int shell_nwk_status(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_get_nwk_status();
-
-	return 0;
-}
-
-static int shell_set_rstack_cfg(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_set_rstack_config();
-
-	return 0;
-}
-
-static int shell_rstack_cfg(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	wimod_lorawan_get_rstack_config();
-
-	return 0;
-}
-
-static int shell_send_udata(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	u8_t data[3];
-
-	data[0] = 0x11;
-	data[1] = 0x22;
-	data[2] = 0x33;
-
-	wimod_lorawan_send_u_radio_data(1, data, 3);
-
-	return 0;
-}
-
-static int shell_send_cdata(int argc, char *argv[])
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	u8_t data[3];
-
-	data[0] = 0x11;
-	data[1] = 0x22;
-	data[2] = 0x33;
-
-	wimod_lorawan_send_c_radio_data(1, data, 3);
-
-	return 0;
-}
-
-
-static struct shell_cmd commands[] = {
-	{ "firmware", shell_cmd_info, NULL },
-	{ "custom", shell_cmd_custom, NULL },
-	{ "getmode", shell_cmd_getmode, NULL },
-	{ "get_rtc", shell_cmd_get_rtc, NULL },
-	{ "set_rtc", shell_cmd_set_rtc, NULL },
-	{ "get_rtc_alarm", shell_cmd_get_rtc_alarm, NULL },
-	{ "factory", shell_factory_reset, NULL },
-	{ "deveui", shell_cmd_deveui, NULL },
-	{ "set", shell_cmd_setparam, NULL },
-	{ "join", shell_cmd_join, NULL },
-	{ "nwk", shell_nwk_status, NULL },
-	{ "setrstack", shell_set_rstack_cfg, NULL },
-	{ "rstack", shell_rstack_cfg, NULL },
-	{ "set_rstack", shell_set_rstack_cfg, NULL },
-	{ "udata", shell_send_udata, NULL },
-	{ "cdata", shell_send_cdata, NULL },
-	{ NULL, NULL, NULL }
+struct lora_msg {
+	u8_t port;
+	u8_t data[20];
+	u8_t size;
+	struct k_work work;
 };
+
+static struct lora_msg lmsg;
+
+#include <uart.h>
+
+void join_callback()
+{
+	LOG_INF("LoRaWAN Network joined.\n");
+	//blink_led(LED_GREEN, MSEC_PER_SEC/4, K_SECONDS(3));
+	#ifdef CONFIG_BOARD_NRF52840_LORAIOT
+		VDDH_DEACTIVATE();
+	#endif
+}
 
 void disable_uart()
 {
+	#ifdef CONFIG_BOARD_NRF52840_LORAIOT
 	if( NOT_IN_DEBUG() ){
 		*(uart_cfg->base + 0x500) = 0;
 	}
+	#endif
 }
 
 void enable_uart()
 {
+	#ifdef CONFIG_BOARD_NRF52840_LORAIOT
 	if( NOT_IN_DEBUG() ){
 		*(uart_cfg->base + 0x500) = 4UL;
 	}
+	#endif
 }
 
-void join_callback()
+static void lora_msg_send(struct k_work *item)
 {
-	SYS_LOG_INF("LoRaWAN Network joined.\n");
-	//blink_led(LED_GREEN, MSEC_PER_SEC/4, K_SECONDS(3));
+	struct lora_msg *msg = CONTAINER_OF(item, struct lora_msg, work);
+
+	enable_uart();
+	wimod_lorawan_send_c_radio_data(msg->port, msg->data, msg->size);
+	disable_uart();
+	#ifdef CONFIG_BOARD_NRF52840_LORAIOT
 	VDDH_DEACTIVATE();
+	#endif
 }
 
-
+#ifdef CONFIG_BOARD_NRF52840_LORAIOT
+#define LORA_UART_DEV CONFIG_LORA_IM881A_UART_DRV_NAME
+#elif defined(CONFIG_BOARD_NUCLEO_L432KC)
+#define LORA_UART_DEV "UART_1"
+#endif
 
 void lora_init()
 {
-	SHELL_REGISTER("lora", commands);
-
-	uart = device_get_binding(CONFIG_LORA_IM881A_UART_DRV_NAME);
+	uart = device_get_binding(LORA_UART_DEV);
 	uart_cfg = (struct uart_device_config *)(uart->config->config_info);
 
 	/* BUG: couldn't launch the debug when the function 'uart_irq_rx_enable' is called too quickly */
 	k_busy_wait(1000000);
 
+	#ifdef CONFIG_BOARD_NRF52840_LORAIOT
 	VDDH_ACTIVATE();
+	#endif
 
 	wimod_lorawan_init();
 
 	wimod_lorawan_join_network_request(join_callback);
 
-	disable_uart();
+	k_work_q_start(&lora_msg_work_q, lora_msg_stack,
+		   K_THREAD_STACK_SIZEOF(lora_msg_stack), K_PRIO_PREEMPT(0));
 
+	k_work_init(&lmsg.work, lora_msg_send);
+
+	disable_uart();
 }

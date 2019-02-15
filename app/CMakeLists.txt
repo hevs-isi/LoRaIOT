@@ -1,13 +1,21 @@
+# Boilerplate code, which pulls in the Zephyr build system.
+cmake_minimum_required(VERSION 3.13.1)
+macro(set_conf_file)
+  if(EXISTS ${APPLICATION_SOURCE_DIR}/boards/${BOARD}.conf)
+    set(CONF_FILE "prj.conf ${APPLICATION_SOURCE_DIR}/boards/${BOARD}.conf")
+  else()
+    set(CONF_FILE "prj.conf")
+  endif()
+endmacro()
 include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
-project(NONE)
 
-target_sources(app PRIVATE src/main.c)
-zephyr_sources_ifdef(CONFIG_SEGGER_SYSTEMVIEW src/sysview.c)
-zephyr_sources_ifdef(CONFIG_LORA src/lora.c)
-target_sources(app PRIVATE src/sensors.c)
-target_sources(app PRIVATE src/app.c)
+project(loraiot)
+# Add all sources files from src/ recuresively
+FILE(GLOB_RECURSE csources src/*.c)
+target_sources(app PRIVATE ${csources})
+
+# add inc/ to include dir
+target_include_directories(app PRIVATE inc/)
 
 #FILE(GLOB app_sources src/*.c)
 #target_sources(app PRIVATE ${app_sources})
-
-zephyr_library_include_directories(${ZEPHYR_BASE}/drivers/sensor/pac1934)
