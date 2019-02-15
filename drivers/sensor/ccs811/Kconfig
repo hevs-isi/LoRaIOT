@@ -14,6 +14,8 @@ menuconfig CCS811
 
 #if !HAS_DTS_I2C_DEVICE
 
+if CCS811
+
 config CCS811_NAME
 	string
 	prompt "Driver name"
