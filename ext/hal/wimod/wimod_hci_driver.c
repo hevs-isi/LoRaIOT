@@ -12,6 +12,9 @@
 
 #include <string.h>
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(wimod_hci_driver, LOG_LEVEL_DBG);
+
 static struct device *uart_dev;
 
 //------------------------------------------------------------------------------
@@ -77,7 +80,6 @@ static void uart_isr(struct device *dev)
 	//uart_irq_update(dev);
 	static int i;
 
-
 	while (uart_irq_update(dev) &&
 		       uart_irq_is_pending(dev)) {
 
@@ -135,6 +137,10 @@ bool wimod_hci_init(wimod_hci_cb_rx_message   cb_rx_message,
     //uart_pipe_register(rxsplipbuf, sizeof(rxsplipbuf), upipe_rx);
     uart_dev = device_get_binding(CONFIG_LORA_IM881A_UART_DRV_NAME);
 
+    if (!uart_dev) {
+        return -ENODEV;
+    }
+
     uart_irq_rx_disable(uart_dev);
     //uart_irq_tx_disable(uart_dev);
 
@@ -161,6 +167,7 @@ bool wimod_hci_init(wimod_hci_cb_rx_message   cb_rx_message,
 
 int wimod_hci_send_message(wimod_hci_message_t* tx_message)
 {
+    LOG_DBG("here");
 
 	u8_t buf[1] = { SLIP_END };
 	u8_t i;
@@ -263,6 +270,7 @@ void wimod_hci_process()
 
 static u8_t* wimod_hci_process_rx_message(u8_t* rx_data, int rx_length)
 {
+    LOG_DBG("wimod_hci_process_rx_message");
     // check min length
     if (rx_length >= (WIMOD_HCI_MSG_HEADER_SIZE + WIMOD_HCI_MSG_FCS_SIZE))
     {
@@ -294,4 +302,3 @@ static u8_t* wimod_hci_process_rx_message(u8_t* rx_data, int rx_length)
     // error, disable SLIP decoder
     return 0;
 }
-

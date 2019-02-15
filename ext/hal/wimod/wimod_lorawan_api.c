@@ -25,21 +25,14 @@
 #include "wimod_hci_driver.h"
 #include "wimod_lorawan_api.h"
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(wimod_lorawan_api, LOG_LEVEL_DBG);
 
 #define MAKEWORD(lo,hi) ((lo)|((hi) << 8))
 #define MAKELONG(lo,hi) ((lo)|((hi) << 16))
 
-
-
-// Values appEui and appKey only used with the command 'set'.
-// Then this information is stored in the LoRa module.
-
-const char appEui[] = "70B3D57ED0010F8B";
-//const char appKey[] = "7F8BC5F8A59B05A2B1BDE8B84E6D62A4";
-//const char appKey[] = "C34ABE27F798991EC7E6AF612FE2AC64";
-const char appKey[] = "FAEB835AE4443C194AD5E0A9CB817C51";
-
-
+const char *appEui = "70B3D57ED0017ED9";
+const char *appKey = "0F7C7E4558C5A711F72857E8397EAE72";
 
 //------------------------------------------------------------------------------
 //
@@ -480,6 +473,7 @@ void wimod_lorawan_process()
 
 static wimod_hci_message_t* wimod_lorawan_process_rx_msg(wimod_hci_message_t* rx_msg)
 {
+    LOG_DBG("here");
     switch(rx_msg->sap_id)
     {
         case DEVMGMT_SAP_ID:
@@ -504,6 +498,7 @@ static wimod_hci_message_t* wimod_lorawan_process_rx_msg(wimod_hci_message_t* rx
 
 static void wimod_lorawan_process_devmgmt_message(wimod_hci_message_t* rx_msg)
 {
+    LOG_DBG("here");
     switch(rx_msg->msg_id)
     {
         case    DEVMGMT_MSG_PING_RSP:
@@ -535,7 +530,7 @@ static void wimod_lorawan_process_devmgmt_message(wimod_hci_message_t* rx_msg)
 				break;
 
         default:
-                printf("unhandled DeviceMgmt message received - msg_id : 0x%02X\n\r", (u8_t)rx_msg->msg_id);
+                LOG_DBG("unhandled DeviceMgmt message received - msg_id : 0x%02X", (u8_t)rx_msg->msg_id);
                 break;
     }
 }
@@ -552,23 +547,25 @@ static void wimod_lorawan_devmgmt_firmware_version_rsp(wimod_hci_message_t* rx_m
 {
     char help[80];
 
+    LOG_DBG("here");
+
     wimod_lorawan_show_response("firmware version response", wimod_device_mgmt_status_strings, rx_msg->payload[0]);
 
     if (rx_msg->payload[0] == DEVMGMT_STATUS_OK)
     {
-        printf("version: V%d.%d\n\r", (int)rx_msg->payload[2], (int)rx_msg->payload[1]);
-        printf("build-count: %d\n\r", (int)MAKEWORD(rx_msg->payload[3], rx_msg->payload[4]));
+        LOG_DBG("version: V%d.%d", (int)rx_msg->payload[2], (int)rx_msg->payload[1]);
+        LOG_DBG("build-count: %d", (int)MAKEWORD(rx_msg->payload[3], rx_msg->payload[4]));
 
         memcpy(help, &rx_msg->payload[5], 10);
         help[10] = 0;
-        printf("build-date: %s\n\r", help);
+        LOG_DBG("build-date: %s", help);
 
         // more information attached ?
         if (rx_msg->length > 15)
         {
             // add string termination
             rx_msg->payload[rx_msg->length] = 0;
-            printf("firmware-content: %s\n\r", &rx_msg->payload[15]);
+            LOG_DBG("firmware-content: %s", &rx_msg->payload[15]);
         }
     }
 }
@@ -576,7 +573,7 @@ static void wimod_lorawan_devmgmt_firmware_version_rsp(wimod_hci_message_t* rx_m
 static void wimod_lorawan_get_opmode_rsp(wimod_hci_message_t* rx_msg)
 {
     wimod_lorawan_show_response("get opmode response", wimod_device_mgmt_status_strings, rx_msg->payload[0]);
-    printf("Operation mode: %d\n\r", rx_msg->payload[1]);
+    LOG_DBG("Operation mode: %d", rx_msg->payload[1]);
 }
 
 static void wimod_lorawan_get_rtc_rsp(wimod_hci_message_t* rx_msg)
@@ -590,7 +587,7 @@ static void wimod_lorawan_get_rtc_rsp(wimod_hci_message_t* rx_msg)
     	rtc_value = MAKELONG(MAKEWORD(rx_msg->payload[4], rx_msg->payload[3]),
     				MAKEWORD(rx_msg->payload[2], rx_msg->payload[1]));
 
-    	printf("RTC: %d\n\r", rtc_value);
+    	LOG_DBG("RTC: %d", rtc_value);
     }
 }
 
@@ -600,8 +597,8 @@ static void wimod_lorawan_get_rtc_alarm_rsp(wimod_hci_message_t* rx_msg)
 
     if (rx_msg->payload[0] == DEVMGMT_STATUS_OK)
     {
-    	printf("Alarm Status: %d\n\r", rx_msg->payload[1]);
-    	printf("Options: %d\n\r", rx_msg->payload[2]);
+    	LOG_DBG("Alarm Status: %d", rx_msg->payload[1]);
+    	LOG_DBG("Options: %d", rx_msg->payload[2]);
     }
 }
 
@@ -617,7 +614,7 @@ static void wimod_lorawan_device_eui_rsp(wimod_hci_message_t* rx_msg)
 	eui_msb = MAKELONG(MAKEWORD(rx_msg->payload[4], rx_msg->payload[3]),
 			MAKEWORD(rx_msg->payload[2], rx_msg->payload[1]));
 
-	printf("64-Bit Device EUI: 0x%x%x\n", eui_msb, eui_lsb);
+	LOG_INF("64-Bit Device EUI: 0x%08x%08x\n", eui_msb, eui_lsb);
 }
 
 static void wimod_lorawan_process_nwk_status_rsp(wimod_hci_message_t* rx_msg)
@@ -627,17 +624,17 @@ static void wimod_lorawan_process_nwk_status_rsp(wimod_hci_message_t* rx_msg)
 	wimod_lorawan_show_response("network status response",
 			wimod_device_mgmt_status_strings, rx_msg->payload[0]);
 
-	printf("Network Status: 0x%02X\n", rx_msg->payload[1]);
+	LOG_DBG("Network Status: 0x%02X\n", rx_msg->payload[1]);
 
 	if(rx_msg->length > 2){
 
 		device_address = MAKELONG(MAKEWORD(rx_msg->payload[5], rx_msg->payload[4]),
 					MAKEWORD(rx_msg->payload[3], rx_msg->payload[2]));
 
-		printf("Device Address: %d\n", device_address);
-		printf("Data Rate Index: %d\n", rx_msg->payload[6]);
-		printf("Power Level: %d\n", rx_msg->payload[7]);
-		printf("Max Payload Size: %d\n", rx_msg->payload[8]);
+		LOG_DBG("Device Address: %d\n", device_address);
+		LOG_DBG("Data Rate Index: %d\n", rx_msg->payload[6]);
+		LOG_DBG("Power Level: %d\n", rx_msg->payload[7]);
+		LOG_DBG("Max Payload Size: %d\n", rx_msg->payload[8]);
 	}
 }
 
@@ -646,19 +643,19 @@ static void wimod_lorawan_process_rstack_config_rsp(wimod_hci_message_t* rx_msg)
 	wimod_lorawan_show_response("radio stack config response",
 			wimod_device_mgmt_status_strings, rx_msg->payload[0]);
 
-	printf("Default Data Rate Index: %d\n", rx_msg->payload[1]);
-	printf("Default TX Power Level: %d\n", rx_msg->payload[2]);
-	printf("Options: 0x%02X\n", rx_msg->payload[3]);
-	printf("\tAdaptive Data Rate: %s\n", (rx_msg->payload[3] & 0x01) ? "enabled" : "disabled");
-	printf("\tDuty Cycle Control: %s\n", (rx_msg->payload[3] & 0x02) ? "enabled" : "disabled");
-	printf("\tDevice Class: %s\n", (rx_msg->payload[3] & 0x04) ? "C" : "A");
-	printf("\tRF packet output format: %s\n", (rx_msg->payload[3] & 0x40) ? "extended" : "standard");
-	printf("\tRx MAC Command Forwarding: %s\n", (rx_msg->payload[3] & 0x80) ? "enabled" : "disabled");
-	printf("Power Saving Mode: %s\n", rx_msg->payload[4] ? "automatic" : "off");
-	printf("Number of Retransmissions: %d\n", rx_msg->payload[5]);
-	printf("Band Index: %d\n", rx_msg->payload[6]);
+	LOG_DBG("Default Data Rate Index: %d\n", rx_msg->payload[1]);
+	LOG_DBG("Default TX Power Level: %d\n", rx_msg->payload[2]);
+	LOG_DBG("Options: 0x%02X\n", rx_msg->payload[3]);
+	LOG_DBG("\tAdaptive Data Rate: %s\n", (rx_msg->payload[3] & 0x01) ? "enabled" : "disabled");
+	LOG_DBG("\tDuty Cycle Control: %s\n", (rx_msg->payload[3] & 0x02) ? "enabled" : "disabled");
+	LOG_DBG("\tDevice Class: %s\n", (rx_msg->payload[3] & 0x04) ? "C" : "A");
+	LOG_DBG("\tRF packet output format: %s\n", (rx_msg->payload[3] & 0x40) ? "extended" : "standard");
+	LOG_DBG("\tRx MAC Command Forwarding: %s\n", (rx_msg->payload[3] & 0x80) ? "enabled" : "disabled");
+	LOG_DBG("Power Saving Mode: %s\n", rx_msg->payload[4] ? "automatic" : "off");
+	LOG_DBG("Number of Retransmissions: %d\n", rx_msg->payload[5]);
+	LOG_DBG("Band Index: %d\n", rx_msg->payload[6]);
 	// not available in 1.11 specs
-	printf("Header MAC Cmd Capacity: %d\n", rx_msg->payload[7] & 0xFF);
+	LOG_DBG("Header MAC Cmd Capacity: %d\n", rx_msg->payload[7] & 0xFF);
 
 }
 
@@ -674,7 +671,7 @@ static void wimod_lorawan_process_send_data_rsp(wimod_hci_message_t* rx_msg)
         time_remaining_ms = MAKELONG(MAKEWORD(rx_msg->payload[1], rx_msg->payload[2]),
                     MAKEWORD(rx_msg->payload[3], rx_msg->payload[4]));
 
-        printf("Channel blocked. Time remaining (ms): %d\n", time_remaining_ms);
+        LOG_DBG("Channel blocked. Time remaining (ms): %d\n", time_remaining_ms);
     }
 }
 
@@ -688,6 +685,8 @@ static void wimod_lorawan_process_send_data_rsp(wimod_hci_message_t* rx_msg)
 
 static void wimod_lorawan_process_lorawan_message(wimod_hci_message_t* rx_msg)
 {
+    LOG_DBG("msg_id:%d", rx_msg->msg_id);
+
     switch(rx_msg->msg_id)
     {
     	case    LORAWAN_MSG_GET_DEVICE_EUI_RSP:
@@ -752,14 +751,14 @@ static void wimod_lorawan_process_lorawan_message(wimod_hci_message_t* rx_msg)
                 break;
 
         case    LORAWAN_MSG_RECV_NO_DATA_IND:
-                printf("no data received indication\n\r");
+                LOG_DBG("no data received indication");
                 if(rx_msg->payload[0] == 1){
-                	printf("Error Code: 0x%02X\n\r", rx_msg->payload[1]);
+                	LOG_DBG("Error Code: 0x%02X", rx_msg->payload[1]);
                 }
                 break;
 
         default:
-                printf("unhandled LoRaWAN SAP message received - msg_id : 0x%02X\n\r", (u8_t)rx_msg->msg_id);
+                LOG_DBG("unhandled LoRaWAN SAP message received - msg_id : 0x%02X", (u8_t)rx_msg->msg_id);
                 break;
     }
 }
@@ -776,16 +775,16 @@ static void wimod_lorawan_process_join_tx_indication(wimod_hci_message_t* rx_msg
 {
     if (rx_msg->payload[0] == 0)
     {
-        printf("join tx event - Status : ok\n\r");
+        LOG_DBG("join tx event - Status : ok");
     }
     // channel info attached ?
     else if(rx_msg->payload[0] == 1)
     {
-        printf("join tx event:%d, ChnIdx:%d, DR:%d - Status : ok\n\r", (int)rx_msg->payload[3], (int)rx_msg->payload[1], (int)rx_msg->payload[2]);
+        LOG_DBG("join tx event:%d, ChnIdx:%d, DR:%d - Status : ok", (int)rx_msg->payload[3], (int)rx_msg->payload[1], (int)rx_msg->payload[2]);
     }
     else
     {
-        printf("join tx event - Status : error\n\r");
+        LOG_DBG("join tx event - Status : error");
     }
 }
 
@@ -804,7 +803,7 @@ void wimod_lorawan_process_join_network_indication(wimod_hci_message_t* rx_msg)
         u32_t address = MAKELONG(MAKEWORD(rx_msg->payload[1],rx_msg->payload[2]),
                                   MAKEWORD(rx_msg->payload[3],rx_msg->payload[4]));
 
-        printf("join network accept event - DeviceAddress:0x%08X\n\r", address);
+        LOG_DBG("join network accept event - DeviceAddress:0x%08X", address);
 
         if(join_callback){
         	(*join_callback)();
@@ -815,7 +814,7 @@ void wimod_lorawan_process_join_network_indication(wimod_hci_message_t* rx_msg)
         u32_t address = MAKELONG(MAKEWORD(rx_msg->payload[1],rx_msg->payload[2]),
                                   MAKEWORD(rx_msg->payload[3],rx_msg->payload[4]));
 
-        printf("join network accept event - DeviceAddress:0x%08X, ChnIdx:%d, DR:%d, RSSI:%d, SNR:%d, RxSlot:%d\n\r", address,
+        LOG_DBG("join network accept event - DeviceAddress:0x%08X, ChnIdx:%d, DR:%d, RSSI:%d, SNR:%d, RxSlot:%d", address,
                (int)rx_msg->payload[5], (int)rx_msg->payload[6], (int)rx_msg->payload[7],
                (int)rx_msg->payload[8], (int)rx_msg->payload[9]);
 
@@ -825,7 +824,7 @@ void wimod_lorawan_process_join_network_indication(wimod_hci_message_t* rx_msg)
     }
     else
     {
-        printf("join network timeout event\n\r");
+        LOG_DBG("join network timeout event");
     }
 }
 
@@ -847,27 +846,27 @@ void wimod_lorawan_process_u_data_rx_indication(wimod_hci_message_t* rx_msg)
 
     if (payload_size >= 1)
     {
-        printf("U-Data rx event: port:0x%02X\n\rapp-payload:", rx_msg->payload[1]);
+        LOG_DBG("U-Data rx event: port:0x%02Xapp-payload:", rx_msg->payload[1]);
         for(int i = 1; i < payload_size; i++)
-            printf("%02X ", rx_msg->payload[1+i]);
-        printf("\n\r");
+            LOG_DBG("%02X ", rx_msg->payload[1+i]);
+        LOG_DBG("");
     }
 
     if (rx_msg->payload[0] & 0x02)
-        printf("ack for uplink packet:yes\n\r");
+        LOG_DBG("ack for uplink packet:yes");
     else
-        printf("ack for uplink packet:no\n\r");
+        LOG_DBG("ack for uplink packet:no");
 
     if (rx_msg->payload[0] & 0x04)
-        printf("frame pending:yes\n\r");
+        LOG_DBG("frame pending:yes");
     else
-        printf("frame pending:no\n\r");
+        LOG_DBG("frame pending:no");
 
     // rx channel info attached ?
     if (rx_msg->payload[0] & 0x01)
     {
         u8_t* rxInfo = &rx_msg->payload[1 + payload_size];
-        printf("ChnIdx:%d, DR:%d, RSSI:%d, SNR:%d, RxSlot:%d\n\r",
+        LOG_DBG("ChnIdx:%d, DR:%d, RSSI:%d, SNR:%d, RxSlot:%d",
               (int)rxInfo[0], (int)rxInfo[1], (int)rxInfo[2],
               (int)rxInfo[3], (int)rxInfo[4]);
     }
@@ -891,27 +890,27 @@ void wimod_lorawan_process_c_data_rx_indication(wimod_hci_message_t* rx_msg)
 
     if (payload_size >= 1)
     {
-        printf("C-Data rx event: port:0x%02X\n\rapp-payload:", rx_msg->payload[1]);
+        LOG_DBG("C-Data rx event: port:0x%02Xapp-payload:", rx_msg->payload[1]);
         for(int i = 1; i < payload_size;)
-            printf("%02X ", rx_msg->payload[1+i]);
-        printf("\n\r");
+            LOG_DBG("%02X ", rx_msg->payload[1+i]);
+        LOG_DBG("");
     }
 
     if (rx_msg->payload[0] & 0x02)
-        printf("ack for uplink packet:yes\n\r");
+        LOG_DBG("ack for uplink packet:yes");
     else
-        printf("ack for uplink packet:no\n\r");
+        LOG_DBG("ack for uplink packet:no");
 
     if (rx_msg->payload[0] & 0x04)
-        printf("frame pending:yes\n\r");
+        LOG_DBG("frame pending:yes");
     else
-        printf("frame pending:no\n\r");
+        LOG_DBG("frame pending:no");
 
     // rx channel info attached ?
     if (rx_msg->payload[0] & 0x01)
     {
         u8_t* rxInfo = &rx_msg->payload[1 + payload_size];
-        printf("ChnIdx:%d, DR:%d, RSSI:%d, SNR:%d, RxSlot:%d\n\r",
+        LOG_DBG("ChnIdx:%d, DR:%d, RSSI:%d, SNR:%d, RxSlot:%d",
               (int)rxInfo[0], (int)rxInfo[1], (int)rxInfo[2],
               (int)rxInfo[3], (int)rxInfo[4]);
     }
@@ -931,10 +930,7 @@ static void wimod_lorawan_show_response(const char* str, const id_string_t* stat
     {
         if (status_table->id == status_id)
         {
-            printf(str);
-            printf(" - Status(0x%02X) : ", status_id);
-            printf(status_table->string);
-            printf("\n\r");
+            LOG_DBG("%s: - Status(0x%02X) : %s", str, status_id, status_table->string);
             return;
         }
 
