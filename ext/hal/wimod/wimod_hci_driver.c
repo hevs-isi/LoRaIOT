@@ -26,8 +26,6 @@ static struct device *uart_dev;
 // SLIP Message Receiver Callback
 static u8_t* wimod_hci_process_rx_message(u8_t* rx_data, int rx_length);
 
-static u8_t rxsplipbuf[10];
-
 //------------------------------------------------------------------------------
 //
 // Declare Layer Instance
@@ -58,13 +56,6 @@ static wimod_hci_msglayer_t  HCI;
 
 // reserve one tx_buffer
 static u8_t tx_buffer[sizeof( wimod_hci_message_t ) * 2 + 2];
-static u8_t rx_buffer[30];
-
-static u8_t *upipe_rx(u8_t *buf, size_t *off)
-{
-	*off = 0;
-	return buf;
-}
 
 //------------------------------------------------------------------------------
 //
@@ -76,7 +67,6 @@ static u8_t *upipe_rx(u8_t *buf, size_t *off)
 
 static void uart_isr(struct device *dev)
 {
-	int got;
 	//uart_irq_update(dev);
 	static int i;
 

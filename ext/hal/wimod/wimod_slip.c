@@ -88,9 +88,6 @@ static void slip_store_tx_byte(u8_t tx_byte) {
 
 int slip_encode_data(u8_t* dst_buffer, int dst_buf_size, u8_t* src_data,
 		int src_length) {
-	// save start pointer
-	int tx_length = 0;
-
 	// init tx_buffer
 	slip.tx_buffer = dst_buffer;
 
@@ -180,9 +177,6 @@ static void slip_store_rx_byte(u8_t rx_byte) {
 //------------------------------------------------------------------------------
 
 void slip_decode_data(u8_t* src_data, int src_length) {
-	// init result
-	int result = 0;
-
 	// iterate over all received bytes
 	while (src_length--) {
 		// get rx_byte
@@ -265,4 +259,3 @@ void slip_decode_data(u8_t* src_data, int src_length) {
 		}
 	}
 }
-

@@ -8,16 +8,8 @@
 
 #include "im881a.h"
 
-static struct device *lora_im881a_dev;
-
 u8_t pipe_buf[1];
 wimod_hci_message_t rx_msg;
-
-
-static u8_t *upipe_rx(u8_t *buf, size_t *off)
-{
-	return 0;
-}
 
 static wimod_hci_message_t* recv_cb(wimod_hci_message_t* rx_msg)
 {

@@ -154,5 +154,3 @@ bool CRC16_Check (u8_t* data, u16_t length, u16_t initVal)
     // CRC ok ?
     return (bool)(crc == CRC16_GOOD_VALUE);
 }
-
-

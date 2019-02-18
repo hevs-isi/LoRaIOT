@@ -140,20 +140,6 @@ static const id_string_t wimod_lorawan_status_strings[] =
 //
 //------------------------------------------------------------------------------
 
-
-static void memset64( void * dest, u64_t value, uintptr_t size )
-{
-  uintptr_t i;
-  for( i = 0; i < (size & (~7)); i+=8 )
-  {
-    memcpy( ((char*)dest) + i, &value, 8 );
-  }
-  for( ; i < size; i++ )
-  {
-    ((char*)dest)[i] = ((char*)&value)[i&7];
-  }
-}
-
 //------------------------------------------------------------------------------
 //
 //  Init
