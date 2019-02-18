@@ -603,7 +603,7 @@ static void wimod_lorawan_device_eui_rsp(wimod_hci_message_t* rx_msg)
 	eui_msb = MAKELONG(MAKEWORD(rx_msg->payload[4], rx_msg->payload[3]),
 			MAKEWORD(rx_msg->payload[2], rx_msg->payload[1]));
 
-	LOG_INF("64-Bit Device EUI: 0x%08x%08x\n", eui_msb, eui_lsb);
+	LOG_INF("64-Bit Device EUI: 0x%08x%08x", eui_msb, eui_lsb);
 }
 
 static void wimod_lorawan_process_nwk_status_rsp(wimod_hci_message_t* rx_msg)
@@ -613,17 +613,17 @@ static void wimod_lorawan_process_nwk_status_rsp(wimod_hci_message_t* rx_msg)
 	wimod_lorawan_show_response("network status response",
 			wimod_device_mgmt_status_strings, rx_msg->payload[0]);
 
-	LOG_DBG("Network Status: 0x%02X\n", rx_msg->payload[1]);
+	LOG_DBG("Network Status: 0x%02X", rx_msg->payload[1]);
 
 	if(rx_msg->length > 2){
 
 		device_address = MAKELONG(MAKEWORD(rx_msg->payload[5], rx_msg->payload[4]),
 					MAKEWORD(rx_msg->payload[3], rx_msg->payload[2]));
 
-		LOG_DBG("Device Address: %d\n", device_address);
-		LOG_DBG("Data Rate Index: %d\n", rx_msg->payload[6]);
-		LOG_DBG("Power Level: %d\n", rx_msg->payload[7]);
-		LOG_DBG("Max Payload Size: %d\n", rx_msg->payload[8]);
+		LOG_DBG("Device Address: %d", device_address);
+		LOG_DBG("Data Rate Index: %d", rx_msg->payload[6]);
+		LOG_DBG("Power Level: %d", rx_msg->payload[7]);
+		LOG_DBG("Max Payload Size: %d", rx_msg->payload[8]);
 	}
 }
 
@@ -632,19 +632,19 @@ static void wimod_lorawan_process_rstack_config_rsp(wimod_hci_message_t* rx_msg)
 	wimod_lorawan_show_response("radio stack config response",
 			wimod_device_mgmt_status_strings, rx_msg->payload[0]);
 
-	LOG_DBG("Default Data Rate Index: %d\n", rx_msg->payload[1]);
-	LOG_DBG("Default TX Power Level: %d\n", rx_msg->payload[2]);
-	LOG_DBG("Options: 0x%02X\n", rx_msg->payload[3]);
-	LOG_DBG("\tAdaptive Data Rate: %s\n", (rx_msg->payload[3] & 0x01) ? "enabled" : "disabled");
-	LOG_DBG("\tDuty Cycle Control: %s\n", (rx_msg->payload[3] & 0x02) ? "enabled" : "disabled");
-	LOG_DBG("\tDevice Class: %s\n", (rx_msg->payload[3] & 0x04) ? "C" : "A");
-	LOG_DBG("\tRF packet output format: %s\n", (rx_msg->payload[3] & 0x40) ? "extended" : "standard");
-	LOG_DBG("\tRx MAC Command Forwarding: %s\n", (rx_msg->payload[3] & 0x80) ? "enabled" : "disabled");
-	LOG_DBG("Power Saving Mode: %s\n", rx_msg->payload[4] ? "automatic" : "off");
-	LOG_DBG("Number of Retransmissions: %d\n", rx_msg->payload[5]);
-	LOG_DBG("Band Index: %d\n", rx_msg->payload[6]);
+	LOG_DBG("Default Data Rate Index: %d", rx_msg->payload[1]);
+	LOG_DBG("Default TX Power Level: %d", rx_msg->payload[2]);
+	LOG_DBG("Options: 0x%02X", rx_msg->payload[3]);
+	LOG_DBG("\tAdaptive Data Rate: %s", (rx_msg->payload[3] & 0x01) ? "enabled" : "disabled");
+	LOG_DBG("\tDuty Cycle Control: %s", (rx_msg->payload[3] & 0x02) ? "enabled" : "disabled");
+	LOG_DBG("\tDevice Class: %s", (rx_msg->payload[3] & 0x04) ? "C" : "A");
+	LOG_DBG("\tRF packet output format: %s", (rx_msg->payload[3] & 0x40) ? "extended" : "standard");
+	LOG_DBG("\tRx MAC Command Forwarding: %s", (rx_msg->payload[3] & 0x80) ? "enabled" : "disabled");
+	LOG_DBG("Power Saving Mode: %s", rx_msg->payload[4] ? "automatic" : "off");
+	LOG_DBG("Number of Retransmissions: %d", rx_msg->payload[5]);
+	LOG_DBG("Band Index: %d", rx_msg->payload[6]);
 	// not available in 1.11 specs
-	LOG_DBG("Header MAC Cmd Capacity: %d\n", rx_msg->payload[7] & 0xFF);
+	LOG_DBG("Header MAC Cmd Capacity: %d", rx_msg->payload[7] & 0xFF);
 
 }
 
@@ -660,7 +660,7 @@ static void wimod_lorawan_process_send_data_rsp(wimod_hci_message_t* rx_msg)
         time_remaining_ms = MAKELONG(MAKEWORD(rx_msg->payload[1], rx_msg->payload[2]),
                     MAKEWORD(rx_msg->payload[3], rx_msg->payload[4]));
 
-        LOG_DBG("Channel blocked. Time remaining (ms): %d\n", time_remaining_ms);
+        LOG_DBG("Channel blocked. Time remaining (ms): %d", time_remaining_ms);
     }
 }
 
