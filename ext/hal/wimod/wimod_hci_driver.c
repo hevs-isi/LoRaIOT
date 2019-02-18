@@ -6,7 +6,8 @@
 //------------------------------------------------------------------------------
 
 #include "wimod_hci_driver.h"
-#include "crc16.h"
+
+#include <crc.h>
 #include "wimod_slip.h"
 #include <uart.h>
 
@@ -16,6 +17,18 @@
 LOG_MODULE_REGISTER(wimod_hci_driver, LOG_LEVEL_DBG);
 
 static struct device *uart_dev;
+
+#define CRC16_INIT_VALUE    0xFFFF    // initial value for CRC algorithem
+#define CRC16_GOOD_VALUE    0x0F47    // constant compare value for check
+
+static bool CRC16_Check (u8_t* data, u16_t length, u16_t initVal)
+{
+    // calc ones complement of CRC16
+    u16_t crc = ~crc16_ccitt(CRC16_INIT_VALUE, data, length);
+
+    // CRC ok ?
+    return (bool)(crc == CRC16_GOOD_VALUE);
+}
 
 //------------------------------------------------------------------------------
 //
@@ -174,9 +187,9 @@ int wimod_hci_send_message(wimod_hci_message_t* tx_message)
 
     // 2. Calculate CRC16 over header and optional payload
     //
-    u16_t crc16 = CRC16_Calc(&tx_message->sap_id,
-                              tx_message->length + WIMOD_HCI_MSG_HEADER_SIZE,
-                              CRC16_INIT_VALUE);
+
+    u16_t crc16 = crc16_ccitt(CRC16_INIT_VALUE, &tx_message->sap_id,
+        tx_message->length + WIMOD_HCI_MSG_HEADER_SIZE);
 
     // 2.1 get 1's complement !!!
     //
