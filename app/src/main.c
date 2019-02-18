@@ -7,7 +7,7 @@
 #include <zephyr.h>
 #include <logging/sys_log.h>
 #include <board_utils.h>
-
+#include "lora_shell.h"
 #include <kernel.h>
 #include <device.h>
 
@@ -27,4 +27,5 @@ void main(void)
 {
 	LOG_DBG("main");
 	lora_init();
+	lora_shell_pm();
 }
