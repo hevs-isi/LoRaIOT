@@ -9,6 +9,8 @@ menuconfig UART_STM32
 	bool "STM32 MCU serial driver"
 	select SERIAL_HAS_DRIVER
 	select SERIAL_SUPPORT_INTERRUPT
+	select USE_STM32_HAL_PWR
+	select USE_STM32_HAL_PWR_EX
 	depends on SOC_FAMILY_STM32
 	help
 	  This option enables the UART driver for STM32 family of
