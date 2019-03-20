@@ -1,5 +1,6 @@
 #include <zephyr.h>
 #include <shell/shell.h>
+#include <stdlib.h>
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(lora_shell, LOG_LEVEL_DBG);
@@ -202,6 +203,34 @@ static int shell_send_cdata(const struct shell *shell, size_t argc, char *argv[]
 	return 0;
 }
 
+#include <device.h>
+#include <gpio.h>
+
+static int shell_swd(const struct shell *shell, size_t argc, char *argv[])
+{
+	int ret;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	shell_print(shell, "disable swd");
+
+	struct device *dev = device_get_binding(DT_GPIO_STM32_GPIOA_LABEL);
+	ret = gpio_pin_configure(dev, 13, (GPIO_DIR_IN | GPIO_PUD_PULL_UP));
+	if (ret) {
+		shell_error(shell, "Error configuring pin PA%d!\n", 13);
+		return ret;
+	}
+
+	ret = gpio_pin_configure(dev, 14, (GPIO_DIR_IN | GPIO_PUD_PULL_UP));
+	if (ret) {
+		shell_error(shell, "Error configuring pin PA%d!\n", 14);
+		return ret;
+	}
+
+	return 0;
+}
+
 static int shell_quit(const struct shell *shell, size_t argc, char *argv[])
 {
 	ARG_UNUSED(argc);
@@ -210,6 +239,40 @@ static int shell_quit(const struct shell *shell, size_t argc, char *argv[])
 	shell_log_backend_disable(shell->log_backend);
 
 	shell_print(shell, "logging disabled until next command");
+
+	int ret;
+
+	struct device *dev = device_get_binding(DT_GPIO_STM32_GPIOA_LABEL);
+	ret = gpio_pin_configure(dev, 0, (GPIO_DIR_IN));
+	if (ret) {
+		shell_error(shell, "Error configuring pin PA%d!\n", 13);
+		return ret;
+	}
+
+	return 0;
+}
+
+#include "stm32_lp.h"
+static int shell_sleep(const struct shell *shell, size_t argc, char *argv[])
+{
+	ARG_UNUSED(argc);
+	char *endptr;
+	u32_t duration;
+
+	if (argc != 2)
+	{
+		shell_error(shell, "arguments?");
+		return -EINVAL;
+	}
+	duration = strtol(argv[1], &endptr, 0);
+
+	if (endptr == argv[1])
+	{
+		shell_error(shell, "error parsing  argv[1] : '%s'", argv[1]);
+		return -EINVAL;
+	}
+
+	stm32_sleep(duration);
 
 	return 0;
 }
@@ -233,6 +296,8 @@ SHELL_CREATE_STATIC_SUBCMD_SET(lora_sub)
 	SHELL_CMD_ARG(udata, NULL, "no help", shell_send_udata, 0, 1),
 	SHELL_CMD_ARG(cdata, NULL, "no help", shell_send_cdata, 0, 1),
 	SHELL_CMD_ARG(quit, NULL, "no help", shell_quit, 0, 0),
+	SHELL_CMD_ARG(swd, NULL, "no help", shell_swd, 0, 0),
+	SHELL_CMD_ARG(sleep, NULL, "no help", shell_sleep, 0, 0),
 	SHELL_SUBCMD_SET_END
 };
 

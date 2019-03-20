@@ -10,6 +10,7 @@
 #include "lora_shell.h"
 #include <kernel.h>
 #include <device.h>
+#include "stm32_lp.h"
 
 #include <string.h>
 
@@ -27,5 +28,5 @@ void main(void)
 {
 	LOG_DBG("main");
 	lora_init();
-	lora_shell_pm();
+	//lora_shell_pm();
 }
