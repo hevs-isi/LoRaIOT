@@ -576,7 +576,18 @@ static void wimod_lorawan_get_rtc_rsp(wimod_hci_message_t* rx_msg)
     	rtc_value = MAKELONG(MAKEWORD(rx_msg->payload[4], rx_msg->payload[3]),
     				MAKEWORD(rx_msg->payload[2], rx_msg->payload[1]));
 
-    	LOG_DBG("RTC: %d", rtc_value);
+        rtc_value = MAKELONG(MAKEWORD(rx_msg->payload[1], rx_msg->payload[2]),
+        			MAKEWORD(rx_msg->payload[3], rx_msg->payload[4]));
+
+    	LOG_DBG("RTC: %d-%02d-%02dT%02d:%02d:%02d", 2000+((rtc_value >> 26) & 0x3f)
+                               , (rtc_value >> 12) & 0x0f
+                               , (rtc_value >> 21) & 0x1f
+                               , (rtc_value >> 16) & 0x1f
+                               , (rtc_value >> 6) & 0x3f
+                               , (rtc_value >> 0) & 0x3f
+        );
+
+        LOG_DBG("RTC: 0x%08x", rtc_value);
     }
 }
 
