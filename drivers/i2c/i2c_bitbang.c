@@ -49,8 +49,15 @@ static const u32_t delays_standard[] = {
 	[T_HIGH] = NS_TO_SYS_CLOCK_HW_CYCLES(4000),
 };
 
+static void i2c_write_bit(struct i2c_bitbang *context, int bit);
+static void i2c_set_scl(struct i2c_bitbang *context, int state);
+static void i2c_set_sda(struct i2c_bitbang *context, int state);
+
 int i2c_bitbang_configure(struct i2c_bitbang *context, u32_t dev_config)
 {
+	i2c_set_scl(context, 1);
+	i2c_set_sda(context, 1);
+
 	/* Check for features we don't support */
 	if (I2C_ADDR_10_BITS & dev_config) {
 		return -ENOTSUP;
@@ -66,6 +73,11 @@ int i2c_bitbang_configure(struct i2c_bitbang *context, u32_t dev_config)
 		break;
 	default:
 		return -ENOTSUP;
+	}
+
+	for (size_t i = 0 ;  i < 64 ; i++)
+	{
+		i2c_write_bit(context, 1);
 	}
 
 	return 0;
@@ -144,6 +156,17 @@ static void i2c_write_bit(struct i2c_bitbang *context, int bit)
 	i2c_delay(context->delays[T_HIGH]);
 }
 
+static void stop_after_ack(struct i2c_bitbang *context)
+{
+	i2c_set_sda(context, 0);
+	i2c_set_scl(context, 0);
+	i2c_delay(context->delays[T_LOW]);
+	i2c_set_scl(context, 1);
+	i2c_delay(context->delays[T_SU_STP]);
+	i2c_set_sda(context, 1);
+	i2c_delay(context->delays[T_BUF]); /* In case we start again too soon */
+}
+
 static bool i2c_read_bit(struct i2c_bitbang *context)
 {
 	bool bit;
@@ -199,7 +222,9 @@ int i2c_bitbang_transfer(struct i2c_bitbang *context,
 
 	/* Make sure we're in a good state so slave recognises the Start */
 	i2c_set_scl(context, 1);
-	flags |= I2C_MSG_STOP;
+	//flags |= I2C_MSG_STOP;
+
+	int final_ack_rx = 0;
 
 	do {
 		/* Stop flag from previous message? */
@@ -225,6 +250,7 @@ int i2c_bitbang_transfer(struct i2c_bitbang *context,
 			unsigned int byte0 = slave_address << 1;
 
 			byte0 |= (flags & I2C_MSG_RW_MASK) == I2C_MSG_READ;
+			final_ack_rx = 1;
 			if (!i2c_write_byte(context, byte0)) {
 				goto finish; /* No ACK received */
 			}
@@ -237,6 +263,7 @@ int i2c_bitbang_transfer(struct i2c_bitbang *context,
 		if ((flags & I2C_MSG_RW_MASK) == I2C_MSG_READ) {
 			/* Read */
 			while (buf < buf_end) {
+				final_ack_rx = 0;
 				*buf++ = i2c_read_byte(context);
 				/* ACK the byte, except for the last one */
 				i2c_write_bit(context, buf == buf_end);
@@ -258,7 +285,13 @@ int i2c_bitbang_transfer(struct i2c_bitbang *context,
 	/* Complete without error */
 	result = 0;
 finish:
-	i2c_stop(context);
+	if (final_ack_rx) {
+		stop_after_ack(context);
+	}
+	else
+	{
+		i2c_stop(context);
+	}
 
 	return result;
 }
