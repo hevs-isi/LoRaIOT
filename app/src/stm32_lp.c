@@ -5,7 +5,7 @@
 #include <power.h>
 #include <counter.h>
 #include <logging/log.h>
-LOG_MODULE_REGISTER(lp, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(lp, LOG_LEVEL_INF);
 
 #define ALARM_CHANNEL_ID 0
 
@@ -37,7 +37,8 @@ void stm32_sleep(u32_t duration)
 	err = counter_set_channel_alarm(counter_dev, ALARM_CHANNEL_ID, &alarm_cfg);
 
 	//HAL_PWR_EnterSTOPMode(HAL_PWR_EnterSLEEPMode, PWR_STOPENTRY_WFI);
-	HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
+	//HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
+	HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
 	//HAL_PWR_EnterSLEEPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
 	//HAL_PWREx_DisableLowPowerRunMode();
 }
