@@ -180,7 +180,7 @@ int wimod_lorawan_set_op_mode();
 int wimod_lorawan_get_op_mode();
 
 int wimod_lorawan_get_device_eui();
-int wimod_lorawan_set_join_param_request();
+int wimod_lorawan_set_join_param_request(const char *appEui, const char *appKey);
 
 // join network
 int wimod_lorawan_join_network_request(join_network_cb cb);
@@ -203,4 +203,3 @@ int wimod_lorawan_set_rtc();
 int wimod_lorawan_get_rtc_alarm();
 
 #endif // WIMOD_LORAWAN_API_H
-

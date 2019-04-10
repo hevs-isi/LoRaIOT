@@ -31,9 +31,6 @@ LOG_MODULE_REGISTER(wimod_lorawan_api, LOG_LEVEL_DBG);
 #define MAKEWORD(lo,hi) ((lo)|((hi) << 8))
 #define MAKELONG(lo,hi) ((lo)|((hi) << 16))
 
-const char *appEui = "70B3D57ED0017ED9";
-const char *appKey = "0F7C7E4558C5A711F72857E8397EAE72";
-
 //------------------------------------------------------------------------------
 //
 //  Forward Declarations
@@ -277,7 +274,7 @@ int wimod_lorawan_get_device_eui()
 }
 
 
-int wimod_lorawan_set_join_param_request()
+int wimod_lorawan_set_join_param_request(const char *appEui, const char *appKey)
 {
 	const char *pos;
 	size_t i;

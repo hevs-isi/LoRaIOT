@@ -116,11 +116,32 @@ static int shell_cmd_deveui(const struct shell *shell, size_t argc, char *argv[]
 
 static int shell_cmd_setparam(const struct shell *shell, size_t argc, char *argv[])
 {
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
 	shell_connected(shell);
 
-	wimod_lorawan_set_join_param_request();
+	if (argc != 3)
+	{
+		return -1;
+	}
+
+	const char *appEui = argv[1]; //"70B3D57ED0017ED9";
+	const char *appKey = argv[2]; //"3F72D483526535F171F1CBA50FDDB884";
+
+	// lora set 70B3D57ED0017ED9 3F72D483526535F171F1CBA50FDDB884
+
+	if (strlen(appEui) != 16)
+	{
+		shell_error(shell, "Invalid APPEUI, length MUST be 16 (was '%s')\n", appEui);
+		return -1;
+	}
+
+	if (strlen(appKey) != 32)
+	{
+		shell_error(shell, "Invalid APPKEY, length MUST be 32 (was '%s')\n", appKey);
+		return -1;
+	}
+
+
+	wimod_lorawan_set_join_param_request(appEui, appKey);
 
 	return 0;
 }
@@ -254,6 +275,9 @@ static int shell_quit(const struct shell *shell, size_t argc, char *argv[])
 
 SHELL_CREATE_STATIC_SUBCMD_SET(lora_sub)
 {
+	SHELL_CMD_ARG(deveui, NULL, "read deveui", shell_cmd_deveui, 0, 1),
+	SHELL_CMD_ARG(set, NULL, "set APPEUI APPKEY", shell_cmd_setparam, 2, 2),
+	SHELL_CMD_ARG(join, NULL, "no help", shell_cmd_join, 0, 1),
 	SHELL_CMD_ARG(firmware, NULL, "no help", shell_cmd_info, 0, 1),
 	SHELL_CMD_ARG(custom, NULL, "no help", shell_cmd_custom, 0, 1),
 	SHELL_CMD_ARG(getmode, NULL, "no help", shell_cmd_getmode, 0, 1),
@@ -261,9 +285,6 @@ SHELL_CREATE_STATIC_SUBCMD_SET(lora_sub)
 	SHELL_CMD_ARG(set_rtc, NULL, "no help", shell_cmd_set_rtc, 0, 1),
 	SHELL_CMD_ARG(get_rtc_alarm, NULL, "no help", shell_cmd_get_rtc_alarm, 0, 1),
 	SHELL_CMD_ARG(factory, NULL, "no help", shell_factory_reset, 0, 1),
-	SHELL_CMD_ARG(deveui, NULL, "no help", shell_cmd_deveui, 0, 1),
-	SHELL_CMD_ARG(set, NULL, "no help", shell_cmd_setparam, 0, 1),
-	SHELL_CMD_ARG(join, NULL, "no help", shell_cmd_join, 0, 1),
 	SHELL_CMD_ARG(nwk, NULL, "no help", shell_nwk_status, 0, 1),
 	SHELL_CMD_ARG(setrstack, NULL, "no help", shell_set_rstack_cfg, 0, 1),
 	SHELL_CMD_ARG(rstack, NULL, "no help", shell_rstack_cfg, 0, 1),
