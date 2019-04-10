@@ -1,0 +1,61 @@
+/*
+* Copyright (c) 2018 Nordic Semiconductor ASA
+*
+* SPDX-License-Identifier: Apache-2.0
+*/
+
+&usart1 {
+	current-speed = <115200>;
+	pinctrl-0 = <&usart1_pins_b>;
+	pinctrl-names = "default";
+   status = "ok";
+};
+
+&usart3 {
+   current-speed = <9600>;
+   pinctrl-0 = <&usart3_pins_b>;
+   pinctrl-names = "default";
+   status = "ok";
+};
+
+&i2c1 {
+	eeprom@50 {
+		compatible = "atmel,at24";
+		reg = <0x50>;
+		label = "EEPROM_SLAVE_0";
+		size = <1>;
+	};
+};
+
+/ {
+	leds {
+		compatible = "gpio-leds";
+		green_led_1: led_1 {
+			gpios = <&gpioc 6 GPIO_INT_ACTIVE_HIGH>;
+			label = "User LD1";
+		};
+		red_led_2: led_2 {
+			gpios = <&gpioc 7 GPIO_INT_ACTIVE_HIGH>;
+			label = "User LD2";
+		};
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		user_button0: button0 {
+			label = "User button 0";
+			gpios = <&gpioc 11 GPIO_INT_ACTIVE_LOW>;
+		};
+        user_button1: button1 {
+			label = "User button 1";
+			gpios = <&gpiob 15 GPIO_INT_ACTIVE_LOW>;
+		};
+	};
+
+	aliases {
+		led0 = &green_led_1;
+        led1 = &red_led_2;
+		sw0 = &user_button0;
+        sw1 = &user_button1;
+	};
+};
