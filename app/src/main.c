@@ -40,6 +40,36 @@ static void leds_init(void)
 	gpio_pin_write(led1_dev, LED1_GPIO_PIN, 1);
 }
 
+static void led0_set(u32_t value)
+{
+	struct device *led0_dev = device_get_binding(LED0_GPIO_CONTROLLER);
+	gpio_pin_write(led0_dev, LED0_GPIO_PIN, value);
+}
+
+static void led1_set(u32_t value)
+{
+	struct device *led1_dev = device_get_binding(LED1_GPIO_CONTROLLER);
+	gpio_pin_write(led1_dev, LED1_GPIO_PIN, value);
+}
+
+#include <kernel.h>
+#include <arch/cpu.h>
+#include <misc/__assert.h>
+#include <soc.h>
+#include <init.h>
+#include <uart.h>
+#include <clock_control.h>
+
+#include <linker/sections.h>
+#include <clock_control/stm32_clock_control.h>
+#include "../drivers/serial/uart_stm32.h"
+#define DEV_CFG(dev)							\
+	((const struct uart_stm32_config * const)(dev)->config->config_info)
+#define DEV_DATA(dev)							\
+	((struct uart_stm32_data * const)(dev)->driver_data)
+#define UART_STRUCT(dev)					\
+	((USART_TypeDef *)(DEV_CFG(dev))->uconf.base)
+
 void main(void)
 {
 	int ret;
@@ -48,31 +78,16 @@ void main(void)
 
 	struct device *dev;
 
-	/* Power on radio module */
-	dev = device_get_binding(DT_GPIO_STM32_GPIOD_LABEL);
-	ret = gpio_pin_configure(dev, 2, (GPIO_DIR_OUT));
-	if (ret) {
-		printk("Error configuring pin PD%d!\n", 2);
-	}
-
-	ret = gpio_pin_write(dev, 2, 1);
-	if (ret) {
-		printk("Error set pin PD%d!\n", 2);
-	}
-
-	/* power down gps */
+	/* Disable vbat measure */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOC_LABEL);
+	ret = gpio_pin_configure(dev, 0, (GPIO_DIR_IN));
 	dev = device_get_binding(DT_GPIO_STM32_GPIOA_LABEL);
-	ret = gpio_pin_configure(dev, 12, (GPIO_DIR_OUT));
-	if (ret) {
-		printk("Error configuring pin PA%d!\n", 12);
-	}
-
-	ret = gpio_pin_write(dev, 12, 0);
+	ret = gpio_pin_configure(dev, 8, (GPIO_DIR_IN));
 
 	/* disable rx/tx radio for firmware update */
 	#if 0
 	{
-		device_get_binding(DT_GPIO_STM32_GPIOA_LABEL);
+		dev = device_get_binding(DT_GPIO_STM32_GPIOA_LABEL);
 		ret = gpio_pin_configure(dev, 9, (GPIO_DIR_IN));
 		if (ret) {
 			printk("Error configuring pin PA%d!\n", 9);
@@ -84,9 +99,29 @@ void main(void)
 	}
 	#endif
 
-	//gps_init();
-	//leds_init();
+	/*
+	USART_TypeDef *UartInstance = UART_STRUCT(device_get_binding("UART_2"));
+
+	printk("UART_2->BRR:%"PRIu32"\n", UartInstance->BRR);
+	*/
+
+	lp_init();
+	leds_init();
 	saved_config_init();
-	lora_init();
+	gps_off();
+
+	lora_off();
+
+	led0_set(0);
+	led1_set(0);
+
+	//stm32_sleep(10000);
+	//k_sleep(3000);
+	//stm32_sleep(0);
+
+	//gps_init();
+
+	//
+	//lora_init();
 	//lora_shell_pm();
 }

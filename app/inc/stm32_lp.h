@@ -7,6 +7,7 @@ extern "C"
 #endif
 
 void stm32_sleep(u32_t duration);
+void lp_init(void);
 
 #ifdef __cplusplus
 }

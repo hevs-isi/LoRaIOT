@@ -7,8 +7,9 @@ extern "C"
 #endif
 
 void lora_init(void);
-void disable_uart();
-void enable_uart();
+void lora_off(void);
+void disable_uart(void);
+void enable_uart(void);
 
 #ifdef __cplusplus
 }

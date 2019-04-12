@@ -162,3 +162,28 @@ void gps_init(void)
 {
 
 }
+
+void gps_off(void)
+{
+	int ret;
+	struct device *dev;
+
+	/* Power off gps backup */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOA_LABEL);
+	ret = gpio_pin_configure(dev, 12, (GPIO_DIR_OUT));
+	ret = gpio_pin_write(dev, 12, 0);
+
+	/* Power off gps module */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOC_LABEL);
+	ret = gpio_pin_configure(dev, 13, (GPIO_DIR_OUT));
+	ret = gpio_pin_write(dev, 13, 0);
+
+	/* Disable uart pins */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOC_LABEL);
+	ret = gpio_pin_configure(dev, 4, (GPIO_DIR_IN));
+	ret = gpio_pin_configure(dev, 5, (GPIO_DIR_IN));
+
+	/* Disable PPS pin */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOC_LABEL);
+	ret = gpio_pin_configure(dev, 12, (GPIO_DIR_IN));
+}

@@ -7,6 +7,7 @@ extern "C"
 #endif
 
 void gps_init(void);
+void gps_off(void);
 
 #ifdef __cplusplus
 }

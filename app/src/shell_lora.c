@@ -2,6 +2,8 @@
 #include <shell/shell.h>
 #include <stdlib.h>
 
+#if CONFIG_SHELL
+
 #include <logging/log.h>
 LOG_MODULE_REGISTER(shell_lora, LOG_LEVEL_DBG);
 
@@ -297,3 +299,5 @@ SHELL_CREATE_STATIC_SUBCMD_SET(lora_sub)
 };
 
 SHELL_CMD_REGISTER(lora, &lora_sub, "LoRa commands", NULL);
+
+#endif /* CONFIG_SHELL */

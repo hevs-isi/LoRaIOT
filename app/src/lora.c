@@ -12,6 +12,8 @@ LOG_MODULE_REGISTER(lora, LOG_LEVEL_DBG);
 #include <board_utils.h>
 #endif
 
+#include <gpio.h>
+
 static struct device *uart;
 static struct uart_device_config *uart_cfg;
 
@@ -90,4 +92,19 @@ void lora_init()
 	wimod_lorawan_join_network_request(join_callback);
 
 	disable_uart();
+}
+
+void lora_off()
+{
+	int ret;
+	struct device *dev;
+
+	/* Power off radio module */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOD_LABEL);
+	ret = gpio_pin_configure(dev, 2, (GPIO_DIR_OUT));
+	ret = gpio_pin_write(dev, 2, 0);
+
+	dev = device_get_binding(DT_GPIO_STM32_GPIOA_LABEL);
+	ret = gpio_pin_configure(dev, 9, (GPIO_DIR_IN));
+	ret = gpio_pin_configure(dev, 10, (GPIO_DIR_IN));
 }
