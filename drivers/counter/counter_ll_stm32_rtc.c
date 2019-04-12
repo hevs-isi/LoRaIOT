@@ -22,8 +22,6 @@
 
 LOG_MODULE_REGISTER(counter_rtc_stm32, CONFIG_COUNTER_LOG_LEVEL);
 
-#define T_TIME_OFFSET 2088656896
-
 #if defined(CONFIG_SOC_SERIES_STM32L4X)
 #define RTC_EXTI_LINE	LL_EXTI_LINE_18
 #elif defined(CONFIG_SOC_SERIES_STM32F4X) \
@@ -87,9 +85,9 @@ static u32_t rtc_stm32_read(struct device *dev)
 	rtc_date = LL_RTC_DATE_Get(RTC);
 
 	/* Convert calendar datetime to UNIX timestamp */
-	now.tm_year = __LL_RTC_CONVERT_BCD2BIN(
+	now.tm_year = 100+__LL_RTC_CONVERT_BCD2BIN(
 					__LL_RTC_GET_YEAR(rtc_date));
-	now.tm_mon = __LL_RTC_CONVERT_BCD2BIN(__LL_RTC_GET_MONTH(rtc_date));
+	now.tm_mon = -1+__LL_RTC_CONVERT_BCD2BIN(__LL_RTC_GET_MONTH(rtc_date));
 	now.tm_mday = __LL_RTC_CONVERT_BCD2BIN(__LL_RTC_GET_DAY(rtc_date));
 
 	now.tm_hour = __LL_RTC_CONVERT_BCD2BIN(__LL_RTC_GET_HOUR(rtc_time));
@@ -97,9 +95,6 @@ static u32_t rtc_stm32_read(struct device *dev)
 	now.tm_sec = __LL_RTC_CONVERT_BCD2BIN(__LL_RTC_GET_SECOND(rtc_time));
 
 	ts = mktime(&now);
-
-	/* Return number of seconds since RTC init */
-	ts -= T_TIME_OFFSET;
 
 	ticks = counter_us_to_ticks(dev, (u64_t)(ts * USEC_PER_SEC));
 
@@ -246,6 +241,11 @@ void rtc_stm32_isr(void *arg)
 	LL_EXTI_ClearFlag_0_31(RTC_EXTI_LINE);
 }
 
+/*
+ Set RESET_RTC_IN_INIT to 1 for original behaviour, please note that this
+ will reset the time to January 2000 00:00:00 at each boot.
+*/
+#define RESET_RTC_IN_INIT 0
 
 static int rtc_stm32_init(struct device *dev)
 {
@@ -259,8 +259,11 @@ static int rtc_stm32_init(struct device *dev)
 	clock_control_on(clk, (clock_control_subsys_t *) &cfg->pclken);
 
 	LL_PWR_EnableBkUpAccess();
-	LL_RCC_ForceBackupDomainReset();
-	LL_RCC_ReleaseBackupDomainReset();
+	if (RESET_RTC_IN_INIT)
+	{
+		LL_RCC_ForceBackupDomainReset();
+		LL_RCC_ReleaseBackupDomainReset();
+	}
 
 #if defined(CONFIG_COUNTER_RTC_STM32_CLOCK_LSI)
 
@@ -271,9 +274,9 @@ static int rtc_stm32_init(struct device *dev)
 
 #else /* CONFIG_COUNTER_RTC_STM32_CLOCK_LSE */
 
-#ifndef(CONFIG_SOC_SERIES_STM32F4X)
+#ifndef CONFIG_SOC_SERIES_STM32F4X
 	LL_RCC_LSE_SetDriveCapability(
-		CONFIG_COUNTER_RTC_STM32_LSE_DRIVE_STRENGTH);
+		LL_RCC_LSEDRIVE_HIGH);
 #endif /* !CONFIG_SOC_SERIES_STM32F4X */
 	LL_RCC_LSE_Enable();
 
@@ -286,14 +289,17 @@ static int rtc_stm32_init(struct device *dev)
 #endif /* CONFIG_COUNTER_RTC_STM32_CLOCK_SRC */
 
 	LL_RCC_EnableRTC();
+	if (RESET_RTC_IN_INIT)
+	{
 
-	if (LL_RTC_DeInit(RTC) != SUCCESS) {
-		return -EIO;
-	}
+		if (LL_RTC_DeInit(RTC) != SUCCESS) {
+			return -EIO;
+		}
 
-	if (LL_RTC_Init(RTC, ((LL_RTC_InitTypeDef *)
-			      &cfg->ll_rtc_config)) != SUCCESS) {
-		return -EIO;
+		if (LL_RTC_Init(RTC, ((LL_RTC_InitTypeDef *)
+			      	&cfg->ll_rtc_config)) != SUCCESS) {
+			return -EIO;
+		}
 	}
 
 #ifdef RTC_CR_BYPSHAD
