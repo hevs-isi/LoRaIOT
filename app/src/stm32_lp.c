@@ -7,6 +7,7 @@
 #include <logging/log.h>
 #include <pinmux/stm32/pinmux_stm32.h>
 #include <time.h>
+#include <gpio.h>
 
 LOG_MODULE_REGISTER(lp, LOG_LEVEL_DBG);
 
@@ -76,6 +77,13 @@ void stm32_sleep(u32_t duration)
 	LL_RTC_EnableWriteProtection(RTC);
 	LL_RCC_SetClkAfterWakeFromStop(LL_RCC_STOP_WAKEUPCLOCK_MSI);
 	HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
+
+	/*
+	HAL_PWREx_EnableGPIOPullDown(PWR_GPIO_C, 13);
+	HAL_PWREx_EnableGPIOPullDown(PWR_GPIO_D, 2);
+	HAL_PWREx_EnablePullUpPullDownConfig();
+	HAL_PWR_EnterSTANDBYMode();
+	*/
 	//HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE2);
 	//HAL_PWREx_DisableLowPowerRunMode();
 	//z_clock_idle_exit();
@@ -126,13 +134,13 @@ static const struct pin_config pinconf[] = {
 	{STM32_PIN_PB3 , INPUT_PULL_DOWN},
 	{STM32_PIN_PB4 , INPUT_PULL_DOWN},
 	{STM32_PIN_PB5 , INPUT_PULL_DOWN},
-	//{STM32_PIN_PB6 , INPUT_PULL_DOWN}, // SENSE_SCL
-	//{STM32_PIN_PB7 , INPUT_PULL_DOWN}, // SENSE_SDA
+	{STM32_PIN_PB6 , INPUT_PULL_DOWN},
+	{STM32_PIN_PB7 , INPUT_PULL_DOWN},
 	{STM32_PIN_PB8 , INPUT_PULL_DOWN},
 	{STM32_PIN_PB9 , INPUT_PULL_DOWN},
 	{STM32_PIN_PB10, INPUT_PULL_UP},
 	{STM32_PIN_PB11, INPUT_PULL_UP},
-	{STM32_PIN_PB12, INPUT_PULL_DOWN},
+	{STM32_PIN_PB12, INPUT_PULL_UP},
 	{STM32_PIN_PB13, INPUT_PULL_DOWN},
 	{STM32_PIN_PB14, INPUT_PULL_DOWN},
 	{STM32_PIN_PB15, INPUT_PULL_UP},
@@ -145,8 +153,8 @@ static const struct pin_config pinconf[] = {
 	{STM32_PIN_PC5 , INPUT_PULL_DOWN},
 	{STM32_PIN_PC6 , INPUT_PULL_DOWN},
 	{STM32_PIN_PC7 , INPUT_PULL_DOWN},
-	{STM32_PIN_PC8 , INPUT_PULL_DOWN},
-	{STM32_PIN_PC9 , INPUT_PULL_DOWN},
+	{STM32_PIN_PC8 , INPUT_PULL_UP},
+	{STM32_PIN_PC9 , INPUT_PULL_UP},
 	{STM32_PIN_PC10, INPUT_PULL_DOWN},
 	{STM32_PIN_PC11, INPUT_PULL_UP},
 	{STM32_PIN_PC12, INPUT_PULL_DOWN},
@@ -159,6 +167,28 @@ static const struct pin_config pinconf[] = {
 	{STM32_PIN_PH1 , INPUT_PULL_DOWN},
 	{STM32_PIN_PH3 , INPUT_PULL_DOWN},
 };
+
+static const struct pin_config pinconf_swd_off[] = {
+	{STM32_PIN_PA13, INPUT_PULL_UP},
+	{STM32_PIN_PA14, INPUT_PULL_DOWN},
+};
+
+static const struct pin_config pinconf_swd_on[] = {
+	{STM32_PIN_PA13, STM32_PINMUX_ALT_FUNC_0 | STM32_PUPDR_PULL_UP}, //SWDIO
+	{STM32_PIN_PA14, STM32_PINMUX_ALT_FUNC_0 | STM32_PUPDR_PULL_DOWN}, //SWDCLK
+};
+
+void stm32_swd_off(void)
+{
+	stm32_setup_pins(pinconf_swd_off, ARRAY_SIZE(pinconf_swd_off));
+}
+
+void stm32_swd_on(void)
+{
+	stm32_setup_pins(pinconf_swd_on, ARRAY_SIZE(pinconf_swd_on));
+}
+
+
 char buf[40];
 
 void lp_init(void)
@@ -192,6 +222,50 @@ enum power_states sys_suspend(s32_t ticks)
 	HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFI);
 
 	return SYS_POWER_STATE_AUTO;
+}
+
+void psu_5v(u32_t enable)
+{
+	int ret;
+	struct device *dev;
+
+	/* Power off gps backup */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOB_LABEL);
+	ret = gpio_pin_configure(dev, 8, (GPIO_DIR_OUT));
+	ret = gpio_pin_write(dev, 8, enable);
+}
+
+void psu_ind(u32_t enable)
+{
+	int ret;
+	struct device *dev;
+
+	/* Power off gps backup */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOB_LABEL);
+	ret = gpio_pin_configure(dev, 14, (GPIO_DIR_OUT));
+	ret = gpio_pin_write(dev, 14, enable);
+}
+
+void psu_charge(u32_t enable)
+{
+	int ret;
+	struct device *dev;
+
+	/* Power off gps backup */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOB_LABEL);
+	ret = gpio_pin_configure(dev, 13, (GPIO_DIR_OUT));
+	ret = gpio_pin_write(dev, 13, enable);
+}
+
+void psu_cpu_hp(u32_t enable)
+{
+	int ret;
+	struct device *dev;
+
+	/* Power off gps backup */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOA_LABEL);
+	ret = gpio_pin_configure(dev, 11, (GPIO_DIR_OUT));
+	ret = gpio_pin_write(dev, 11, enable);
 }
 
 void sys_resume(void)

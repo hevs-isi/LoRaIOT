@@ -52,6 +52,23 @@ change is detected (for instance, every 0.1V but at least twice a day).
 
 Downlink messages can be used to configure the various periods, modes, thresholds, ...
 
+## Timings
+
+All time are in unix time (seconds since january 1970) and represents the UTC
+time.
+
+Periodic measures are done at T_MEASURE interval, and send at T_RADIO_TX
+interval.
+
+The measure will be done at MEASURE_TS, when unix_tx % T_MEASURE == 0.
+Since all measures are synchronized in the network, sending the result over
+radio at the same time will almost guarantee collisions. We try to avoid
+collision using this pseudo-random generated time:
+
+RADIO_TS = MEASURE_TS + (HASH(DevAddr | measure_ts) % T_RADIO_TX)
+
+Since there is no need to 
+
 ## Wintering
 For this particular application, when the irrigation network is emptied for the
 winter period, the nodes are expected to stay in place and conserve as much

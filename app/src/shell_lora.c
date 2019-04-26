@@ -294,7 +294,6 @@ SHELL_CREATE_STATIC_SUBCMD_SET(lora_sub)
 	SHELL_CMD_ARG(udata, NULL, "no help", shell_send_udata, 0, 1),
 	SHELL_CMD_ARG(cdata, NULL, "no help", shell_send_cdata, 0, 1),
 	SHELL_CMD_ARG(quit, NULL, "no help", shell_quit, 0, 0),
-	SHELL_CMD_ARG(swd, NULL, "no help", shell_swd, 0, 0),
 	SHELL_SUBCMD_SET_END
 };
 

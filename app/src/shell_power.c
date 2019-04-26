@@ -46,7 +46,6 @@ static int shell_off(const struct shell *shell, size_t argc, char *argv[])
 	return 0;
 }
 
-
 static int shell_rtc(const struct shell *shell, size_t argc, char *argv[])
 {
 	ARG_UNUSED(argv);
@@ -92,12 +91,52 @@ static int shell_rtc(const struct shell *shell, size_t argc, char *argv[])
 	return 0;
 }
 
+static int shell_swd(const struct shell *shell, size_t argc, char *argv[])
+{
+	int enable;
+
+	if (argc <= 1)
+	{
+		return -1;
+	}
+
+	if (argv[1][0] == '0')
+	{
+		enable = 0;
+	}
+	else if (argv[1][0] == '1')
+	{
+		enable = 1;
+	}
+	else
+	{
+		shell_error(shell, "unknown arg:'%s'", argv[1]);
+		return -1;
+	}
+
+	if (enable)
+	{
+		shell_print(shell, "swd enable");
+		stm32_swd_on();
+	}
+	else
+	{
+		shell_print(shell, "swd disable");
+		stm32_swd_off();
+	}
+
+	return 0;
+}
+
 SHELL_CREATE_STATIC_SUBCMD_SET(power_sub)
 {
+	SHELL_CMD_ARG(sleep, NULL, "sleep [ms]", shell_sleep, 0, 0),
+	SHELL_CMD_ARG(rtc, NULL, "setup rtc date/time", shell_rtc, 0, 1),
+	SHELL_CMD_ARG(swd, NULL, "[0/1]disable or enable swd pins", shell_swd, 2, 0),
+
 	SHELL_CMD_ARG(off, NULL, "no help", shell_off, 0, 0),
 	SHELL_CMD_ARG(on, NULL, "no help", shell_on, 0, 0),
-	SHELL_CMD_ARG(sleep, NULL, "no help", shell_sleep, 0, 0),
-	SHELL_CMD_ARG(rtc, NULL, "no help", shell_rtc, 0, 1),
+
 	SHELL_SUBCMD_SET_END
 };
 

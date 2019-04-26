@@ -107,6 +107,10 @@ void main(void)
 
 	lp_init();
 	leds_init();
+	psu_5v(0);
+	psu_ind(0);
+	psu_charge(1);
+	psu_cpu_hp(1);
 	saved_config_init();
 	gps_off();
 
@@ -115,7 +119,9 @@ void main(void)
 	led0_set(0);
 	led1_set(0);
 
-	//stm32_sleep(10000);
+	stm32_swd_off();
+	stm32_sleep(10000);
+	stm32_swd_on();
 	//k_sleep(3000);
 	//stm32_sleep(0);
 
