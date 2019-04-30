@@ -21,7 +21,7 @@ static struct device *uart_dev;
 #define CRC16_INIT_VALUE    0xFFFF    // initial value for CRC algorithem
 #define CRC16_GOOD_VALUE    0x0F47    // constant compare value for check
 
-static bool CRC16_Check (u8_t* data, u16_t length, u16_t initVal)
+static bool CRC16_Check (const u8_t* data, u16_t length, u16_t initVal)
 {
     // calc ones complement of CRC16
     u16_t crc = ~crc16_ccitt(CRC16_INIT_VALUE, data, length);
