@@ -67,7 +67,8 @@ collision using this pseudo-random generated time:
 
 RADIO_TS = MEASURE_TS + (HASH(DevAddr | measure_ts) % T_RADIO_TX)
 
-Since there is no need to 
+There is no need to choose a cryptographically secure hash, but it's possible that
+a simple crc32 will produce similar pseudo-random values for similar mac addresses.
 
 ## Wintering
 For this particular application, when the irrigation network is emptied for the

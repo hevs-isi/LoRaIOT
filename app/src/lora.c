@@ -2,6 +2,11 @@
 #include <zephyr.h>
 
 #include <logging/log.h>
+#include <device.h>
+#include <counter.h>
+#include "global.h"
+#include <pinmux/stm32/pinmux_stm32.h>
+
 LOG_MODULE_REGISTER(lora, LOG_LEVEL_DBG);
 
 #ifdef CONFIG_LORA_IM881A
@@ -104,7 +109,49 @@ void lora_off()
 	ret = gpio_pin_configure(dev, 2, (GPIO_DIR_OUT));
 	ret = gpio_pin_write(dev, 2, 0);
 
+	/* configure uart pins as inputs */
 	dev = device_get_binding(DT_GPIO_STM32_GPIOA_LABEL);
 	ret = gpio_pin_configure(dev, 9, (GPIO_DIR_IN));
 	ret = gpio_pin_configure(dev, 10, (GPIO_DIR_IN));
+}
+
+static const struct pin_config pinconf_lora_uart[] = {
+	{STM32_PIN_PA9, STM32L4X_PINMUX_FUNC_PA9_USART1_TX},
+	{STM32_PIN_PA10, STM32L4X_PINMUX_FUNC_PA10_USART1_RX},
+};
+
+void lora_on()
+{
+	int ret;
+	struct device *dev;
+
+	/* Power on radio module */
+	dev = device_get_binding(DT_GPIO_STM32_GPIOD_LABEL);
+	ret = gpio_pin_configure(dev, 2, (GPIO_DIR_OUT));
+	ret = gpio_pin_write(dev, 2, 1);
+
+	stm32_setup_pins(pinconf_lora_uart, ARRAY_SIZE(pinconf_lora_uart));
+}
+
+void lora_time_AppTimeReq(u8_t AnsRequired)
+{
+	struct device *counter_dev;
+	counter_dev = device_get_binding(DT_RTC_0_NAME);
+	u32_t time = counter_read(counter_dev);
+
+	u8_t TokenReq = global.lora_TokenReq;
+	global.lora_TokenReq++;
+	global.lora_TokenReq&=0x1f;
+
+	const u8_t data[] =
+	{
+		0x01, // cid
+		time >> 24,
+		time >> 16,
+		time >> 8,
+		time >> 0,
+		(AnsRequired ? (1 << 5) : 0) | (TokenReq & 0x1f)
+	};
+
+	wimod_lorawan_send_u_radio_data(202, data, sizeof(data));
 }

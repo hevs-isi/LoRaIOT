@@ -14,7 +14,7 @@ LOG_MODULE_REGISTER(shell_lora, LOG_LEVEL_DBG);
 #include <wimod_lorawan_api.h>
 #endif
 #include "lora.h"
-#include "lora_shell.h"
+#include "shell_lora.h"
 
 void lora_shell_pm(void)
 {
@@ -34,10 +34,22 @@ static int shell_cmd_info(const struct shell *shell, size_t argc, char *argv[])
 	ARG_UNUSED(argv);
 	shell_connected(shell);
 
+	wimod_lorawan_get_device_info();
+
+	return 0;
+}
+
+static int shell_cmd_fw(const struct shell *shell, size_t argc, char *argv[])
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+	shell_connected(shell);
+
 	wimod_lorawan_get_firmware_version();
 
 	return 0;
 }
+
 
 static int shell_cmd_custom(const struct shell *shell, size_t argc, char *argv[])
 {
@@ -275,12 +287,42 @@ static int shell_quit(const struct shell *shell, size_t argc, char *argv[])
 	return 0;
 }
 
+static int shell_time(const struct shell *shell, size_t argc, char *argv[])
+{
+	shell_connected(shell);
+	int required;
+
+	if (argc <= 1)
+	{
+		return -1;
+	}
+
+	if (argv[1][0] == '0')
+	{
+		required = 0;
+	}
+	else if (argv[1][0] == '1')
+	{
+		required = 1;
+	}
+	else
+	{
+		shell_error(shell, "unknown arg:'%s'", argv[1]);
+		return -1;
+	}
+
+	lora_time_AppTimeReq(required);
+
+	return 0;
+}
+
 SHELL_CREATE_STATIC_SUBCMD_SET(lora_sub)
 {
 	SHELL_CMD_ARG(deveui, NULL, "read deveui", shell_cmd_deveui, 0, 1),
 	SHELL_CMD_ARG(set, NULL, "set APPEUI APPKEY", shell_cmd_setparam, 2, 2),
 	SHELL_CMD_ARG(join, NULL, "no help", shell_cmd_join, 0, 1),
-	SHELL_CMD_ARG(firmware, NULL, "no help", shell_cmd_info, 0, 1),
+	SHELL_CMD_ARG(info, NULL, "no help", shell_cmd_info, 0, 1),
+	SHELL_CMD_ARG(firmware, NULL, "no help", shell_cmd_fw, 0, 1),
 	SHELL_CMD_ARG(custom, NULL, "no help", shell_cmd_custom, 0, 1),
 	SHELL_CMD_ARG(getmode, NULL, "no help", shell_cmd_getmode, 0, 1),
 	SHELL_CMD_ARG(get_rtc, NULL, "no help", shell_cmd_get_rtc, 0, 1),
@@ -294,6 +336,7 @@ SHELL_CREATE_STATIC_SUBCMD_SET(lora_sub)
 	SHELL_CMD_ARG(udata, NULL, "no help", shell_send_udata, 0, 1),
 	SHELL_CMD_ARG(cdata, NULL, "no help", shell_send_cdata, 0, 1),
 	SHELL_CMD_ARG(quit, NULL, "no help", shell_quit, 0, 0),
+	SHELL_CMD_ARG(time, NULL, "time [0/1], will request server time (1 for mandatory response)", shell_time, 1, 1),
 	SHELL_SUBCMD_SET_END
 };
 
